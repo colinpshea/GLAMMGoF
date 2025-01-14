@@ -1,19 +1,19 @@
 #' Bootstrap Brier score and AUC fit statistics
 #'
-#' @description Bootstrap Brier score and AUC fit statistics (see `rms` package documentation for details) for generalized linear models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model. 
-#' @param nReps Desired number of bootstrap replicates. The default value is 100. 
-#' @param testModel A logistic regression model fitted to testData using `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm` (without random effects). 
+#' @description Bootstrap Brier score and AUC fit statistics (see `rms` package documentation for details) for generalized linear models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
+#' @param nReps Desired number of bootstrap replicates. The default value is 100.
+#' @param testModel A logistic regression model fitted to testData using `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm` (without random effects).
 #' @param testData A data frame with a binary response variable and continuous and/or categorical predictors variables.
 #' @param propTrain Proportion of testData that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining % is used to assess out-of-sample predictive performance.
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package.
-#' 
+#'
 #' This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in `glmmTMB`, but logitModel1 could also be a `glmer` model object (from `lme4`) and logitModel2 could also be `glm` model object:
 #'
 #' logitModel1 <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
-#' 
+#'
 #' logitModel2 <- glmmTMB(y ~ totalLengthcm + Zone, family = binomial, data = logitData)
 #'
-#' Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set: 
+#' Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
 #'
 #' BRIER_AUC(nReps = 100, testModel = logitModel, testData = logitData, propTrain = 0.8)
 #' @export
@@ -35,7 +35,7 @@ for (j in 1:nReps){
   if ("glmmTMB" %in% class(testModel)){
     if (sum(glmmTMB::ranef(testModel)=="list()")<2){
     train_pred <- train
-    train_pred[,which(names(train_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA 
+    train_pred[,which(names(train_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
     test_pred <- test
     test_pred[,which(names(test_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
     auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train_pred), y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
