@@ -5,9 +5,18 @@ Authors@R:
     person("Colin", "Shea", , "colin.shea@myfwc.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-2906-250X"))
 Description: Description: This package takes generalized linear models (with or without random effects) fit using various packages (glmmTMB, stats, lme4, MASS, etc.) to bootstrap fit statistics to assess in- and out-of-sample performance. For models with a continuous or integer response, the fit statistics are relative root mean squared error (RRMSE) or relative median absolute deviation. For binary response models, the fit statistics are Brier scores and AUC statistics. By default, 80% of the data are used for model fitting and to assess in-sample or training performance, and the remaining 20% are used to assess out-of-sample or testing performance. 
-License: `use_mit_license()`
+License: use_mit_license()
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
-Imports: dplyr, tidyr, ggplot2, rms, DHARMa, glmmTMB, magrittr, lme4, MASS
 LazyData: true
+Imports:
+dplyr,
+tidyr,
+ggplot2,
+rms,
+DHARMa,
+glmmTMB,
+magrittr,
+lme4,
+MASS
