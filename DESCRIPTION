@@ -13,7 +13,6 @@ LazyData: true
 Imports:
     dplyr
     ,tidyr
-    ,ggplot2
     ,rms
     ,Hmisc
     ,DHARMa
@@ -21,4 +20,5 @@ Imports:
     ,magrittr
     ,lme4
     ,MASS
+Depend: ggplot2
     
