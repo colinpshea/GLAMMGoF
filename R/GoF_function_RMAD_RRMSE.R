@@ -5,6 +5,14 @@
 #' @param testModel A regression model fit to testData in `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm`/`lm` (without random effects). The response variable can be continuous or an integer, and possible error distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
 #' @param testData A data frame with a continuous or integer response variable and continuous and/or categorical predictors.
 #' @param propTrain Proportion of testData that is used for model-fitting and in-sample predictive performance (the remaining % is used to assess out-of-sample predictive performance). The default value is 0.8.
+#' @importFrom magrittr %>%
+#' @importFrom ggplot2 ggplot
+#' @importFrom dplyr select group_by summarize mutate bind_rows
+#' @importFrom tidyr pivot_longer separate
+#' @importFrom DHARMa simulateResiduals
+#' @importFrom glmmTMB ranef glmmTMB
+#' @importFrom lme4 glmer lmer glmer.nb
+#' @importFrom MASS glm.nb
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package.
 #'
 #' This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a `glmer` model object (fitted using `glmer` or `glmer.nb` from `lme4`) and countModel2 could also be a `glm.nb` (from the `MASS` package) model object:
@@ -31,7 +39,7 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
     train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
     train <- testData[train_ind, ]
     test <-  testData[-train_ind, ]
-    if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB::glmmTMB(formula(testModel), family = family(testModel), data = train)}
+    if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
     if ("glmerMod" %in% class(testModel)) {
       if ((grepl("Negative Binomial", family(testModel)$family))) {
         try(m_train <- lme4::glmer.nb(formula(testModel), data = train))
@@ -42,22 +50,22 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
         try(m_train <- lme4::glmer(formula(testModel), family = family(testModel), data = train))
       }
     }
-    if ("lmerMod" %in% class(testModel)) {try(m_train <- lme4::lmer(formula(testModel), data = train))}
-    if ("negbin" %in% class(testModel)) {m_train <- MASS::glm.nb(formula(testModel), data = train)}
+    if ("lmerMod" %in% class(testModel)) {try(m_train <- lmer(formula(testModel), data = train))}
+    if ("negbin" %in% class(testModel)) {m_train <- glm.nb(formula(testModel), data = train)}
     if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
     if ("lm" %in% class(testModel)) {m_train <- lm(formula(testModel), data = train)}
     if ("glmmTMB" %in% class(testModel)) {
-      if (sum(glmmTMB::ranef(testModel)=="list()")<2){
+      if (sum(ranef(testModel)=="list()")<2){
       train_pred <- train
-      train_pred[,which(names(train_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
+      train_pred[,which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
       test_pred <- test
-      test_pred[,which(names(test_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
+      test_pred[,which(names(test_pred) %in% names(ranef(testModel)$cond))] <- NA
       cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
       cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
       cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
       cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
       }
-       if (sum(glmmTMB::ranef(testModel)=="list()")==2){
+       if (sum(ranef(testModel)=="list()")==2){
           cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
           cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
           cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
@@ -79,13 +87,13 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
   }
   results_list <- list(train_RRMSE = cost_train_fin_RRMSE, test_RRMSE = cost_test_fin_RRMSE, train_RMAD = cost_train_fin_RMAD, test_RMAD = cost_test_fin_RMAD)
 
-  results_df <- dplyr::bind_rows(results_list, .id = "column_label") %>% dplyr::mutate(simRep = 1:n()) %>% tidyr::pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% tidyr::separate(metric, into = c("Group", "Metric")) %>% dplyr::mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("RRMSE", "RMAD"), labels = c("RRMSE", "RMAD")))
+  results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% tidyr::separate(metric, into = c("Group", "Metric")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("RRMSE", "RMAD"), labels = c("RRMSE", "RMAD")))
 
-  results_summary <- results_df %>% dplyr::group_by(Group, Metric) %>% dplyr::summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
+  results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
 
-  dharmaPlot <- DHARMa::simulateResiduals(n = 1000, testModel, plot = T)
+  dharmaPlot <- simulateResiduals(n = 1000, testModel, plot = T)
 
-  results_plot <- ggplot2::ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric, scales = "free") + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + theme(panel.spacing = unit(1.5, "lines"))
+  results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric, scales = "free") + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + theme(panel.spacing = unit(1.5, "lines"))
 
   return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary, dharmaPlot = dharmaPlot))
 }
