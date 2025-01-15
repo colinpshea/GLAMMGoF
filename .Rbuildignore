@@ -1,4 +1,2 @@
-^renv$
-^renv\.lock$
 ^GLMMGoF\.Rproj$
 ^\.Rproj\.user$
