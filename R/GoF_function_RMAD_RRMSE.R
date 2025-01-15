@@ -39,15 +39,15 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
     train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
     train <- testData[train_ind, ]
     test <-  testData[-train_ind, ]
-    if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
+    if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB::glmmTMB(formula(testModel), family = family(testModel), data = train)}
     if ("glmerMod" %in% class(testModel)) {
       if ((grepl("Negative Binomial", family(testModel)$family))) {
-        try(m_train <- lme4::glmer.nb(formula(testModel), data = train))
+        try(m_train <- glmer.nb(formula(testModel), data = train))
       }
     }
     if ("glmerMod" %in% class(testModel)) {
       if (!(grepl("Negative Binomial", family(testModel)$family))) {
-        try(m_train <- lme4::glmer(formula(testModel), family = family(testModel), data = train))
+        try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))
       }
     }
     if ("lmerMod" %in% class(testModel)) {try(m_train <- lmer(formula(testModel), data = train))}

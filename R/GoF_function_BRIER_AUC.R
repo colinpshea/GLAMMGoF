@@ -37,7 +37,7 @@ for (j in 1:nReps){
   train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
   train <- testData[train_ind, ]
   test <-  testData[-train_ind, ]
-  if ("glmmTMB" %in% class(testModel)){m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
+  if ("glmmTMB" %in% class(testModel)){m_train <- glmmTMB::glmmTMB(formula(testModel), family = family(testModel), data = train)}
   if ("glmerMod" %in% class(testModel)) {try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))}
   if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
   if ("glmmTMB" %in% class(testModel)){
