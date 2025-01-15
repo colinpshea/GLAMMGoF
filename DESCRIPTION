@@ -11,12 +11,13 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
 LazyData: true
 Imports:
-dplyr,
-tidyr,
-ggplot2,
-rms,
-DHARMa,
-glmmTMB,
-magrittr,
-lme4,
-MASS
+    dplyr
+    ,tidyr
+    ,ggplot2
+    ,rms
+    ,DHARMa
+    ,glmmTMB
+    ,magrittr
+    ,lme4
+    ,MASS
+    
