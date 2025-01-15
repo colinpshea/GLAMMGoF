@@ -15,6 +15,7 @@ Imports:
     ,tidyr
     ,ggplot2
     ,rms
+    ,Hmisc
     ,DHARMa
     ,glmmTMB
     ,magrittr
