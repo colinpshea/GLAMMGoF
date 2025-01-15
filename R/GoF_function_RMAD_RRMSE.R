@@ -5,14 +5,6 @@
 #' @param testModel A regression model fit to testData in `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm`/`lm` (without random effects). The response variable can be continuous or an integer, and possible error distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
 #' @param testData A data frame with a continuous or integer response variable and continuous and/or categorical predictors.
 #' @param propTrain Proportion of testData that is used for model-fitting and in-sample predictive performance (the remaining % is used to assess out-of-sample predictive performance). The default value is 0.8.
-#' @importFrom magrittr %>%
-#' @importFrom ggplot2 ggplot
-#' @importFrom dplyr select group_by summarize mutate bind_rows
-#' @importFrom tidyr pivot_longer separate
-#' @importFrom DHARMa simulateResiduals
-#' @importFrom glmmTMB ranef glmmTMB
-#' @importFrom lme4 glmer lmer glmer.nb
-#' @importFrom MASS glm.nb
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package.
 #'
 #' This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a `glmer` model object (fitted using `glmer` or `glmer.nb` from `lme4`) and countModel2 could also be a `glm.nb` (from the `MASS` package) model object:
@@ -24,6 +16,14 @@
 #' Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
 #'
 #' RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8)
+#' @importFrom magrittr %>%
+#' @importFrom ggplot2 ggplot
+#' @importFrom dplyr select group_by summarize mutate bind_rows
+#' @importFrom tidyr pivot_longer separate
+#' @importFrom DHARMa simulateResiduals
+#' @importFrom glmmTMB ranef glmmTMB
+#' @importFrom lme4 glmer lmer glmer.nb
+#' @importFrom MASS glm.nb
 #' @export
 RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8){
   fit_cost_rrmse <- function(y, yhat){sqrt(mean((y - yhat)^2))/mean(y)*100}
