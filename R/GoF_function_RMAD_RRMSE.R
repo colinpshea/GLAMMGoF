@@ -79,13 +79,13 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
   }
   results_list <- list(train_RRMSE = cost_train_fin_RRMSE, test_RRMSE = cost_test_fin_RRMSE, train_RMAD = cost_train_fin_RMAD, test_RMAD = cost_test_fin_RMAD)
 
-  results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Group", "Metric")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("RRMSE", "RMAD"), labels = c("RRMSE", "RMAD")))
+  results_df <- dplyr::bind_rows(results_list, .id = "column_label") %>% dplyr::mutate(simRep = 1:n()) %>% tidyr::pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% tidyr::separate(metric, into = c("Group", "Metric")) %>% dplyr::mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("RRMSE", "RMAD"), labels = c("RRMSE", "RMAD")))
 
-  results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
+  results_summary <- results_df %>% dplyr::group_by(Group, Metric) %>% dplyr::summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
 
   dharmaPlot <- DHARMa::simulateResiduals(n = 1000, testModel, plot = T)
 
-  results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric, scales = "free") + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + theme(panel.spacing = unit(1.5, "lines"))
+  results_plot <- ggplot2::ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric, scales = "free") + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + theme(panel.spacing = unit(1.5, "lines"))
 
   return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary, dharmaPlot = dharmaPlot))
 }
