@@ -17,7 +17,7 @@
 #'
 #' RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8)
 #' @importFrom magrittr %>%
-#' @importFrom ggplot2 ggplot aes geom_histogram facet_grid
+#' @importFrom ggplot2 ggplot aes geom_histogram geom_freqpoly facet_grid
 #' @importFrom dplyr select group_by summarize summarise mutate bind_rows n
 #' @importFrom tidyr pivot_longer pivot_wider separate
 #' @importFrom DHARMa simulateResiduals
