@@ -73,7 +73,7 @@ for (j in 1:nReps){
 }
 results_list <- list(auc_train = unname(auc_train), brier_train = unname(brier_train), auc_test = unname(auc_test), brier_test = unname(brier_test))
 
-results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Metric", "Group")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("auc", "brier"), labels = c("AUC statistic", "Brier score")))
+results_df <- bind_rows(results_list, .id = "column_label") %>% dplyr::mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Metric", "Group")) %>% dplyr::mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("auc", "brier"), labels = c("AUC statistic", "Brier score")))
 
 results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
 
