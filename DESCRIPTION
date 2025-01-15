@@ -14,7 +14,6 @@ Imports:
     dplyr
     ,tidyr
     ,rms
-    ,Hmisc
     ,DHARMa
     ,glmmTMB
     ,magrittr
