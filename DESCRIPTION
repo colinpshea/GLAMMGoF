@@ -13,11 +13,10 @@ LazyData: true
 Imports:
     dplyr
     ,tidyr
-    ,rms
-    ,DHARMa
-    ,glmmTMB
+    ,rms (>= 6.0-0)
+    ,DHARMa (>= 0.4.0)
+    ,glmmTMB  (>= 1.1.5)
     ,magrittr
     ,lme4
     ,MASS
 Depends: ggplot2
-    
