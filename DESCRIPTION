@@ -20,5 +20,5 @@ Imports:
     ,magrittr
     ,lme4
     ,MASS
-Depend: ggplot2
+Depends: ggplot2
     
