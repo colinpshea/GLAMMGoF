@@ -18,8 +18,8 @@
 #' BRIER_AUC(nReps = 100, testModel = logitModel, testData = logitData, propTrain = 0.8)
 #' @importFrom magrittr %>%
 #' @importFrom ggplot2 ggplot
-#' @importFrom dplyr select group_by summarize mutate bind_rows
-#' @importFrom tidyr pivot_longer separate
+#' @importFrom dplyr select group_by summarize summarise mutate bind_rows
+#' @importFrom tidyr pivot_longer pivot_wider separate
 #' @importFrom DHARMa simulateResiduals
 #' @importFrom rms val.prob
 #' @importFrom glmmTMB ranef glmmTMB
@@ -37,21 +37,21 @@ for (j in 1:nReps){
   train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
   train <- testData[train_ind, ]
   test <-  testData[-train_ind, ]
-  if ("glmmTMB" %in% class(testModel)){m_train <- glmmTMB::glmmTMB(formula(testModel), family = family(testModel), data = train)}
+  if ("glmmTMB" %in% class(testModel)){m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
   if ("glmerMod" %in% class(testModel)) {try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))}
   if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
   if ("glmmTMB" %in% class(testModel)){
-    if (sum(glmmTMB::ranef(testModel)=="list()")<2){
+    if (sum(ranef(testModel)=="list()")<2){
     train_pred <- train
-    train_pred[,which(names(train_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
+    train_pred[,which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
     test_pred <- test
-    test_pred[,which(names(test_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
+    test_pred[,which(names(test_pred) %in% names(ranef(testModel)$cond))] <- NA
     auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train_pred), y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
     brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train_pred), y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
     auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
     brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
   }
-      if (sum(glmmTMB::ranef(testModel)=="list()")==2){
+      if (sum(ranef(testModel)=="list()")==2){
     auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
   brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
   auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
@@ -73,7 +73,7 @@ for (j in 1:nReps){
 }
 results_list <- list(auc_train = unname(auc_train), brier_train = unname(brier_train), auc_test = unname(auc_test), brier_test = unname(brier_test))
 
-results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% tidyr::separate(metric, into = c("Metric", "Group")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("auc", "brier"), labels = c("AUC statistic", "Brier score")))
+results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Metric", "Group")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("auc", "brier"), labels = c("AUC statistic", "Brier score")))
 
 results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
 

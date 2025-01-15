@@ -18,8 +18,8 @@
 #' RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8)
 #' @importFrom magrittr %>%
 #' @importFrom ggplot2 ggplot
-#' @importFrom dplyr select group_by summarize mutate bind_rows
-#' @importFrom tidyr pivot_longer separate
+#' @importFrom dplyr select group_by summarize summarise mutate bind_rows
+#' @importFrom tidyr pivot_longer pivot_wider separate
 #' @importFrom DHARMa simulateResiduals
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
@@ -39,7 +39,7 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
     train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
     train <- testData[train_ind, ]
     test <-  testData[-train_ind, ]
-    if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB::glmmTMB(formula(testModel), family = family(testModel), data = train)}
+    if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
     if ("glmerMod" %in% class(testModel)) {
       if ((grepl("Negative Binomial", family(testModel)$family))) {
         try(m_train <- glmer.nb(formula(testModel), data = train))
@@ -55,17 +55,17 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
     if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
     if ("lm" %in% class(testModel)) {m_train <- lm(formula(testModel), data = train)}
     if ("glmmTMB" %in% class(testModel)) {
-      if (sum(glmmTMB::ranef(testModel)=="list()")<2){
+      if (sum(ranef(testModel)=="list()")<2){
       train_pred <- train
-      train_pred[,which(names(train_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
+      train_pred[,which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
       test_pred <- test
-      test_pred[,which(names(test_pred) %in% names(glmmTMB::ranef(testModel)$cond))] <- NA
+      test_pred[,which(names(test_pred) %in% names(ranef(testModel)$cond))] <- NA
       cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
       cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
       cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
       cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
       }
-       if (sum(glmmTMB::ranef(testModel)=="list()")==2){
+       if (sum(ranef(testModel)=="list()")==2){
           cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
           cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
           cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
@@ -87,7 +87,7 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
   }
   results_list <- list(train_RRMSE = cost_train_fin_RRMSE, test_RRMSE = cost_test_fin_RRMSE, train_RMAD = cost_train_fin_RMAD, test_RMAD = cost_test_fin_RMAD)
 
-  results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% tidyr::separate(metric, into = c("Group", "Metric")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("RRMSE", "RMAD"), labels = c("RRMSE", "RMAD")))
+  results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Group", "Metric")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("RRMSE", "RMAD"), labels = c("RRMSE", "RMAD")))
 
   results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
 
