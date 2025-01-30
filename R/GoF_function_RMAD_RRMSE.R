@@ -31,8 +31,8 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
   cost_train_fin_RRMSE = NULL
   cost_test_fin_RMAD = NULL
   cost_train_fin_RMAD = NULL
-  testResp <- function(data){length(unique(data))==2 && all(data %in% c(0, 1))}
-  stopifnot("Response variable is binary! Use BRIER_AUC() instead" = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,all.vars(formula(testModel))[1]])))=="FALSE")
+#  testResp <- function(data){length(unique(data))==2 && all(data %in% c(0, 1))}
+#  stopifnot("Response variable is binary! Use BRIER_AUC() instead" = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,all.vars(formula(testModel))[1]])))=="FALSE")
   for (j in 1:nReps){
     smp_size <- floor(propTrain*nrow(testData))
     train_ind <- sample(seq_len(nrow(testData)), size = smp_size)

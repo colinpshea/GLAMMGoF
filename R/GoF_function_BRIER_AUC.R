@@ -29,8 +29,8 @@ auc_train = NULL
 brier_train = NULL
 auc_test = NULL
 brier_test = NULL
-testResp <- function(data){length(unique(data))==2 && all(data %in% c(0, 1))}
-stopifnot("Response variable is not binary! Use RRMSE_RMAD() instead" = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,all.vars(formula(testModel))[1]])))=="TRUE")
+#testResp <- function(data){length(unique(data))==2 && all(data %in% c(0, 1))}
+#stopifnot("Response variable is not binary! Use RRMSE_RMAD() instead" = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,all.vars(formula(testModel))[1]])))=="TRUE")
 for (j in 1:nReps){
   smp_size <- floor(propTrain*nrow(testData))
   train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
