@@ -40,7 +40,7 @@ for (j in 1:nReps){
   if ("glmerMod" %in% class(testModel)) {try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))}
   if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
   if ("glmmTMB" %in% class(testModel)){
-    if (sum(ranef(testModel)=="list()")<2){
+    if (sum(ranef(testModel)=="list()")<3){
     train_pred <- train
     train_pred[,which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
     test_pred <- test
@@ -50,7 +50,7 @@ for (j in 1:nReps){
     auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
     brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
   }
-      if (sum(ranef(testModel)=="list()")==2){
+      if (sum(ranef(testModel)=="list()")==3){
     auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
   brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
   auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]

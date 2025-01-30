@@ -54,7 +54,7 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
     if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
     if ("lm" %in% class(testModel)) {m_train <- lm(formula(testModel), data = train)}
     if ("glmmTMB" %in% class(testModel)) {
-      if (sum(ranef(testModel)=="list()")<2){
+      if (sum(ranef(testModel)=="list()")<3){
       train_pred <- train
       train_pred[,which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
       test_pred <- test
@@ -64,7 +64,7 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
       cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
       cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
       }
-       if (sum(ranef(testModel)=="list()")==2){
+       if (sum(ranef(testModel)=="list()")==3){
           cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
           cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
           cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
