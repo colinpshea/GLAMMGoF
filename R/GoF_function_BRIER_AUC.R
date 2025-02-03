@@ -5,6 +5,7 @@
 #' @param testModel A logistic regression model fitted to testData using `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm` (without random effects).
 #' @param testData A data frame with a binary response variable and continuous and/or categorical predictors variables.
 #' @param propTrain Proportion of testData that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining % is used to assess out-of-sample predictive performance.
+#' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is "Yes".
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package.
 #'
 #' This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in `glmmTMB`, but logitModel1 could also be a `glmer` model object (from `lme4`) and logitModel2 could also be `glm` model object:
@@ -24,7 +25,7 @@
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @export
-BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8){
+BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = "Yes"){
 auc_train = NULL
 brier_train = NULL
 auc_test = NULL

@@ -4,7 +4,13 @@
 \alias{BRIER_AUC}
 \title{Bootstrap Brier score and AUC fit statistics}
 \usage{
-BRIER_AUC(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8)
+BRIER_AUC(
+  nReps = 100,
+  testModel = NULL,
+  testData = NULL,
+  propTrain = 0.8,
+  DHARMaPlot = "Yes"
+)
 }
 \arguments{
 \item{nReps}{Desired number of bootstrap replicates. The default value is 100.}
@@ -14,6 +20,8 @@ BRIER_AUC(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8)
 \item{testData}{A data frame with a binary response variable and continuous and/or categorical predictors variables.}
 
 \item{propTrain}{Proportion of testData that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining \% is used to assess out-of-sample predictive performance.}
+
+\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is "Yes".}
 }
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package.
