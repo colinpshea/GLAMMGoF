@@ -77,10 +77,10 @@ results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 
 
 results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
 
+results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric) + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + scale_x_continuous(limits = c(0,1), breaks = seq(0,1, 0.20), expand = expansion(add = c(0.05,0.05))) + theme(panel.spacing = unit(1.5, "lines"))
+
 if (DHARMaPlot=="Yes"){
   dharmaPlot <- simulateResiduals(n = 1000, testModel, plot = T)
-
-  results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric) + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + scale_x_continuous(limits = c(0,1), breaks = seq(0,1, 0.20), expand = expansion(add = c(0.05,0.05))) + theme(panel.spacing = unit(1.5, "lines"))
 
 return(list(brier_auc_results = results_df, brier_auc_hist = results_plot, brier_auc_summary = results_summary, dharmaPlot = dharmaPlot))
 }
