@@ -1,6 +1,6 @@
 #' Bootstrap Brier score and AUC fit statistics
 #'
-#' @description Bootstrap Brier score and AUC fit statistics (see `rms` package documentation for details) for generalized linear models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
+#' @description Bootstrap Brier score and AUC fit statistics (see `rms` package documentation for details) for generalized linear models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, acrfsamooss all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
 #' @param nReps Desired number of bootstrap replicates. The default value is 100.
 #' @param testModel A logistic regression model fitted to testData using `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm` (without random effects).
 #' @param testData A data frame with a binary response variable and continuous and/or categorical predictors variables.
