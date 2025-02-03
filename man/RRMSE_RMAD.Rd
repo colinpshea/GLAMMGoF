@@ -24,7 +24,7 @@ RRMSE_RMAD(
 \item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is "Yes".}
 }
 \value{
-This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package.
+This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = "No", then \code{simulateResiduals()} isn't used to assess the model's residuals and only three of the four objects are returned.
 
 This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a \code{glmer} model object (fitted using \code{glmer} or \code{glmer.nb} from \code{lme4}) and countModel2 could also be a \code{glm.nb} (from the \code{MASS} package) model object:
 
@@ -34,7 +34,7 @@ countModel2 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, data
 
 Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
 
-RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8)
+RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8, DHARMaPlot = "Yes")
 }
 \description{
 Bootstrap RRMSE and RMAD fit statistics for generalized linear models with continuous or integer response variables and with or without random effects. The fit statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, and relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100. The RMAD is generally less sensitive than RRMSE to extreme values.

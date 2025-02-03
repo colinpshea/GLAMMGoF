@@ -85,7 +85,7 @@ if (DHARMaPlot=="Yes"){
 return(list(brier_auc_results = results_df, brier_auc_hist = results_plot, brier_auc_summary = results_summary, dharmaPlot = dharmaPlot))
 }
 if (DHARMaPlot=="No"){
-  return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary))
+  return(list(brier_auc_results = results_df, brier_auc_hist = results_plot, brier_auc_summary = results_summary))
   }
 }
 
