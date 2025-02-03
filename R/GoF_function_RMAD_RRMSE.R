@@ -6,7 +6,7 @@
 #' @param testData A data frame with a continuous or integer response variable and continuous and/or categorical predictors.
 #' @param propTrain Proportion of testData that is used for model-fitting and in-sample predictive performance (the remaining % is used to assess out-of-sample predictive performance). The default value is 0.8.
 #' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is "Yes".
-#' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package.
+#' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = "No", then `simulateResiduals()` isn't used to assess the model's residuals and only three of the four objects are returned.
 #'
 #' This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a `glmer` model object (fitted using `glmer` or `glmer.nb` from `lme4`) and countModel2 could also be a `glm.nb` (from the `MASS` package) model object:
 #'
@@ -16,7 +16,7 @@
 #'
 #' Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
 #'
-#' RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8)
+#' RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8, DHARMaPlot = "Yes")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr select group_by summarize summarise mutate bind_rows n
 #' @importFrom tidyr pivot_longer pivot_wider separate
