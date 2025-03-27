@@ -34,7 +34,7 @@ countModel2 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, data
 
 Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
 
-RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8, DHARMaPlot = "Yes")
+RRMSE_RMAD(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = "Yes")
 }
 \description{
 Bootstrap RRMSE and RMAD fit statistics for generalized linear models with continuous or integer response variables and with or without random effects. The fit statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, and relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100. The RMAD is generally less sensitive than RRMSE to extreme values.
