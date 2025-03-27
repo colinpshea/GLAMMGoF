@@ -16,7 +16,7 @@
 #'
 #' Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
 #'
-#' RRMSE_RMAD(nReps = 100, testModel = NULL, testData = countData, propTrain = 0.8, DHARMaPlot = "Yes")
+#' RRMSE_RMAD(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = "Yes")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr select group_by summarize summarise mutate bind_rows n
 #' @importFrom tidyr pivot_longer pivot_wider separate
