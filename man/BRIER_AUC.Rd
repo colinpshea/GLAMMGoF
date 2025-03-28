@@ -37,5 +37,5 @@ Bootstrapping the fit statistics requires specifying the data and model being te
 BRIER_AUC(nReps = 100, testModel = logitModel, testData = logitData, propTrain = 0.8, DHARMaPlot = "Yes")
 }
 \description{
-Bootstrap Brier score and AUC fit statistics (see \code{rms} package documentation for details) for generalized linear models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, acrfsamooss all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
+Bootstrap Brier score and AUC fit statistics (see \code{rms} package documentation for details) for generalized linear models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
 }
