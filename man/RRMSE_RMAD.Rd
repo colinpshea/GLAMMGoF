@@ -14,7 +14,7 @@ RRMSE_RMAD(
 )
 }
 \arguments{
-\item{nReps}{Desired number of bootstrap replicates. The default value is 100.}
+\item{nReps}{Desired number of bootstrap replicates. The default value is 100, but this number should be at least 1000 in practice.}
 
 \item{testModel}{A regression model fit to testData in \code{glmmTMB} (with or without random effects), \code{glmer} (with random effects), or \code{glm}/\code{lm} (without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
 
@@ -33,9 +33,9 @@ countModel1 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + (1|
 
 countModel2 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, data = countDat, family = nbinom2)
 
-Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
+Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is TRUE), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
 
-RRMSE_RMAD(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE)
+RRMSE_RMAD(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000)
 }
 \description{
 Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics for generalized linear models with continuous or integer response variables and with or without random effects. The performance statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. The RMAD is generally less sensitive than RRMSE to extreme values.
