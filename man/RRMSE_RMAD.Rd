@@ -20,12 +20,12 @@ RRMSE_RMAD(
 
 \item{testData}{A data frame with a continuous or integer response variable and continuous and/or categorical predictors.}
 
-\item{propTrain}{Proportion of testData that is used for model-fitting and in-sample predictive performance (the remaining \% is used to assess out-of-sample predictive performance). The default value is 0.8.}
+\item{propTrain}{Proportion of \code{testData} that is used for model-fitting and in-sample predictive performance (the remaining \% is used to assess out-of-sample predictive performance). The default value is 0.8.}
 
-\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is TRUE. You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
+\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is \code{TRUE}. You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
 }
 \value{
-This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = FALSE, then \code{simulateResiduals()} isn't used to assess the model's residuals, and only three of the four objects are returned.
+This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals, and only three of the four objects are returned.
 
 This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a \code{glmer} model object (fitted using \code{glmer} or \code{glmer.nb} from \code{lme4}) and countModel2 could also be a \code{glm.nb} (from the \code{MASS} package) model object:
 
@@ -33,7 +33,7 @@ countModel1 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + (1|
 
 countModel2 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, data = countDat, family = nbinom2)
 
-Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is TRUE), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
+Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is \code{TRUE}), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
 
 RRMSE_RMAD(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000)
 }

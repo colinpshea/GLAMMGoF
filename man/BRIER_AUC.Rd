@@ -20,12 +20,12 @@ BRIER_AUC(
 
 \item{testData}{A data frame with a binary response variable and continuous and/or categorical predictors variables.}
 
-\item{propTrain}{Proportion of testData that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining \% is used to assess out-of-sample predictive performance.}
+\item{propTrain}{Proportion of \code{testData} that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining \% is used to assess out-of-sample predictive performance.}
 
-\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is TRUE. You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
+\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is \code{TRUE}. You can also specify \code{DHARMaReps} if you want something other than the default of 1000 simulation replicates.}
 }
 \value{
-This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = FALSE, then \code{simulateResiduals()} isn't used to assess the model's residuals and only three of the four objects are returned.
+This function returns four objects: a data frame with all of the bootstrapping results (i.e., all \code{nReps} bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals and only three of the four objects are returned.
 
 This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in \code{glmmTMB}, but logitModel1 could also be a \code{glmer} model object (from \code{lme4}) and logitModel2 could also be \code{glm} model object:
 
