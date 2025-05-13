@@ -1,12 +1,12 @@
-#' Bootstrap RRMSE and RMAD fit statistics
+#' Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics
 #'
-#' @description Bootstrap RRMSE, RMAD, and RBIAS fit statistics for generalized linear models with continuous or integer response variables and with or without random effects. The fit statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as (mean((observed - predicted)))/mean(observed)*100. The RMAD is generally less sensitive than RRMSE to extreme values.
+#' @description Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics for generalized linear models with continuous or integer response variables and with or without random effects. The performance statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. The RMAD is generally less sensitive than RRMSE to extreme values.
 #' @param nReps Desired number of bootstrap replicates. The default value is 100.
-#' @param testModel A regression model fit to testData in `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm`/`lm` (without random effects). The response variable can be continuous or an integer, and possible error distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
+#' @param testModel A regression model fit to testData in `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm`/`lm` (without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
 #' @param testData A data frame with a continuous or integer response variable and continuous and/or categorical predictors.
 #' @param propTrain Proportion of testData that is used for model-fitting and in-sample predictive performance (the remaining % is used to assess out-of-sample predictive performance). The default value is 0.8.
-#' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is "Yes".
-#' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = "No", then `simulateResiduals()` isn't used to assess the model's residuals and only three of the four objects are returned.
+#' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is TRUE. You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
+#' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = FALSE, then `simulateResiduals()` isn't used to assess the model's residuals, and only three of the four objects are returned.
 #'
 #' This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a `glmer` model object (fitted using `glmer` or `glmer.nb` from `lme4`) and countModel2 could also be a `glm.nb` (from the `MASS` package) model object:
 #'
@@ -16,7 +16,7 @@
 #'
 #' Bootstrapping the fit statistics requires specifying the data and model being tested, the desired number of bootstrap replicates, and the proportion of data used in the training (in-sample performance) data set:
 #'
-#' RRMSE_RMAD(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = "Yes")
+#' RRMSE_RMAD(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE)
 #' @importFrom magrittr %>%
 #' @importFrom dplyr select group_by summarize summarise mutate bind_rows n
 #' @importFrom tidyr pivot_longer pivot_wider separate
@@ -25,7 +25,7 @@
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
 #' @export
-RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = "Yes"){
+RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   fit_cost_rrmse <- function(y, yhat){sqrt(mean((y - yhat)^2))/mean(y)*100}
   fit_cost_rmad <- function(y, yhat){median(abs((y - yhat)))/mean(y)*100}
   fit_cost_rbias <- function(y, yhat){(mean((y - yhat)))/mean(y)*100}
@@ -104,11 +104,11 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
 
 results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
 
-  if (DHARMaPlot=="Yes"){
-    dharmaPlot <- simulateResiduals(n = 1000, testModel, plot = T)
+  if (DHARMaPlot==TRUE){
+    dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel, plot = T)
   return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary, dharmaPlot = dharmaPlot))
   }
-  if (DHARMaPlot=="No"){
+  if (DHARMaPlot==FALSE){
   return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary))
   }
 }
