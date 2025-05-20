@@ -27,7 +27,7 @@ BRIER_AUC(
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all \code{nReps} bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals and only three of the four objects are returned.
 
-This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in \code{glmmTMB}, but logitModel1 could also be a \code{glmer} model object (from \code{lme4}) and logitModel2 could also be \code{glm} model object:
+This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in \code{glmmTMB}, but logitModel1 could also be a \code{glmer} (from \code{lme4}) or gam (from \code{mgcv}) model object and logitModel2 could also be \code{glm} or \code{gam} (from \code{mgcv}) model object:
 
 logitModel1 <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
 
@@ -38,5 +38,5 @@ Bootstrapping the performance statistics requires specifying the data and model 
 BRIER_AUC(nReps = 100, testModel = logitModel, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000)
 }
 \description{
-Bootstrap Brier score and AUC fit statistics (see \code{rms} package documentation for details) for generalized linear models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
+Bootstrap Brier score and AUC fit statistics (see \code{rms} package documentation for details) for generalized linear and generalized additive models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
 }
