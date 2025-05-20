@@ -41,7 +41,7 @@ for (j in 1:nReps){
   if ("glmmTMB" %in% class(testModel)){m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
   if ("gam" %in% class(testModel)){m_train <- gam(formula(testModel), family = family(testModel), data = train)}
   if ("glmerMod" %in% class(testModel)) {try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))}
-  if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
+  if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
   if ("glmmTMB" %in% class(testModel)){
     if (sum(ranef(testModel)=="list()")<length(ranef(testModel))){
       train_pred <- train

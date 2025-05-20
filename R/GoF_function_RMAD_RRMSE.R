@@ -57,8 +57,8 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
     }
     if ("lmerMod" %in% class(testModel)) {try(m_train <- lmer(formula(testModel), data = train))}
     if ("negbin" %in% class(testModel)) {m_train <- glm.nb(formula(testModel), data = train)}
-    if ("glm" %in% class(testModel)) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
-    if ("lm" %in% class(testModel)) {m_train <- lm(formula(testModel), data = train)}
+    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
+    if ("lm" %in% class(testModel) & !("gam" %in% class(testModel))) {m_train <- lm(formula(testModel), data = train)}
     if ("glmmTMB" %in% class(testModel)) {
       if (sum(ranef(testModel)=="list()")<length(ranef(testModel))){
       train_pred <- train
