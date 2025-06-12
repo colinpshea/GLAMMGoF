@@ -79,8 +79,10 @@ for (j in 1:nReps){
         brier_train[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
         auc_test[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
         brier_test[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-      }
-      if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) == 0){
+    }
+  }
+  if ("gam" %in% class(testModel)){
+        if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) == 0){
         auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
         brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
         auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]

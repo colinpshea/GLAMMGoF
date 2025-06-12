@@ -98,7 +98,9 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
         cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = paste0(re_name), newdata = test))
         cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", newdata = train))
         cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = paste0(re_name), newdata = test))
-              }
+      }
+    }
+    if ("gam" %in% class(testModel)){
       if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) == 0){
         cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
         cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
@@ -106,7 +108,7 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
         cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
         cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
         cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        }
+       }
     }
     if (any(c("glmerMod", "lmerMod") %in% class(testModel))){
       cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = train))
