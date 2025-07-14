@@ -8,7 +8,7 @@
 #' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is `TRUE`. You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = `FALSE`, then `simulateResiduals()` isn't used to assess the model's residuals, and only three of the four objects are returned.
 #'
-#' This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a `glmer` (fitted using `glmer` or `glmer.nb` from `lme4`) or `gam` (fitted using `mgcv`) model object, and countModel2 could also be a `glm.nb` (from the `MASS` package) or `gam` model object:
+#' This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a `glmer` (fitted using `glmer` or `glmer.nb` from `lme4`) model object, and countModel2 could also be a `glm.nb` (from the `MASS` package) model object:
 #'
 #' countModel1 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + (1|RiverSeasonYear), data = countDat, family = nbinom2)
 #'
@@ -44,7 +44,6 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
     train <- testData[train_ind, ]
     test <-  testData[-train_ind, ]
     if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
-    if ("gam" %in% class(testModel)) {m_train <- gam(formula(testModel), family = family(testModel), data = train)}
     if ("glmerMod" %in% class(testModel)) {
       if ((grepl("Negative Binomial", family(testModel)$family))) {
         try(m_train <- glmer.nb(formula(testModel), data = train))
@@ -81,35 +80,6 @@ RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain
           cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
        }
       }
-      if (!("gam" %in% class(testModel)) & any(c("negbin", "lm", "glm") %in% class(testModel))){
-        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-      }
-    if ("gam" %in% class(testModel)){
-      if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) > 0){
-        re_name <- testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0][[1]]$label
-        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = train))
-        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = train))
-        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = train))
-        cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-      }
-    }
-    if ("gam" %in% class(testModel)){
-      if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) == 0){
-        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-       }
-    }
     if (any(c("glmerMod", "lmerMod") %in% class(testModel))){
       cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = train))
       cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = test))

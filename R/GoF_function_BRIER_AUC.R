@@ -8,7 +8,7 @@
 #' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is `TRUE`. You can also specify `DHARMaReps` if you want something other than the default of 1000 simulation replicates.
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all `nReps` bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = `FALSE`, then `simulateResiduals()` isn't used to assess the model's residuals and only three of the four objects are returned.
 #'
-#' This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in `glmmTMB`, but logitModel1 could also be a `glmer` (from `lme4`) or gam (from `mgcv`) model object and logitModel2 could also be `glm` or `gam` (from `mgcv`) model object:
+#' This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in `glmmTMB`, but logitModel1 could also be a `glmer` (from `lme4`) model object and logitModel2 could also be `glm` model object:
 #'
 #' logitModel1 <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
 #'
@@ -24,7 +24,6 @@
 #' @importFrom rms val.prob
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
-#' @importFrom mgcv gam
 #' @export
 BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
 auc_train = NULL
@@ -39,7 +38,6 @@ for (j in 1:nReps){
   train <- testData[train_ind, ]
   test <-  testData[-train_ind, ]
   if ("glmmTMB" %in% class(testModel)){m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
-  if ("gam" %in% class(testModel)){m_train <- gam(formula(testModel), family = family(testModel), data = train)}
   if ("glmerMod" %in% class(testModel)) {try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))}
   if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
   if ("glmmTMB" %in% class(testModel)){
@@ -66,29 +64,6 @@ for (j in 1:nReps){
     auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
     brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
   }
-  if (!("gam" %in% class(testModel)) & any(c("glm", "lm") %in% class(testModel))){
-    auc_train[j] <-  val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-    brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-    auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-    brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-  }
-  if ("gam" %in% class(testModel)){
-    if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) > 0){
-        re_name <- testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0][[1]]$label
-        auc_train[j] <-  val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_train[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-        auc_test[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_test[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-    }
-  }
-  if ("gam" %in% class(testModel)){
-        if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) == 0){
-        auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-        auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-    }
-  }
 }
 results_list <- list(auc_train = unname(auc_train), brier_train = unname(brier_train), auc_test = unname(auc_test), brier_test = unname(brier_test))
 
@@ -107,5 +82,3 @@ if (DHARMaPlot==FALSE){
   return(list(brier_auc_results = results_df, brier_auc_hist = results_plot, brier_auc_summary = results_summary))
   }
 }
-
-
