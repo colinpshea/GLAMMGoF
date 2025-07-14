@@ -27,7 +27,7 @@ BRIER_AUC(
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all \code{nReps} bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals and only three of the four objects are returned.
 
-This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in \code{glmmTMB}, but logitModel1 could also be a \code{glmer} (from \code{lme4}) or gam (from \code{mgcv}) model object and logitModel2 could also be \code{glm} or \code{gam} (from \code{mgcv}) model object:
+This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in \code{glmmTMB}, but logitModel1 could also be a \code{glmer} (from \code{lme4}) model object and logitModel2 could also be \code{glm} model object:
 
 logitModel1 <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
 
