@@ -26,7 +26,7 @@
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam
 #' @export
-RRMSE_RMAD <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
+RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   fit_cost_rrmse <- function(y, yhat){sqrt(mean((y - yhat)^2))/mean(y)*100}
   fit_cost_rmad <- function(y, yhat){median(abs((y - yhat)))/mean(y)*100}
   fit_cost_rbias <- function(y, yhat){(mean((y - yhat)))/mean(y)*100}
