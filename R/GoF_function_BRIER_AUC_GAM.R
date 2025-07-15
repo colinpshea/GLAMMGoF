@@ -25,6 +25,7 @@
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom mgcv gam predict.gam
+#' @importFrom stringr str_match
 #' @export
 BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   auc_train = NULL
@@ -116,7 +117,6 @@ BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTr
                                                                                                                              all.vars(formula(testModel))[1]])), smooth = FALSE,
                                 pl = FALSE)["Brier"]
     }
-
     if (!("gam" %in% class(testModel)) & any(c("glm", "lm") %in% class(testModel))){
       auc_train[j] <-  val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
       brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
@@ -165,7 +165,7 @@ BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTr
     scale_x_continuous(limits = c(0, 1), breaks = seq(0,
                                                       1, 0.2), expand = expansion(add = c(0.05, 0.05))) +
     theme(panel.spacing = unit(1.5, "lines"))
-  library(DHARMa)
+
   if (DHARMaPlot == TRUE) {
     dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel,
                                     plot = T)

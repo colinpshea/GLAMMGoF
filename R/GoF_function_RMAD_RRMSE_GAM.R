@@ -25,6 +25,7 @@
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
+#' @importFrom stringr str_match
 #' @export
 RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   fit_cost_rrmse <- function(y, yhat){sqrt(mean((y - yhat)^2))/mean(y)*100}
@@ -143,7 +144,6 @@ RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propT
   results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric, scales = "free") + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + theme(panel.spacing = unit(1.5, "lines"))
 
 results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
-
   if (DHARMaPlot==TRUE){
     dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel, plot = T)
   return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary, dharmaPlot = dharmaPlot))
