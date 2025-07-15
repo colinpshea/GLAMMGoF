@@ -24,7 +24,7 @@
 #' @importFrom rms val.prob
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
-#' @importFrom mgcv gam
+#' @importFrom mgcv gam predict.gam
 #' @export
 BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   auc_train = NULL
@@ -38,10 +38,10 @@ BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTr
     train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
     train <- testData[train_ind, ]
     test <-  testData[-train_ind, ]
-    if ("glmmTMB" %in% class(testModel)){m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
-    if ("gam" %in% class(testModel)){m_train <- gam(formula(testModel), family = family(testModel), data = train)}
+    if ("glmmTMB" %in% class(testModel)){try(m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train))}
+    if ("gam" %in% class(testModel)){m_train <- try(gam(formula(testModel), family = family(testModel), data = train))}
     if ("glmerMod" %in% class(testModel)) {try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))}
-    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
+    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {try(m_train <- glm(formula(testModel), family = family(testModel), data = train))}
     if ("glmmTMB" %in% class(testModel)){
       if (sum(ranef(testModel)=="list()")<length(ranef(testModel))){
         train_pred <- train
@@ -91,16 +91,16 @@ BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTr
     }
   }
   results_list <- list(auc_train = unname(auc_train), brier_train = unname(brier_train), auc_test = unname(auc_test), brier_test = unname(brier_test))
-  
+
   results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Metric", "Group")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("auc", "brier"), labels = c("AUC statistic", "Brier score")))
-  
+
   results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
-  
+
   results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric) + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + scale_x_continuous(limits = c(0,1), breaks = seq(0,1, 0.20), expand = expansion(add = c(0.05,0.05))) + theme(panel.spacing = unit(1.5, "lines"))
-  
+
   if (DHARMaPlot==TRUE){
     dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel, plot = T)
-    
+
     return(list(brier_auc_results = results_df, brier_auc_hist = results_plot, brier_auc_summary = results_summary, dharmaPlot = dharmaPlot))
   }
   if (DHARMaPlot==FALSE){

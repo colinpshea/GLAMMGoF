@@ -24,7 +24,7 @@
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
-#' @importFrom mgcv gam
+#' @importFrom mgcv gam predict.gam
 #' @export
 RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   fit_cost_rrmse <- function(y, yhat){sqrt(mean((y - yhat)^2))/mean(y)*100}
@@ -43,8 +43,13 @@ RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propT
     train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
     train <- testData[train_ind, ]
     test <-  testData[-train_ind, ]
-    if ("glmmTMB" %in% class(testModel)) {m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train)}
-    if ("gam" %in% class(testModel)) {m_train <- gam(formula(testModel), family = family(testModel), data = train)}
+    if ("glmmTMB" %in% class(testModel)) {
+      try(m_train <- glmmTMB(formula(testModel), family = family(testModel),
+                             data = train))
+    }
+    if ("gam" %in% class(testModel)) {
+      try(m_train <- gam(formula(testModel), family = family(testModel), data = train))
+    }
     if ("glmerMod" %in% class(testModel)) {
       if ((grepl("Negative Binomial", family(testModel)$family))) {
         try(m_train <- glmer.nb(formula(testModel), data = train))
@@ -52,13 +57,23 @@ RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propT
     }
     if ("glmerMod" %in% class(testModel)) {
       if (!(grepl("Negative Binomial", family(testModel)$family))) {
-        try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))
+        try(m_train <- glmer(formula(testModel), family = family(testModel),
+                             data = train))
       }
     }
-    if ("lmerMod" %in% class(testModel)) {try(m_train <- lmer(formula(testModel), data = train))}
-    if ("negbin" %in% class(testModel)) {m_train <- glm.nb(formula(testModel), data = train)}
-    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {m_train <- glm(formula(testModel), family = family(testModel), data = train)}
-    if ("lm" %in% class(testModel) & !("gam" %in% class(testModel))) {m_train <- lm(formula(testModel), data = train)}
+    if ("lmerMod" %in% class(testModel)) {
+      try(m_train <- lmer(formula(testModel), data = train))
+    }
+    if ("negbin" %in% class(testModel)) {
+      try(m_train <- glm.nb(formula(testModel), data = train))
+    }
+    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {
+      try(m_train <- glm(formula(testModel), family = family(testModel),
+                         data = train))
+    }
+    if ("lm" %in% class(testModel) & !("gam" %in% class(testModel))) {
+      try(m_train <- lm(formula(testModel), data = train))
+    }
     if ("glmmTMB" %in% class(testModel)) {
       if (sum(ranef(testModel)=="list()")<length(ranef(testModel))){
       train_pred <- train
