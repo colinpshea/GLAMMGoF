@@ -126,8 +126,8 @@ BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTr
     if ("gam" %in% class(testModel)){
       if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) > 0){
         re_name <- testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0][[1]]$label
-        train[which(colnames(train) %in% str_match(re_name, "\\((.*)\\)"))] <- 0
-        test[which(colnames(test) %in% str_match(re_name, "\\((.*)\\)"))] <- 0
+        train[which(colnames(train) %in% str_match(re_name, "\\((.*)\\)"))] <- NULL
+        test[which(colnames(test) %in% str_match(re_name, "\\((.*)\\)"))] <- NULL
         auc_train[j] <-  val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = train, newdata.guaranteed = TRUE), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
         brier_train[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = train, newdata.guaranteed = TRUE), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
         auc_test[j] <- val.prob(p = predict.gam(m_train, type="response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
