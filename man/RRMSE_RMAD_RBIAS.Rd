@@ -35,9 +35,9 @@ countModel1 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + (1|
 
 countModel2 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, data = countDat, family = nbinom2)
 
-countModel1 <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re), data = countDatGAM, family = nb)
+countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re), data = countDatGAM, family = nb)
 
-countModel2 <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth), data = countDatGAM, family = nb)
+countModel2GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth), data = countDatGAM, family = nb)
 
 Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is \code{TRUE}), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
 
