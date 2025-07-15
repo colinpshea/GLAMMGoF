@@ -31,41 +31,92 @@ BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTr
   brier_train = NULL
   auc_test = NULL
   brier_test = NULL
-  testResp <- function(data){length(unique(data))==2 && all(data %in% c(0, 1))}
-  stopifnot("Response variable is not binary! Use RRMSE_RMAD() instead" = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,all.vars(formula(testModel))[1]])))=="TRUE")
-  for (j in 1:nReps){
-    smp_size <- floor(propTrain*nrow(testData))
+  testResp <- function(data) {
+    length(unique(data)) == 2 && all(data %in% c(0, 1))
+  }
+  stopifnot(`Response variable is not binary! Use RRMSE_RMAD() instead` = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,
+                                                                                                                                     all.vars(formula(testModel))[1]]))) == "TRUE")
+  for (j in 1:nReps) {
+    smp_size <- floor(propTrain * nrow(testData))
     train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
     train <- testData[train_ind, ]
-    test <-  testData[-train_ind, ]
-    if ("glmmTMB" %in% class(testModel)){try(m_train <- glmmTMB(formula(testModel), family = family(testModel), data = train))}
-    if ("gam" %in% class(testModel)){m_train <- try(gam(formula(testModel), family = family(testModel), data = train))}
-    if ("glmerMod" %in% class(testModel)) {try(m_train <- glmer(formula(testModel), family = family(testModel), data = train))}
-    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {try(m_train <- glm(formula(testModel), family = family(testModel), data = train))}
-    if ("glmmTMB" %in% class(testModel)){
-      if (sum(ranef(testModel)=="list()")<length(ranef(testModel))){
+    test <- testData[-train_ind, ]
+    if ("glmmTMB" %in% class(testModel)) {
+      m_train <- glmmTMB(formula(testModel), family = family(testModel),
+                         data = train)
+    }
+    if ("gam" %in% class(testModel)){
+      m_train <- gam(formula(testModel), family = family(testModel), data = train)
+    }
+    if ("glmerMod" %in% class(testModel)) {
+      try(m_train <- glmer(formula(testModel), family = family(testModel),
+                           data = train))
+    }
+    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {
+      m_train <- glm(formula(testModel), family = family(testModel),
+                     data = train)
+    }
+    if ("glmmTMB" %in% class(testModel)) {
+      if (sum(ranef(testModel) == "list()") < length(ranef(testModel))) {
         train_pred <- train
-        train_pred[,which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
+        train_pred[, which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
         test_pred <- test
-        test_pred[,which(names(test_pred) %in% names(ranef(testModel)$cond))] <- NA
-        auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train_pred), y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train_pred), y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-        auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
+        test_pred[, which(names(test_pred) %in% names(ranef(testModel)$cond))] <- NA
+        auc_train[j] <- val.prob(p = predict(m_train,
+                                             type = "response", newdata = train_pred), y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,
+                                                                                                                                               all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                 pl = FALSE)["C (ROC)"]
+        brier_train[j] <- val.prob(p = predict(m_train,
+                                               type = "response", newdata = train_pred), y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,
+                                                                                                                                                 all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                   pl = FALSE)["Brier"]
+        auc_test[j] <- val.prob(p = predict(m_train,
+                                            type = "response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,
+                                                                                                                                            all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                pl = FALSE)["C (ROC)"]
+        brier_test[j] <- val.prob(p = predict(m_train,
+                                              type = "response", newdata = test_pred), y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,
+                                                                                                                                              all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                  pl = FALSE)["Brier"]
       }
-      if (sum(ranef(testModel)=="list()")==length(ranef(testModel))){
-        auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-        auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-        brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
+      if (sum(ranef(testModel) == "list()") == length(ranef(testModel))) {
+        auc_train[j] <- val.prob(p = predict(m_train,
+                                             type = "response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,
+                                                                                                                                     all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                 pl = FALSE)["C (ROC)"]
+        brier_train[j] <- val.prob(p = predict(m_train,
+                                               type = "response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,
+                                                                                                                                       all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                   pl = FALSE)["Brier"]
+        auc_test[j] <- val.prob(p = predict(m_train,
+                                            type = "response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,
+                                                                                                                                  all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                pl = FALSE)["C (ROC)"]
+        brier_test[j] <- val.prob(p = predict(m_train,
+                                              type = "response", newdata = test), y = unname(unlist(eval(as.symbol(paste0("test")))[,
+                                                                                                                                    all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                  pl = FALSE)["Brier"]
       }
     }
-    if ("glmerMod" %in% class(testModel)){
-      auc_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-      brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
-      auc_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
-      brier_test[j] <- val.prob(p = predict(m_train, type="response", newdata = test, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
+    if ("glmerMod" %in% class(testModel)) {
+      auc_train[j] <- val.prob(p = predict(m_train, type = "response",
+                                           newdata = train, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("train")))[,
+                                                                                                                              all.vars(formula(testModel))[1]])), smooth = FALSE,
+                               pl = FALSE)["C (ROC)"]
+      brier_train[j] <- val.prob(p = predict(m_train, type = "response",
+                                             newdata = train, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("train")))[,
+                                                                                                                                all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                 pl = FALSE)["Brier"]
+      auc_test[j] <- val.prob(p = predict(m_train, type = "response",
+                                          newdata = test, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("test")))[,
+                                                                                                                           all.vars(formula(testModel))[1]])), smooth = FALSE,
+                              pl = FALSE)["C (ROC)"]
+      brier_test[j] <- val.prob(p = predict(m_train, type = "response",
+                                            newdata = test, re.form = NA), y = unname(unlist(eval(as.symbol(paste0("test")))[,
+                                                                                                                             all.vars(formula(testModel))[1]])), smooth = FALSE,
+                                pl = FALSE)["Brier"]
     }
+
     if (!("gam" %in% class(testModel)) & any(c("glm", "lm") %in% class(testModel))){
       auc_train[j] <-  val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["C (ROC)"]
       brier_train[j] <- val.prob(p = predict(m_train, type="response", newdata = train), y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), smooth = FALSE, pl = FALSE)["Brier"]
@@ -90,22 +141,39 @@ BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTr
       }
     }
   }
-  results_list <- list(auc_train = unname(auc_train), brier_train = unname(brier_train), auc_test = unname(auc_test), brier_test = unname(brier_test))
-
-  results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Metric", "Group")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("auc", "brier"), labels = c("AUC statistic", "Brier score")))
-
-  results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
-
-  results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric) + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + scale_x_continuous(limits = c(0,1), breaks = seq(0,1, 0.20), expand = expansion(add = c(0.05,0.05))) + theme(panel.spacing = unit(1.5, "lines"))
-
-  if (DHARMaPlot==TRUE){
-    dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel, plot = T)
-
-    return(list(brier_auc_results = results_df, brier_auc_hist = results_plot, brier_auc_summary = results_summary, dharmaPlot = dharmaPlot))
+  table(train$Year)
+  table(test$Year)
+  results_list <- list(auc_train = unname(auc_train), brier_train = unname(brier_train),
+                       auc_test = unname(auc_test), brier_test = unname(brier_test))
+  results_df <- bind_rows(results_list, .id = "column_label") %>%
+    mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep,
+                                            values_to = "value", names_to = "metric") %>% separate(metric,
+                                                                                                   into = c("Metric", "Group")) %>% mutate(Group = factor(Group,
+                                                                                                                                                          levels = c("train", "test"), labels = c("In-sample performance",
+                                                                                                                                                                                                  "Out-of-sample performance")), Metric = factor(Metric,
+                                                                                                                                                                                                                                                 levels = c("auc", "brier"), labels = c("AUC statistic",
+                                                                                                                                                                                                                                                                                        "Brier score")))
+  results_summary <- results_df %>% group_by(Group, Metric) %>%
+    summarise(mn = mean(value), lwr95 = quantile(value, 0.025),
+              upr95 = quantile(value, 0.975))
+  results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black",
+                                                                      fill = "grey") + facet_grid(Group ~ Metric) + theme_bw() +
+    theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90",
+                                                                                  linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90",
+                                                                                                                                         linetype = "dashed"), axis.text = element_text(colour = "black")) +
+    labs(x = "% relative to true mean", y = "Frequency") +
+    scale_x_continuous(limits = c(0, 1), breaks = seq(0,
+                                                      1, 0.2), expand = expansion(add = c(0.05, 0.05))) +
+    theme(panel.spacing = unit(1.5, "lines"))
+  library(DHARMa)
+  if (DHARMaPlot == TRUE) {
+    dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel,
+                                    plot = T)
+        return(list(brier_auc_results = results_df, brier_auc_hist = results_plot,
+                    brier_auc_summary = results_summary, dharmaPlot = dharmaPlot))
   }
-  if (DHARMaPlot==FALSE){
-    return(list(brier_auc_results = results_df, brier_auc_hist = results_plot, brier_auc_summary = results_summary))
+  if (DHARMaPlot == FALSE) {
+       return(list(brier_auc_results = results_df, brier_auc_hist = results_plot,
+                    brier_auc_summary = results_summary))
   }
-}
-
-
+  }
