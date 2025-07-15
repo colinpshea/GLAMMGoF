@@ -107,11 +107,11 @@ RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propT
     if ("gam" %in% class(testModel)){
       if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) > 0){
         re_name <- testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0][[1]]$label
-        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = train))
-        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = train))
-        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict.gam(m_train, type = "response", exclude = re_name, newdata = train))
+        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = train))
+        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
+        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = train))
+        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
+        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = train))
         cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
       }
     }
