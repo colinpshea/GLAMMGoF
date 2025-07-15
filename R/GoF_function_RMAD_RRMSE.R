@@ -5,7 +5,8 @@
 #' @param testModel A regression model fit to testData in `glmmTMB` (with or without random effects), `glmer` (with random effects), or `glm`/`lm` (without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
 #' @param testData A data frame with a continuous or integer response variable and continuous and/or categorical predictors.
 #' @param propTrain Proportion of `testData` that is used for model-fitting and in-sample predictive performance (the remaining % is used to assess out-of-sample predictive performance). The default value is 0.8.
-#' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is `TRUE`. You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
+#' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is `TRUE`.
+#' @param DHARMaReps You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = `FALSE`, then `simulateResiduals()` isn't used to assess the model's residuals, and only three of the four objects are returned.
 #'
 #' This package contains an example data set for a negative binomial or Poisson regression called countData (but data with a continuous response variable could also be used). Two example negative binomial regression model objects are also included called countModel1, which includes a random effect, and countModel2, which does not; both models were fitted using glmmTMB, but countModel1 could also be a `glmer` (fitted using `glmer` or `glmer.nb` from `lme4`) or `gam` (fitted using `mgcv`) model object, and countModel2 could also be a `glm.nb` (from the `MASS` package) or `gam` model object:
@@ -27,7 +28,7 @@
 #' @importFrom mgcv gam predict.gam
 #' @importFrom stringr str_match
 #' @export
-RRMSE_RMAD_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
+RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   fit_cost_rrmse <- function(y, yhat){sqrt(mean((y - yhat)^2))/mean(y)*100}
   fit_cost_rmad <- function(y, yhat){median(abs((y - yhat)))/mean(y)*100}
   fit_cost_rbias <- function(y, yhat){(mean((y - yhat)))/mean(y)*100}

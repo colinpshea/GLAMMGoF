@@ -6,6 +6,7 @@
 #' @param testData A data frame with a binary response variable and continuous and/or categorical predictors variables.
 #' @param propTrain Proportion of `testData` that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining % is used to assess out-of-sample predictive performance.
 #' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is `TRUE`. You can also specify `DHARMaReps` if you want something other than the default of 1000 simulation replicates.
+#' @param DHARMaReps You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all `nReps` bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = `FALSE`, then `simulateResiduals()` isn't used to assess the model's residuals and only three of the four objects are returned.
 #'
 #' This package contains an example data set to fit a logistic regression called logitData. Two example logistic regression model objects are also included: logitModel1 includes a random effect, and logitModel2 does not; both models were fitted in `glmmTMB`, but logitModel1 could also be a `glmer` (from `lme4`) or gam (from `mgcv`) model object and logitModel2 could also be `glm` or `gam` (from `mgcv`) model object:
@@ -27,7 +28,7 @@
 #' @importFrom mgcv gam predict.gam
 #' @importFrom stringr str_match
 #' @export
-BRIER_AUC_GAM <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
+BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
   auc_train = NULL
   brier_train = NULL
   auc_test = NULL
