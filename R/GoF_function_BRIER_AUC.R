@@ -9,11 +9,11 @@
 #' @param DHARMaReps If DHARMaPlot is `TRUE`, you can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all `nReps` bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = `FALSE`, then `simulateResiduals()` isn't used to assess the model's residuals and only three of the four objects are returned.
 #'
-#' This package contains an example data sets to fit a logistic regression called logitData, and four example logistic regression model objects are also included: logitModel1 is a GLM that includes a random effect, logitModel2 is a GLM that does not include a random effect, logitModel1GAM is a GAM that includes a random effect, and logitModel2GAM is a GAM that does not include a random effect; both the GLMs were fitted using `glmmTMB`, whereas the GAMs were fitted using `mgcv`. logitModel1 could also be a `glmer` (from `lme4`) or gam (from `mgcv`) model object and logitModel2 could also be `glm` or `gam` (from `mgcv`) model object:
+#' This package contains an example data sets to fit a logistic regression called logitData, and four example logistic regression model objects are also included: logitModel1GLM is a GLM that includes a random effect; logitModel2GLM is a GLM that does not include a random effect; logitModel1GAM is a GAM that includes a random effect; and logitModel2GAM is a GAM that does not include a random effect. Both the GLMs were fitted using `glmmTMB`, whereas the GAMs were fitted using `mgcv`. logitModel1GLM could also be a `glmer` (from `lme4`) or gam (from `mgcv`) model object, and logitModel2GLM could also be `glm` or `gam` (from `mgcv`) model object:
 #'
-#' logitModel1 <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
+#' logitModel1GLM <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
 #'
-#' logitModel2 <- glmmTMB(y ~ totalLengthcm + Zone, family = binomial, data = logitData)
+#' logitModel2GLM <- glmmTMB(y ~ totalLengthcm + Zone, family = binomial, data = logitData)
 #'
 #' logitModel1GAM <- gam(y ~ s(totalLengthcm) + Zone + s(Year, bs = "re), family = binomial, data = logitData)
 #'
