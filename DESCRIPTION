@@ -21,4 +21,6 @@ Imports:
     ,lme4
     ,MASS
     ,mgcv
+    ,stringr
 Depends: ggplot2
+Suggests: mgcViz
