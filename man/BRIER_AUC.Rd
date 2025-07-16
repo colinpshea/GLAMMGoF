@@ -16,33 +16,33 @@ BRIER_AUC(
 \arguments{
 \item{nReps}{Desired number of bootstrap replicates. The default value is 100, but this number should be at least 1000 in practice.}
 
-\item{testModel}{A logistic regression model fitted to testData using \code{glmmTMB} (with or without random effects), \code{glmer} (with random effects), or \code{glm} (without random effects).}
+\item{testModel}{A logistic regression model fitted to testData using \code{glmmTMB} (with or without random effects), \code{glmer} (with random effects), \code{glm} (without random effects), or \code{gam} (with or without random effects).}
 
 \item{testData}{A data frame with a binary response variable and continuous and/or categorical predictors variables.}
 
-\item{propTrain}{Proportion of \code{testData} that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining \% is used to assess out-of-sample predictive performance.}
+\item{propTrain}{The proportion of \code{testData} that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining \% is used to assess out-of-sample predictive performance.}
 
-\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is \code{TRUE}. You can also specify \code{DHARMaReps} if you want something other than the default of 1000 simulation replicates.}
+\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is \code{TRUE}.}
 
-\item{DHARMaReps}{You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
+\item{DHARMaReps}{If DHARMaPlot is \code{TRUE}, you can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
 }
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all \code{nReps} bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals and only three of the four objects are returned.
 
-This package contains two example data sets to fit a logistic regression called logitData and logitDataGAM. Four example logistic regression model objects are also included: logitModel1 is a GLM that includes a random effect, logitModel2 is a GLM that does not include a random effect, logitModel1GAM is a GAM that includes a random effect, and logitModel2GAM is a GAM that does not include a random effect; both the GLMs were fitted in \code{glmmTMB}, whereas the GAMs were fitted using \code{mgcv}. logitModel1 could also be a \code{glmer} (from \code{lme4}) or gam (from \code{mgcv}) model object and logitModel2 could also be \code{glm} or \code{gam} (from \code{mgcv}) model object:
+This package contains an example data sets to fit a logistic regression called logitData, and four example logistic regression model objects are also included: logitModel1 is a GLM that includes a random effect, logitModel2 is a GLM that does not include a random effect, logitModel1GAM is a GAM that includes a random effect, and logitModel2GAM is a GAM that does not include a random effect; both the GLMs were fitted using \code{glmmTMB}, whereas the GAMs were fitted using \code{mgcv}. logitModel1 could also be a \code{glmer} (from \code{lme4}) or gam (from \code{mgcv}) model object and logitModel2 could also be \code{glm} or \code{gam} (from \code{mgcv}) model object:
 
 logitModel1 <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
 
 logitModel2 <- glmmTMB(y ~ totalLengthcm + Zone, family = binomial, data = logitData)
 
-logitModel1GAM <- gam(y ~ s(totalLengthcm) + Zone + s(Year, bs = "re), family = binomial, data = logitDataGAM)
+logitModel1GAM <- gam(y ~ s(totalLengthcm) + Zone + s(Year, bs = "re), family = binomial, data = logitData)
 
-logitModel2GAM <- gam(y ~ s(totalLengthcm) + Zone, family = binomial, data = logitDataGAM)
+logitModel2GAM <- gam(y ~ s(totalLengthcm) + Zone, family = binomial, data = logitData)
 
-Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is TRUE), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
+Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is TRUE), and how many simulation replicates you want to use in DHARMa's \code{simulateResiduals()} function (the default is 1000):
 
 BRIER_AUC(nReps = 100, testModel = logitModel, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000)
 }
 \description{
-Bootstrap Brier score and AUC fit statistics (see \code{rms} package documentation for details) for generalized linear and generalized additive models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). Conversely, AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model.
+Bootstrap Brier score and AUC fit statistics (see \code{rms} package documentation for details) for generalized linear and generalized additive models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). The AUC score is an aggregated metric that evaluates how well as logistic regression model classifies positive and negative outcomes at all possible cutoffs (i.e., probability cutoffs for defining positive (1) vs negative (0) cases). AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model (i.e., a better classifier), and where an AUC score of 0.5 suggests a model performs no better than random guessing.Note that although this function works with GLMMs and GAMMs fitted using a variety of packages/functions, all performance measures are based on model predictions that ignore random effects when present in a model (i.e., performance statistics are based on marginal or population-level model predictions).
 }

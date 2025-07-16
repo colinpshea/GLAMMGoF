@@ -16,7 +16,7 @@ RRMSE_RMAD_RBIAS(
 \arguments{
 \item{nReps}{Desired number of bootstrap replicates. The default value is 100, but this number should be at least 1000 in practice.}
 
-\item{testModel}{A regression model fit to testData in \code{glmmTMB} (with or without random effects), \code{glmer} (with random effects), or \code{glm}/\code{lm} (without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
+\item{testModel}{A regression model fit to testData in \code{glmmTMB} (with or without random effects), \code{glmer} (with random effects), \code{glm}/\code{lm} (without random effects), or \code{gam} (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
 
 \item{testData}{A data frame with a continuous or integer response variable and continuous and/or categorical predictors.}
 
@@ -29,20 +29,20 @@ RRMSE_RMAD_RBIAS(
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals, and only three of the four objects are returned.
 
-This package contains two example data sets for a negative binomial or Poisson regression called countData and countDataGAM (but data with a continuous response variable could also be used). Four example negative binomial regression model objects are also included called countModel1, a GLM that includes a random effect, countModel2, a GLM that does not include a random effect; countModel1GAM, a GAM that includes a random effect; and countModel2GAM, a GAM that does not include a random effect. Both GLMs were fitted using glmmTMB, whereas the GAMs were fitted using \code{mgcv}. countModel1 could also be a \code{glmer} (fitted using \code{glmer} or \code{glmer.nb} from \code{lme4}) or \code{gam} (fitted using \code{mgcv}) model object, and countModel2 could also be a \code{glm.nb} (from the \code{MASS} package) or \code{gam} model object:
+This package contains an example data set for fitting a negative binomial or Poisson regression called countData. This data set has an integer response variable, but data with a continuous response variable could also be used. Four example negative binomial regression model objects are also included called countModel1, a GLM that includes a random effect; countModel2, a GLM that does not include a random effect; countModel1GAM, a GAM that includes a random effect; and countModel2GAM, a GAM that does not include a random effect. Both GLMs were fitted using \code{glmmTMB}, whereas the GAMs were fitted using \code{mgcv}. countModel1 could also be a \code{glmer} (fitted using \code{glmer} or \code{glmer.nb} from \code{lme4}) or \code{gam} (fitted using \code{mgcv}) model object, and countModel2 could also be a \code{glm.nb} (from the \code{MASS} package) or \code{gam} model object:
 
-countModel1 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + (1|RiverSeasonYear), data = countDat, family = nbinom2)
+countModel1 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + (1|RiverSeasonYear), family = nbinom2, data = countData)
 
-countModel2 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, data = countDat, family = nbinom2)
+countModel2 <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, family = nbinom2, data = countData)
 
-countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re), data = countDatGAM, family = nb)
+countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re), family = nb, data = countData)
 
-countModel2GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth), data = countDatGAM, family = nb)
+countModel2GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth), family = nb, data = countData)
 
 Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is \code{TRUE}), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
 
 RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000)
 }
 \description{
-Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics for generalized linear and generalized additive models with continuous or integer response variables and with or without random effects. The performance statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. The RMAD is generally less sensitive than RRMSE to extreme values.
+Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics for generalized linear and generalized additive models with continuous or integer response variables and with or without random effects. The performance statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that although this function works with GLMMs and GAMMs fitted using a variety of packages/functions, all performance measures are based on model predictions that ignore random effects when present in a model (i.e., performance statistics are based on marginal or population-level model predictions).
 }
