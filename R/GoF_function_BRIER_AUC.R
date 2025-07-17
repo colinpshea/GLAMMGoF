@@ -40,7 +40,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain 
   testResp <- function(data) {
     length(unique(data)) == 2 && all(data %in% c(0, 1))
   }
-  stopifnot(`Response variable is not binary! Use RRMSE_RMAD() instead` = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,
+  stopifnot(`Response variable is not binary! Use RRMSE_RMAD_RBIAS() instead` = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,
                                                                                                                                      all.vars(formula(testModel))[1]]))) == "TRUE")
   for (j in 1:nReps) {
     smp_size <- floor(propTrain * nrow(testData))
