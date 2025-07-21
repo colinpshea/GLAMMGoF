@@ -50,8 +50,7 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL, pro
     train <- testData[train_ind, ]
     test <-  testData[-train_ind, ]
     if ("glmmTMB" %in% class(testModel)) {
-      try(m_train <- glmmTMB(formula(testModel), family = family(testModel),
-                             data = train))
+      try(m_train <- glmmTMB(formula(testModel, component = "cond"), family = family(testModel), dispformula = formula(testModel, component = "disp"), ziformula = formula(testModel, component = "zi"), data = train))
     }
     if ("gam" %in% class(testModel)) {
       try(m_train <- gam(formula(testModel), family = family(testModel), data = train))
