@@ -7,6 +7,7 @@
 #' @param propTrain Proportion of `testData` that is used for model-fitting and in-sample predictive performance (the remaining % is used to assess out-of-sample predictive performance). The default value is 0.8.
 #' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is `TRUE`.
 #' @param DHARMaReps You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
+#' @param seed Optional integer seed for reproducibility. If `NULL` (the default), no seed is set and results will differ across runs.
 #' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = `FALSE`, then `simulateResiduals()` isn't used to assess the model's residuals, and only three of the four objects are returned.
 #'
 #' This package contains an example data set for fitting a negative binomial or Poisson regression called countData. This data set has an integer response variable, but data with a continuous response variable could also be used. Four example negative binomial regression model objects are also included: countModel1GLM is a GLM that includes a random effect; countModel2GLM is a GLM that does not include a random effect; countModel1GAM is a GAM that includes a random effect; and countModel2GAM is a GAM that does not include a random effect. Both GLMs were fitted using `glmmTMB`, whereas the GAMs were fitted using `mgcv`. countModel1 could also be a `glmer` (fitted using `glmer` or `glmer.nb` from `lme4`) or `gam` (fitted using `mgcv`) model object, and countModel2 could also be a `glm.nb` (from the `MASS` package) or `gam` model object:
@@ -15,144 +16,199 @@
 #'
 #' countModel2GLM <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, family = nbinom2, data = countData)
 #'
-#' countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re), family = nb, data = countData)
+#' countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re"), family = nb, data = countData)
 #'
 #' countModel2GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth), family = nb, data = countData)
 #'
-#' Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is `TRUE`), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
+#' Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is `TRUE`), how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000), and an optional integer seed for reproducibility:
 #'
-#' RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000)
+#' RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
 #' @importFrom magrittr %>%
-#' @importFrom dplyr select group_by summarize summarise mutate bind_rows n
-#' @importFrom tidyr pivot_longer pivot_wider separate
+#' @importFrom dplyr group_by summarise mutate bind_rows
+#' @importFrom tidyr pivot_longer separate
+#' @importFrom ggplot2 ggplot aes geom_histogram facet_grid theme_bw theme element_blank element_line element_text labs unit
 #' @importFrom DHARMa simulateResiduals
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
-#' @importFrom stringr str_match
 #' @export
-RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000){
-  fit_cost_rrmse <- function(y, yhat){sqrt(mean((y - yhat)^2))/mean(y)*100}
-  fit_cost_rmad <- function(y, yhat){median(abs((y - yhat)))/mean(y)*100}
-  fit_cost_rbias <- function(y, yhat){(mean((y - yhat)))/mean(y)*100}
-  cost_test_fin_RRMSE = NULL
-  cost_train_fin_RRMSE = NULL
-  cost_test_fin_RMAD = NULL
-  cost_train_fin_RMAD = NULL
-  cost_test_fin_RBIAS = NULL
-  cost_train_fin_RBIAS = NULL
-  testResp <- function(data){length(unique(data))==2 && all(data %in% c(0, 1))}
-  stopifnot("Response variable is binary! Use BRIER_AUC() instead" = testResp(unname(unlist(eval(as.symbol(paste0("testData")))[,all.vars(formula(testModel))[1]])))=="FALSE")
-  for (j in 1:nReps){
-    smp_size <- floor(propTrain*nrow(testData))
-    train_ind <- sample(seq_len(nrow(testData)), size = smp_size)
-    train <- testData[train_ind, ]
-    test <-  testData[-train_ind, ]
-    if ("glmmTMB" %in% class(testModel)) {
-      try(m_train <- glmmTMB(formula(testModel, component = "cond"), family = family(testModel), dispformula = formula(testModel, component = "disp"), ziformula = formula(testModel, component = "zi"), data = train))
-    }
-    if ("gam" %in% class(testModel)) {
-      try(m_train <- gam(formula(testModel), family = family(testModel), data = train))
-    }
-    if ("glmerMod" %in% class(testModel)) {
-      if ((grepl("Negative Binomial", family(testModel)$family))) {
-        try(m_train <- glmer.nb(formula(testModel), data = train))
-      }
-    }
-    if ("glmerMod" %in% class(testModel)) {
-      if (!(grepl("Negative Binomial", family(testModel)$family))) {
-        try(m_train <- glmer(formula(testModel), family = family(testModel),
-                             data = train))
-      }
-    }
-    if ("lmerMod" %in% class(testModel)) {
-      try(m_train <- lmer(formula(testModel), data = train))
-    }
-    if ("negbin" %in% class(testModel)) {
-      try(m_train <- glm.nb(formula(testModel), data = train))
-    }
-    if ("glm" %in% class(testModel) & !("gam" %in% class(testModel))) {
-      try(m_train <- glm(formula(testModel), family = family(testModel),
-                         data = train))
-    }
-    if ("lm" %in% class(testModel) & !("gam" %in% class(testModel))) {
-      try(m_train <- lm(formula(testModel), data = train))
-    }
-    if ("glmmTMB" %in% class(testModel)) {
-      if (sum(ranef(testModel)=="list()")<length(ranef(testModel))){
-      train_pred <- train
-      train_pred[,which(names(train_pred) %in% names(ranef(testModel)$cond))] <- NA
-      test_pred <- test
-      test_pred[,which(names(test_pred) %in% names(ranef(testModel)$cond))] <- NA
-      cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
-      cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
-      cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
-      cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
-      cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train_pred))
-      cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test_pred")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test_pred))
-      }
-       if (sum(ranef(testModel)=="list()")==length(ranef(testModel))){
-          cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-          cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-          cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-          cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-          cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-          cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-       }
-      }
-      if (!("gam" %in% class(testModel)) & any(c("negbin", "lm", "glm") %in% class(testModel))){
-        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-      }
-    if ("gam" %in% class(testModel)){
-      if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) > 0){
-        re_name <- testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0][[1]]$label
-        train[which(colnames(train) %in% str_match(re_name, "\\((.*)\\)"))] <- NULL
-        test[which(colnames(test) %in% str_match(re_name, "\\((.*)\\)"))] <- NULL
-        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = train, newdata.guaranteed = TRUE))
-        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = train, newdata.guaranteed = TRUE))
-        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = train, newdata.guaranteed = TRUE))
-        cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", exclude = re_name, newdata = test, newdata.guaranteed = TRUE))
-      }
-    }
-    if ("gam" %in% class(testModel)){
-      if (length(testModel$smooth[lengths(lapply(testModel$smooth, function(x) x$random==TRUE))>0]) == 0){
-        cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-        cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = train))
-        cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", newdata = test))
-       }
-    }
-    if (any(c("glmerMod", "lmerMod") %in% class(testModel))){
-      cost_train_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = train))
-      cost_test_fin_RRMSE[j] <- fit_cost_rrmse(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = test))
-      cost_train_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = train))
-      cost_test_fin_RMAD[j] <- fit_cost_rmad(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = test))
-      cost_train_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("train")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = train))
-      cost_test_fin_RBIAS[j] <- fit_cost_rbias(y = unname(unlist(eval(as.symbol(paste0("test")))[,all.vars(formula(testModel))[1]])), yhat = predict(m_train, type = "response", re.form = ~0, newdata = test))
+RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
+                             propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
+                             seed = NULL) {
+
+  # --- Optional seed ---
+  if (!is.null(seed)) set.seed(seed)
+
+  # --- Cost functions ---
+  fit_cost_rrmse <- function(y, yhat) sqrt(mean((y - yhat)^2)) / mean(y) * 100
+  fit_cost_rmad  <- function(y, yhat) median(abs(y - yhat)) / mean(y) * 100
+  fit_cost_rbias <- function(y, yhat) mean(y - yhat) / mean(y) * 100
+
+  # --- Validate inputs ---
+  stopifnot("testModel cannot be NULL" = !is.null(testModel))
+  stopifnot("testData cannot be NULL"  = !is.null(testData))
+  stopifnot("propTrain must be between 0 and 1" = propTrain > 0 && propTrain < 1)
+
+  resp_var  <- all.vars(formula(testModel))[1]
+  is_binary <- function(x) length(unique(x)) == 2 && all(x %in% c(0, 1))
+  stopifnot("Response variable is binary! Use BRIER_AUC() instead" =
+              !is_binary(testData[[resp_var]]))
+
+  # --- Pre-compute model class flags (once, outside loop) ---
+  mc         <- class(testModel)
+  is_glmmTMB <- "glmmTMB"  %in% mc
+  is_gam     <- "gam"      %in% mc
+  is_glmer   <- "glmerMod" %in% mc
+  is_lmer    <- "lmerMod"  %in% mc
+  is_negbin  <- "negbin"   %in% mc
+  is_glm     <- "glm"      %in% mc && !is_gam
+  is_lm      <- "lm"       %in% mc && !is_gam && !is_glm
+
+  # --- Pre-compute RE metadata (once, outside loop) ---
+
+  # glmmTMB: which columns correspond to RE grouping factors?
+  glmmTMB_re_cols <- NULL
+  if (is_glmmTMB) {
+    re <- ranef(testModel)$cond
+    if (length(re) > 0) glmmTMB_re_cols <- names(re)
+  }
+
+  # GAM: collect label and term for every RE smooth (bs = "re").
+  # smooth$label is passed to exclude= in predict.gam (e.g. "s(Site)")
+  # smooth$term  is the actual column name      (e.g. "Site")
+  # Using smooth object fields directly avoids any regex on the label string.
+  gam_re_labels <- NULL
+  gam_re_terms  <- NULL
+  if (is_gam) {
+    re_smooths <- Filter(function(s) isTRUE(s$random), testModel$smooth)
+    if (length(re_smooths) > 0) {
+      gam_re_labels <- sapply(re_smooths, function(s) s$label)  # character vector, one per RE smooth
+      gam_re_terms  <- sapply(re_smooths, function(s) s$term)   # retained for metadata/validation
     }
   }
-  results_list <- list(train_RRMSE = cost_train_fin_RRMSE, test_RRMSE = cost_test_fin_RRMSE, train_RMAD = cost_train_fin_RMAD, test_RMAD = cost_test_fin_RMAD, train_RBIAS = cost_train_fin_RBIAS, test_RBIAS = cost_test_fin_RBIAS)
 
-  results_df <- bind_rows(results_list, .id = "column_label") %>% mutate(simRep = 1:n()) %>% pivot_longer(cols = -simRep, values_to = "value", names_to = "metric") %>% separate(metric, into = c("Group", "Metric")) %>% mutate(Group = factor(Group, levels = c("train", "test"), labels = c("In-sample performance", "Out-of-sample performance")), Metric = factor(Metric, levels = c("RRMSE", "RMAD", "RBIAS"), labels = c("RRMSE", "RMAD", "RBIAS")))
-
-  results_plot <- ggplot(results_df, aes(x = value)) + geom_histogram(color = "black", fill = "grey") + facet_grid(Group~Metric, scales = "free") + theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"), panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"), axis.text = element_text(colour = "black")) + labs(x = "% relative to true mean", y = "Frequency") + theme(panel.spacing = unit(1.5, "lines"))
-
-results_summary <- results_df %>% group_by(Group, Metric) %>% summarise(mn = mean(value), lwr95 = quantile(value, 0.025), upr95 = quantile(value, 0.975))
-  if (DHARMaPlot==TRUE){
-    dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel, plot = T)
-  return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary, dharmaPlot = dharmaPlot))
+  # --- Fit helper: dispatch on model class, return NULL on failure ---
+  fit_model <- function(train) {
+    tryCatch({
+      if (is_glmmTMB) {
+        glmmTMB(formula(testModel, component = "cond"),
+                family      = family(testModel),
+                dispformula = formula(testModel, component = "disp"),
+                ziformula   = formula(testModel, component = "zi"),
+                data        = train)
+      } else if (is_gam) {
+        gam(formula(testModel), family = family(testModel), data = train)
+      } else if (is_glmer) {
+        if (grepl("Negative Binomial", family(testModel)$family))
+          glmer.nb(formula(testModel), data = train)
+        else
+          glmer(formula(testModel), family = family(testModel), data = train)
+      } else if (is_lmer) {
+        lmer(formula(testModel), data = train)
+      } else if (is_negbin) {
+        glm.nb(formula(testModel), data = train)
+      } else if (is_glm) {
+        glm(formula(testModel), family = family(testModel), data = train)
+      } else if (is_lm) {
+        lm(formula(testModel), data = train)
+      }
+    }, error = function(e) NULL)
   }
-  if (DHARMaPlot==FALSE){
-  return(list(rrmse_rmad_results = results_df, rrmse_rmad_hist = results_plot, rrmse_rmad_summary = results_summary))
+
+  # --- Predict helper: marginal/population-level predictions, RE excluded ---
+  # glmmTMB: set RE grouping columns to NA so predict() uses population mean
+  # GAM:     exclude= + newdata.guaranteed=TRUE drops all RE smooths cleanly;
+  #          no column deletion needed, full newdata passed untouched
+  # lme4:    re.form = ~0 suppresses all random effects
+  get_preds <- function(m, newdata) {
+    if (is_glmmTMB) {
+      if (!is.null(glmmTMB_re_cols)) {
+        nd <- newdata
+        nd[, glmmTMB_re_cols] <- NA
+        predict(m, type = "response", newdata = nd)
+      } else {
+        predict(m, type = "response", newdata = newdata)
+      }
+    } else if (is_gam) {
+      if (!is.null(gam_re_labels)) {
+        predict(m, type = "response",
+                exclude            = gam_re_labels,  # vector: all RE smooth labels excluded
+                newdata            = newdata,
+                newdata.guaranteed = TRUE)            # mgcv won't look for RE columns in newdata
+      } else {
+        predict(m, type = "response", newdata = newdata)
+      }
+    } else if (is_glmer || is_lmer) {
+      predict(m, type = "response", re.form = ~0, newdata = newdata)
+    } else {
+      predict(m, type = "response", newdata = newdata)
+    }
   }
+
+  # --- Bootstrap loop ---
+  results <- vector("list", nReps)
+
+  for (j in seq_len(nReps)) {
+    train_idx <- sample(seq_len(nrow(testData)), size = floor(propTrain * nrow(testData)))
+    train <- testData[ train_idx, ]
+    test  <- testData[-train_idx, ]
+
+    m_train <- fit_model(train)
+    if (is.null(m_train)) next  # skip failed fits cleanly; no stale model carried forward
+
+    y_train    <- train[[resp_var]]
+    y_test     <- test[[resp_var]]
+    yhat_train <- get_preds(m_train, train)
+    yhat_test  <- get_preds(m_train, test)
+
+    results[[j]] <- data.frame(
+      train_RRMSE = fit_cost_rrmse(y_train, yhat_train),
+      test_RRMSE  = fit_cost_rrmse(y_test,  yhat_test),
+      train_RMAD  = fit_cost_rmad(y_train,  yhat_train),
+      test_RMAD   = fit_cost_rmad(y_test,   yhat_test),
+      train_RBIAS = fit_cost_rbias(y_train, yhat_train),
+      test_RBIAS  = fit_cost_rbias(y_test,  yhat_test)
+    )
+  }
+
+  # --- Tidy results ---
+  results_df <- bind_rows(results, .id = "simRep") %>%
+    pivot_longer(cols = -simRep, names_to = "metric", values_to = "value") %>%
+    separate(metric, into = c("Group", "Metric")) %>%
+    mutate(
+      Group  = factor(Group, levels = c("train", "test"),
+                      labels = c("In-sample performance", "Out-of-sample performance")),
+      Metric = factor(Metric, levels = c("RRMSE", "RMAD", "RBIAS"))
+    )
+
+  results_summary <- results_df %>%
+    group_by(Group, Metric) %>%
+    summarise(mn    = mean(value),
+              lwr95 = quantile(value, 0.025),
+              upr95 = quantile(value, 0.975),
+              .groups = "drop")
+
+  results_plot <- ggplot(results_df, aes(x = value)) +
+    geom_histogram(color = "black", fill = "grey") +
+    facet_grid(Group ~ Metric, scales = "free") +
+    theme_bw() +
+    theme(panel.grid.major.x = element_blank(),
+          panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"),
+          panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"),
+          axis.text          = element_text(colour = "black"),
+          panel.spacing      = unit(1.5, "lines")) +
+    labs(x = "% relative to true mean", y = "Frequency")
+
+  if (DHARMaPlot) {
+    dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel, plot = TRUE)
+    return(list(rrmse_rmad_results  = results_df,
+                rrmse_rmad_hist     = results_plot,
+                rrmse_rmad_summary  = results_summary,
+                dharmaPlot          = dharmaPlot))
+  }
+
+  list(rrmse_rmad_results = results_df,
+       rrmse_rmad_hist    = results_plot,
+       rrmse_rmad_summary = results_summary)
 }
