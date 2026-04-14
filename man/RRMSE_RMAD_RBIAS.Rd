@@ -10,7 +10,8 @@ RRMSE_RMAD_RBIAS(
   testData = NULL,
   propTrain = 0.8,
   DHARMaPlot = TRUE,
-  DHARMaReps = 1000
+  DHARMaReps = 1000,
+  seed = NULL
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ RRMSE_RMAD_RBIAS(
 \item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is \code{TRUE}.}
 
 \item{DHARMaReps}{You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
+
+\item{seed}{Optional integer seed for reproducibility. If \code{NULL} (the default), no seed is set and results will differ across runs.}
 }
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals, and only three of the four objects are returned.
@@ -35,13 +38,13 @@ countModel1GLM <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + 
 
 countModel2GLM <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, family = nbinom2, data = countData)
 
-countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re), family = nb, data = countData)
+countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re"), family = nb, data = countData)
 
 countModel2GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth), family = nb, data = countData)
 
-Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is \code{TRUE}), and how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000):
+Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is \code{TRUE}), how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000), and an optional integer seed for reproducibility:
 
-RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000)
+RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
 }
 \description{
 Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics for generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation. The performance statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that although this function works with GLMMs and GAMMs fitted using a variety of packages/functions, all performance measures are based on model predictions that ignore random effects when present in a model (i.e., performance statistics are based on marginal or population-level model predictions). For models with a zero-inflation component, the performance statistics are based on predictions that account for zero-inflation (e.g., for glmmTMB and pscl model objects, the predicted value represents the product of the mean_count and (1 - prob_zero)).
