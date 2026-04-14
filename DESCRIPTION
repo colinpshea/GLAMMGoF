@@ -1,6 +1,6 @@
 Package: GLMMGoF
 Title: Boostrap generalized linear model fit statistics (RRMSE, RMAD, RBIAS, Brier, and AUC)
-Version: 1.0.0.2
+Version: 1.0.0.3
 Authors@R: 
     person("Colin", "Shea", , "colin.shea@myfwc.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-2906-250X"))
