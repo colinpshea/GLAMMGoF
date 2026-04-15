@@ -160,7 +160,8 @@ BRIER_AUC <- function(
 
     if (is_glmmTMB) {
 
-      predict(m, type = "response", newdata = newdata)
+      predict(m, type = "response", newdata = newdata,
+              allow.new.levels = TRUE)
 
     } else if (is_gam) {
 
@@ -176,7 +177,8 @@ BRIER_AUC <- function(
 
     } else if (is_glmer || is_lmer) {
 
-      predict(m, type = "response", re.form = ~0, newdata = newdata)
+      predict(m, type = "response", re.form = ~0,
+              allow.new.levels = TRUE, newdata = newdata)
 
     } else {
 
