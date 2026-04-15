@@ -33,15 +33,9 @@
 #' @importFrom lme4 glmer
 #' @importFrom mgcv gam predict.gam
 #' @export
-BRIER_AUC <- function(
-    nReps = 100,
-    testModel = NULL,
-    testData = NULL,
-    propTrain = 0.8,
-    DHARMaPlot = TRUE,
-    DHARMaReps = 1000,
-    seed = NULL
-) {
+BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
+                      propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
+                      seed = NULL) {
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -49,15 +43,10 @@ BRIER_AUC <- function(
   stopifnot(!is.null(testData))
   stopifnot(propTrain > 0 && propTrain < 1)
 
-  resp_var <- all.vars(formula(testModel))[1]
+  resp_var  <- all.vars(formula(testModel))[1]
 
-  is_binary <- function(x)
-    length(unique(x)) == 2 && all(x %in% c(0, 1))
-
-  stopifnot(
-    "Response variable is not binary" =
-      is_binary(testData[[resp_var]])
-  )
+  is_binary <- function(x) length(unique(x)) == 2 && all(x %in% c(0, 1))
+  stopifnot(is_binary(testData[[resp_var]]))
 
   mc <- class(testModel)
 
@@ -68,10 +57,17 @@ BRIER_AUC <- function(
   is_negbin  <- "negbin" %in% mc
   is_glm     <- "glm" %in% mc && !is_gam
 
-  is_glmm_like <- is_glmmTMB || is_glmer || is_lmer
+  # FIX 1: ensure scalar logical
+  has_re_syntax <- any(grepl("\\|", deparse(formula(testModel))))
+  is_glmm_like <- has_re_syntax && (is_glmmTMB || is_glmer || is_lmer)
+
+  glmmTMB_re_cols <- NULL
+  if (is_glmmTMB) {
+    re <- ranef(testModel)$cond
+    if (length(re) > 0) glmmTMB_re_cols <- names(re)
+  }
 
   gam_re_labels <- NULL
-
   if (is_gam) {
     re_smooths <- Filter(function(s) isTRUE(s$random), testModel$smooth)
     if (length(re_smooths) > 0) {
@@ -79,11 +75,7 @@ BRIER_AUC <- function(
     }
   }
 
-  # ----------------------------
-  # FIT
-  # ----------------------------
   fit_model <- function(train) {
-
     tryCatch({
 
       if (is_glmm_like) {
@@ -105,9 +97,7 @@ BRIER_AUC <- function(
           if (grepl("Negative Binomial", fam$family)) {
             lme4::glmer.nb(formula(testModel), data = train)
           } else {
-            lme4::glmer(formula(testModel),
-                        family = fam,
-                        data   = train)
+            lme4::glmer(formula(testModel), family = fam, data = train)
           }
         }
 
@@ -123,15 +113,9 @@ BRIER_AUC <- function(
             family = family(testModel),
             data   = train)
 
-      } else if (is_glmer) {
+      } else if (is_lm(testModel)) {
 
-        lme4::glmer(formula(testModel),
-                    family = family(testModel),
-                    data   = train)
-
-      } else if (is_lmer) {
-
-        lme4::lmer(formula(testModel), data = train)
+        lm(formula(testModel), data = train)
 
       } else if (is_negbin) {
 
@@ -141,20 +125,22 @@ BRIER_AUC <- function(
     }, error = function(e) NULL)
   }
 
-  # ----------------------------
-  # PREDICT
-  # ----------------------------
   get_preds <- function(m, newdata) {
 
     if (is_glmmTMB) {
 
-      predict(m, type = "response", newdata = newdata)
+      if (!is.null(glmmTMB_re_cols)) {
+        nd <- newdata
+        nd[, glmmTMB_re_cols] <- NA
+        predict(m, type = "response", newdata = nd)
+      } else {
+        predict(m, type = "response", newdata = newdata)
+      }
 
     } else if (is_gam) {
 
       if (!is.null(gam_re_labels)) {
-        predict(m,
-                type = "response",
+        predict(m, type = "response",
                 exclude = gam_re_labels,
                 newdata = newdata,
                 newdata.guaranteed = TRUE)
@@ -164,7 +150,12 @@ BRIER_AUC <- function(
 
     } else if (is_glmer || is_lmer) {
 
-      predict(m, type = "response", re.form = ~0, newdata = newdata)
+      # FIX 2: suppress new-level warnings
+      predict(m,
+              type = "response",
+              re.form = ~0,
+              allow.new.levels = TRUE,
+              newdata = newdata)
 
     } else {
 
@@ -172,9 +163,6 @@ BRIER_AUC <- function(
     }
   }
 
-  # ----------------------------
-  # METRICS
-  # ----------------------------
   get_stats <- function(phat, y) {
     vp <- val.prob(p = phat, y = y, smooth = FALSE, pl = FALSE)
     c(
@@ -183,27 +171,24 @@ BRIER_AUC <- function(
     )
   }
 
-  # ----------------------------
-  # LOOP
-  # ----------------------------
   results <- vector("list", nReps)
 
   for (j in seq_len(nReps)) {
 
-    train_idx <- sample(seq_len(nrow(testData)),
-                        size = floor(propTrain * nrow(testData)))
+    idx <- sample(seq_len(nrow(testData)),
+                  size = floor(propTrain * nrow(testData)))
 
-    train <- testData[train_idx, ]
-    test  <- testData[-train_idx, ]
+    train <- testData[idx, ]
+    test  <- testData[-idx, ]
 
     m_train <- fit_model(train)
     if (is.null(m_train)) next
 
-    stats_train <- get_stats(get_preds(m_train, train),
-                             train[[resp_var]])
+    yhat_train <- get_preds(m_train, train)
+    yhat_test  <- get_preds(m_train, test)
 
-    stats_test <- get_stats(get_preds(m_train, test),
-                            test[[resp_var]])
+    stats_train <- get_stats(yhat_train, train[[resp_var]])
+    stats_test  <- get_stats(yhat_test,  test[[resp_var]])
 
     results[[j]] <- data.frame(
       auc_train   = stats_train["auc"],
@@ -214,16 +199,12 @@ BRIER_AUC <- function(
   }
 
   results_clean <- results[!vapply(results, is.null, logical(1))]
-
-  if (length(results_clean) == 0) {
+  if (length(results_clean) == 0)
     stop("All model fits failed — no results.")
-  }
 
-  results_df <- bind_rows(results_clean, .id = "simRep") %>%
-    tidyr::pivot_longer(cols = -simRep,
-                        names_to = "metric",
-                        values_to = "value") %>%
-    tidyr::separate(metric, into = c("Metric", "Group")) %>%
+  results_df <- dplyr::bind_rows(results_clean, .id = "simRep") |>
+    tidyr::pivot_longer(-simRep, names_to = "metric", values_to = "value") |>
+    tidyr::separate(metric, into = c("Metric", "Group")) |>
     dplyr::mutate(
       Group = factor(Group,
                      levels = c("train", "test"),
@@ -234,8 +215,7 @@ BRIER_AUC <- function(
                       labels = c("AUC statistic", "Brier score"))
     )
 
-  results_summary <- results_df %>%
-    dplyr::group_by(Group, Metric) %>%
+  results_summary <- dplyr::group_by(results_df, Group, Metric) |>
     dplyr::summarise(
       mn    = mean(value),
       lwr95 = quantile(value, 0.025),
@@ -243,8 +223,30 @@ BRIER_AUC <- function(
       .groups = "drop"
     )
 
+  results_plot <- ggplot2::ggplot(results_df,
+                                  ggplot2::aes(x = value)) +
+    ggplot2::geom_histogram(color = "black", fill = "grey") +
+    ggplot2::facet_grid(Group ~ Metric) +
+    ggplot2::theme_bw()
+
+  if (DHARMaPlot) {
+    dharmaPlot <- DHARMa::simulateResiduals(
+      n = DHARMaReps,
+      testModel,
+      plot = TRUE
+    )
+
+    return(list(
+      brier_auc_results = results_df,
+      brier_auc_hist    = results_plot,
+      brier_auc_summary = results_summary,
+      dharmaPlot        = dharmaPlot
+    ))
+  }
+
   list(
     brier_auc_results = results_df,
+    brier_auc_hist    = results_plot,
     brier_auc_summary = results_summary
   )
 }
