@@ -39,14 +39,19 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   if (!is.null(seed)) set.seed(seed)
 
-  stopifnot("testModel cannot be NULL" = !is.null(testModel))
-  stopifnot("testData cannot be NULL"  = !is.null(testData))
-  stopifnot("propTrain must be between 0 and 1" = propTrain > 0 && propTrain < 1)
+  stopifnot(!is.null(testModel))
+  stopifnot(!is.null(testData))
+  stopifnot(propTrain > 0 && propTrain < 1)
 
   resp_var  <- all.vars(formula(testModel))[1]
-  is_binary <- function(x) length(unique(x)) == 2 && all(x %in% c(0, 1))
-  stopifnot("Response variable is not binary! Use RRMSE_RMAD_RBIAS() instead" =
-              is_binary(testData[[resp_var]]))
+
+  is_binary <- function(x)
+    length(unique(x)) == 2 && all(x %in% c(0, 1))
+
+  stopifnot(
+    "Response variable is not binary! Use RRMSE_RMAD_RBIAS() instead" =
+      is_binary(testData[[resp_var]])
+  )
 
   mc <- class(testModel)
 
@@ -57,37 +62,37 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   is_negbin  <- "negbin" %in% mc
   is_glm     <- "glm" %in% mc && !is_gam
 
-  # =========================
-  # NEW: detect RE syntax
-  # =========================
+  # ----------------------------
+  # SAFE GLMM DETECTION
+  # ----------------------------
   has_re_syntax <- grepl("\\|", deparse(formula(testModel)))
 
-  # --- glmmTMB RE structure ---
-  glmmTMB_re_cols <- NULL
-  if (is_glmmTMB) {
-    re <- ranef(testModel)$cond
-    if (length(re) > 0) glmmTMB_re_cols <- names(re)
-  }
+  is_glmm_like <- has_re_syntax && (
+    is_glmmTMB || is_glmer || is_lmer
+  )
 
-  # --- GAM RE smooths ---
+  # ----------------------------
+  # GAM RE metadata
+  # ----------------------------
   gam_re_labels <- NULL
-  gam_re_terms  <- NULL
   if (is_gam) {
     re_smooths <- Filter(function(s) isTRUE(s$random), testModel$smooth)
     if (length(re_smooths) > 0) {
       gam_re_labels <- sapply(re_smooths, function(s) s$label)
-      gam_re_terms  <- sapply(re_smooths, function(s) s$term)
     }
   }
 
-  # --- Fit model ---
+  # ----------------------------
+  # FIT MODEL
+  # ----------------------------
   fit_model <- function(train) {
+
     tryCatch({
 
       # =========================
-      # NEW: GLMM routing
+      # GLMM (SAFE ROUTING)
       # =========================
-      if (has_re_syntax) {
+      if (is_glmm_like) {
 
         if (is_glmmTMB) {
 
@@ -131,7 +136,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
             data   = train)
 
         # =========================
-        # GLMM objects (original fits)
+        # GLMM objects
         # =========================
       } else if (is_glmer) {
 
@@ -151,21 +156,20 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
         MASS::glm.nb(formula(testModel), data = train)
       }
 
-    }, error = function(e) NULL)
+    }, error = function(e) {
+      message("Model failed: ", e$message)
+      NULL
+    })
   }
 
-  # --- Predict helper ---
+  # ----------------------------
+  # PREDICTION
+  # ----------------------------
   get_preds <- function(m, newdata) {
 
     if (is_glmmTMB) {
 
-      if (!is.null(glmmTMB_re_cols)) {
-        nd <- newdata
-        nd[, glmmTMB_re_cols] <- NA
-        predict(m, type = "response", newdata = nd)
-      } else {
-        predict(m, type = "response", newdata = newdata)
-      }
+      predict(m, type = "response", newdata = newdata)
 
     } else if (is_gam) {
 
@@ -189,7 +193,9 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     }
   }
 
-  # --- AUC + Brier ---
+  # ----------------------------
+  # METRICS
+  # ----------------------------
   get_stats <- function(phat, y) {
     vp <- val.prob(p = phat, y = y, smooth = FALSE, pl = FALSE)
     c(
@@ -198,7 +204,9 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     )
   }
 
-  # --- simulation loop ---
+  # ----------------------------
+  # LOOP
+  # ----------------------------
   results <- vector("list", nReps)
 
   for (j in seq_len(nReps)) {
@@ -210,16 +218,14 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     test  <- testData[-train_idx, ]
 
     m_train <- fit_model(train)
-    if (is.null(m_train)) next
 
-    y_train <- train[[resp_var]]
-    y_test  <- test[[resp_var]]
+    if (is.null(m_train)) next
 
     yhat_train <- get_preds(m_train, train)
     yhat_test  <- get_preds(m_train, test)
 
-    stats_train <- get_stats(yhat_train, y_train)
-    stats_test  <- get_stats(yhat_test, y_test)
+    stats_train <- get_stats(yhat_train, train[[resp_var]])
+    stats_test  <- get_stats(yhat_test,  test[[resp_var]])
 
     results[[j]] <- data.frame(
       auc_train   = stats_train["auc"],
@@ -229,8 +235,16 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     )
   }
 
-  # --- tidy ---
-  results_df <- bind_rows(results, .id = "simRep") %>%
+  # ----------------------------
+  # SAFE BIND (IMPORTANT FIX)
+  # ----------------------------
+  results_clean <- results[!vapply(results, is.null, logical(1))]
+
+  if (length(results_clean) == 0) {
+    stop("All model fits failed.")
+  }
+
+  results_df <- bind_rows(results_clean, .id = "simRep") %>%
     tidyr::pivot_longer(cols = -simRep,
                         names_to = "metric",
                         values_to = "value") %>%
