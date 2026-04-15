@@ -76,47 +76,39 @@ RRMSE_RMAD_RBIAS <- function(
 
   mc <- class(testModel)
 
+  # ----------------------------
+  # CLASS-BASED MODEL DETECTION
+  # ----------------------------
   is_glmmTMB <- "glmmTMB" %in% mc
   is_gam     <- "gam" %in% mc
   is_glmer   <- "glmerMod" %in% mc
   is_lmer    <- "lmerMod" %in% mc
   is_negbin  <- "negbin" %in% mc
   is_glm     <- "glm" %in% mc && !is_gam
-  is_lm      <- "lm" %in% mc && !is_gam && !is_glm
+  is_lm      <- "lm" %in% mc && !is_glm && !is_glm
 
-  # ----------------------------
-  # BULLETPROOF GLMM DETECTION
-  # ----------------------------
-  has_re_syntax <- grepl("\\|", deparse(formula(testModel)))
-
-  is_glmm_like <- has_re_syntax && (
-    is_glmmTMB || is_glmer || is_lmer
-  )
+  is_glmm_like <- is_glmmTMB || is_glmer || is_lmer
 
   # ----------------------------
   # GAM RE metadata
   # ----------------------------
   gam_re_labels <- NULL
-  gam_re_terms  <- NULL
 
   if (is_gam) {
     re_smooths <- Filter(function(s) isTRUE(s$random), testModel$smooth)
     if (length(re_smooths) > 0) {
       gam_re_labels <- sapply(re_smooths, function(s) s$label)
-      gam_re_terms  <- sapply(re_smooths, function(s) s$term)
     }
   }
 
   # ----------------------------
-  # Fit model
+  # FIT MODEL
   # ----------------------------
   fit_model <- function(train) {
 
     tryCatch({
 
-      # =========================
-      # GLMM (SAFE ROUTING)
-      # =========================
+      # GLMM
       if (is_glmm_like) {
 
         if (is_glmmTMB) {
@@ -142,39 +134,31 @@ RRMSE_RMAD_RBIAS <- function(
           }
         }
 
-        # =========================
         # GAM
-        # =========================
       } else if (is_gam) {
 
         mgcv::gam(formula(testModel),
                   family = family(testModel),
                   data   = train)
 
-        # =========================
-        # GLM / LM
-        # =========================
+        # GLM
       } else if (is_glm) {
 
         glm(formula(testModel),
             family = family(testModel),
             data   = train)
 
+        # LM
       } else if (is_lm) {
 
         lm(formula(testModel), data = train)
 
-        # =========================
         # fallback GLMM objects
-        # =========================
       } else if (is_glmer) {
 
-        if (grepl("Negative Binomial", family(testModel)$family))
-          lme4::glmer.nb(formula(testModel), data = train)
-        else
-          lme4::glmer(formula(testModel),
-                      family = family(testModel),
-                      data   = train)
+        lme4::glmer(formula(testModel),
+                    family = family(testModel),
+                    data   = train)
 
       } else if (is_lmer) {
 
@@ -192,7 +176,7 @@ RRMSE_RMAD_RBIAS <- function(
   }
 
   # ----------------------------
-  # Prediction helper
+  # PREDICTION
   # ----------------------------
   get_preds <- function(m, newdata) {
 
@@ -223,7 +207,7 @@ RRMSE_RMAD_RBIAS <- function(
   }
 
   # ----------------------------
-  # Loop
+  # LOOP
   # ----------------------------
   results <- vector("list", nReps)
 
@@ -238,25 +222,19 @@ RRMSE_RMAD_RBIAS <- function(
     m_train <- fit_model(train)
     if (is.null(m_train)) next
 
-    y_train <- train[[resp_var]]
-    y_test  <- test[[resp_var]]
-
     yhat_train <- get_preds(m_train, train)
     yhat_test  <- get_preds(m_train, test)
 
     results[[j]] <- data.frame(
-      train_RRMSE = fit_cost_rrmse(y_train, yhat_train),
-      test_RRMSE  = fit_cost_rrmse(y_test, yhat_test),
-      train_RMAD  = fit_cost_rmad(y_train, yhat_train),
-      test_RMAD   = fit_cost_rmad(y_test, yhat_test),
-      train_RBIAS = fit_cost_rbias(y_train, yhat_train),
-      test_RBIAS  = fit_cost_rbias(y_test, yhat_test)
+      train_RRMSE = fit_cost_rrmse(train[[resp_var]], yhat_train),
+      test_RRMSE  = fit_cost_rrmse(test[[resp_var]],  yhat_test),
+      train_RMAD  = fit_cost_rmad(train[[resp_var]], yhat_train),
+      test_RMAD   = fit_cost_rmad(test[[resp_var]],  yhat_test),
+      train_RBIAS = fit_cost_rbias(train[[resp_var]], yhat_train),
+      test_RBIAS  = fit_cost_rbias(test[[resp_var]],  yhat_test)
     )
   }
 
-  # ----------------------------
-  # SAFE bind_rows (fixes simRep crash)
-  # ----------------------------
   results_clean <- results[!vapply(results, is.null, logical(1))]
 
   if (length(results_clean) == 0) {
@@ -267,8 +245,7 @@ RRMSE_RMAD_RBIAS <- function(
     tidyr::pivot_longer(cols = -simRep,
                         names_to = "metric",
                         values_to = "value") %>%
-    tidyr::separate(metric,
-                    into = c("Group", "Metric")) %>%
+    tidyr::separate(metric, into = c("Group", "Metric")) %>%
     dplyr::mutate(
       Group = factor(Group,
                      levels = c("train", "test"),
@@ -287,30 +264,8 @@ RRMSE_RMAD_RBIAS <- function(
       .groups = "drop"
     )
 
-  results_plot <- ggplot2::ggplot(results_df,
-                                  ggplot2::aes(x = value)) +
-    ggplot2::geom_histogram(color = "black", fill = "grey") +
-    ggplot2::facet_grid(Group ~ Metric) +
-    ggplot2::theme_bw()
-
-  if (DHARMaPlot) {
-    dharmaPlot <- DHARMa::simulateResiduals(
-      n = DHARMaReps,
-      testModel,
-      plot = TRUE
-    )
-
-    return(list(
-      rrmse_rmad_results = results_df,
-      rrmse_rmad_hist    = results_plot,
-      rrmse_rmad_summary = results_summary,
-      dharmaPlot         = dharmaPlot
-    ))
-  }
-
   list(
     rrmse_rmad_results = results_df,
-    rrmse_rmad_hist    = results_plot,
     rrmse_rmad_summary = results_summary
   )
 }
