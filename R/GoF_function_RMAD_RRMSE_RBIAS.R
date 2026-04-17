@@ -209,7 +209,19 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
     labs(x = "% relative to true mean", y = "Frequency")
 
   if (DHARMaPlot) {
-    dharmaPlot <- simulateResiduals(n = DHARMaReps, testModel, plot = TRUE)
+    dharmaPlot <- tryCatch(
+      withCallingHandlers(
+        simulateResiduals(n = DHARMaReps, testModel, plot = TRUE),
+        warning = function(w) {
+          message("DHARMa warning (", class(testModel)[1], "): ", conditionMessage(w))
+          invokeRestart("muffleWarning")
+        }
+      ),
+      error = function(e) {
+        message("DHARMa failed (", class(testModel)[1], "): ", conditionMessage(e))
+        NULL
+      }
+    )
     return(list(rrmse_rmad_results  = results_df,
                 rrmse_rmad_hist     = results_plot,
                 rrmse_rmad_summary  = results_summary,

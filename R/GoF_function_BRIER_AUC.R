@@ -198,9 +198,15 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   if (DHARMaPlot) {
     dharmaPlot <- tryCatch(
-      simulateResiduals(n = DHARMaReps, testModel, plot = TRUE),
+      withCallingHandlers(
+        simulateResiduals(n = DHARMaReps, testModel, plot = TRUE),
+        warning = function(w) {
+          message("DHARMa warning (", class(testModel)[1], "): ", conditionMessage(w))
+          invokeRestart("muffleWarning")
+        }
+      ),
       error = function(e) {
-        warning("DHARMa plot failed: ", e$message)
+        message("DHARMa failed (", class(testModel)[1], "): ", conditionMessage(e))
         NULL
       }
     )
