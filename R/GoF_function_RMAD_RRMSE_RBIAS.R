@@ -60,6 +60,15 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
   stopifnot("Response variable is binary! Use BRIER_AUC() instead" =
               !is_binary(testData[[resp_var]]))
 
+  # Check for unsupported binomial response types
+  resp_expr <- formula(testModel)[[2]]
+  is_cbind  <- is.call(resp_expr) && deparse(resp_expr[[1]]) == "cbind"
+  is_prop   <- is.call(resp_expr) && grepl("/", deparse(resp_expr))
+  stopifnot(
+    "cbind() and proportion binomial responses are not supported. See ?RRMSE_RMAD_RBIAS for details." =
+      !is_cbind && !is_prop
+  )
+
   # --- Pre-compute model class flags (once, outside loop) ---
   mc         <- class(testModel)
   is_glmmTMB <- "glmmTMB"  %in% mc
