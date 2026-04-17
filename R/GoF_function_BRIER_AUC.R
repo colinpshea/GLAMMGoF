@@ -191,7 +191,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
           axis.text          = element_text(colour = "black"),
           panel.spacing      = unit(1.5, "lines")) +
     labs(x = "Value", y = "Frequency") +
-    scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2),
+    scale_x_continuous(breaks = seq(0, 1, 0.2),
                        expand = expansion(add = c(0.05, 0.05)))
 
   if (DHARMaPlot) {
