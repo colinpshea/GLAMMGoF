@@ -32,19 +32,23 @@ BRIER_AUC(
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all \code{nReps} bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals and only three of the four objects are returned.
 
-This package contains an example data set to fit a logistic regression called logitData, and four example logistic regression model objects are also included: logitModel1GLM is a GLM that includes a random effect; logitModel2GLM is a GLM that does not include a random effect; logitModel1GAM is a GAM that includes a random effect; and logitModel2GAM is a GAM that does not include a random effect. Both GLMs were fitted using \code{glmmTMB}, whereas the GAMs were fitted using \code{mgcv}. logitModel1GLM could also be a \code{glmer} (from \code{lme4}) or \code{gam} (from \code{mgcv}) model object, and logitModel2GLM could also be a \code{glm} or \code{gam} (from \code{mgcv}) model object:
+This package contains an example data set to fit a logistic regression called logitData. Six example logistic regression model objects are also included: logitModel_GLM is a GLM with no random effects; logitModel_GLMM is a GLMM with one random effect; logitModel_GLMM2 is a GLMM with two random effects; logitModel_GAM is a GAM with no random effects; logitModel_GAMM is a GAMM with one random effect; and logitModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using \code{glmmTMB}, whereas GAMs and GAMMs were fitted using \code{mgcv}:
 
-logitModel1GLM <- glmmTMB(y ~ totalLengthcm + Zone + (1|Year), family = binomial, data = logitData)
+logitModel_GLM <- glmmTMB(y ~ Season + Temp, family = binomial, data = logitData)
 
-logitModel2GLM <- glmmTMB(y ~ totalLengthcm + Zone, family = binomial, data = logitData)
+logitModel_GLMM <- glmmTMB(y ~ Season + Temp + (1|Site), family = binomial, data = logitData)
 
-logitModel1GAM <- gam(y ~ s(totalLengthcm) + Zone + s(Year, bs = "re"), family = binomial, data = logitData)
+logitModel_GLMM2 <- glmmTMB(y ~ Season + Temp + (1|Site) + (1|Year), family = binomial, data = logitData)
 
-logitModel2GAM <- gam(y ~ s(totalLengthcm) + Zone, family = binomial, data = logitData)
+logitModel_GAM <- gam(y ~ Season + s(Temp), family = binomial, data = logitData)
+
+logitModel_GAMM <- gam(y ~ Season + s(Temp) + s(Site, bs = "re"), family = binomial, data = logitData)
+
+logitModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = binomial, data = logitData)
 
 Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want to use DHARMa to assess the residuals (the default is TRUE), how many simulation replicates you want to use in DHARMa's \code{simulateResiduals()} function (the default is 1000), and an optional integer seed for reproducibility:
 
-BRIER_AUC(nReps = 100, testModel = logitModel1GLM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
 }
 \description{
 Bootstrap Brier score and AUC fit statistics (see \code{rms} package documentation for details) for generalized linear and generalized additive models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). The AUC score is an aggregated metric that evaluates how well a logistic regression model classifies positive and negative outcomes at all possible cutoffs (i.e., probability cutoffs for defining positive (1) vs negative (0) cases). AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model (i.e., a better classifier), and where an AUC score of 0.5 suggests a model performs no better than random guessing. Note that although this function works with GLMMs and GAMMs fitted using a variety of packages/functions, all performance measures are based on model predictions that ignore random effects when present in a model (i.e., performance statistics are based on marginal or population-level model predictions).

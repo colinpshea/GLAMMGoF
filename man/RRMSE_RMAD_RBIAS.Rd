@@ -32,19 +32,23 @@ RRMSE_RMAD_RBIAS(
 \value{
 This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals, and only three of the four objects are returned.
 
-This package contains an example data set for fitting a negative binomial or Poisson regression called countData. This data set has an integer response variable, but data with a continuous response variable could also be used. Four example negative binomial regression model objects are also included: countModel1GLM is a GLM that includes a random effect; countModel2GLM is a GLM that does not include a random effect; countModel1GAM is a GAM that includes a random effect; and countModel2GAM is a GAM that does not include a random effect. Both GLMs were fitted using \code{glmmTMB}, whereas the GAMs were fitted using \code{mgcv}. countModel1 could also be a \code{glmer} (fitted using \code{glmer} or \code{glmer.nb} from \code{lme4}) or \code{gam} (fitted using \code{mgcv}) model object, and countModel2 could also be a \code{glm.nb} (from the \code{MASS} package) or \code{gam} model object:
+This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using \code{glmmTMB}, whereas GAMs and GAMMs were fitted using \code{mgcv}:
 
-countModel1GLM <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth + (1|RiverSeasonYear), family = nbinom2, data = countData)
+countModel_GLM <- glmmTMB(y ~ Season + Temp, family = nbinom2, data = countData)
 
-countModel2GLM <- glmmTMB(y ~ Season + River + Temp + Snags + Year + AvgDepth, family = nbinom2, data = countData)
+countModel_GLMM <- glmmTMB(y ~ Season + Temp + (1|Site), family = nbinom2, data = countData)
 
-countModel1GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth) + s(RiverSeasonYear, bs = "re"), family = nb, data = countData)
+countModel_GLMM2 <- glmmTMB(y ~ Season + Temp + (1|Site) + (1|Year), family = nbinom2, data = countData)
 
-countModel2GAM <- gam(y ~ Season + River + s(Temp) + Snags + Year + s(AvgDepth), family = nb, data = countData)
+countModel_GAM <- gam(y ~ Season + s(Temp), family = nb, data = countData)
 
-Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want use DHARMa to assess the residuals (the default is \code{TRUE}), how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000), and an optional integer seed for reproducibility:
+countModel_GAMM <- gam(y ~ Season + s(Temp) + s(Site, bs = "re"), family = nb, data = countData)
 
-RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel1, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
+
+Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want to use DHARMa to assess the residuals (the default is \code{TRUE}), how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000), and an optional integer seed for reproducibility:
+
+RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
 }
 \description{
 Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics for generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation. The performance statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that although this function works with GLMMs and GAMMs fitted using a variety of packages/functions, all performance measures are based on model predictions that ignore random effects when present in a model (i.e., performance statistics are based on marginal or population-level model predictions). For models with a zero-inflation component, the performance statistics are based on predictions that account for zero-inflation (e.g., for glmmTMB and pscl model objects, the predicted value represents the product of the mean_count and (1 - prob_zero)).
