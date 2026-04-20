@@ -26,3 +26,7 @@ Depends:
     ggplot2,
     mgcViz,
     R (>= 3.5)
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

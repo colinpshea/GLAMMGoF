@@ -1,0 +1,193 @@
+---
+title: "GLAMMGoF Tutorial"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    number_sections: false
+vignette: >
+  %\VignetteIndexEntry{GLAMMGoF Tutorial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = T,
+  warning = F,
+  comment = NA,
+  message = F,
+  fig.width = 7, 
+  fig.height = 4
+)
+```
+
+####### What does GLAMMGoF do?
+
+GLAMMGoF is an R package that uses bootstrapping to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `RRMSE_RMAD_RBIAS()` and `BRIER_AUC`(), bootstrap several performance statistics and support model objects from a variety of R packages, including glmmTMB() from glmmTMB, glmer() and glmer.nb() from lme4, glm.nb() from MASS, gam() from mgcv, and glm() and lm() from the stats package). This package also uses the R package DHARMa to assess goodness-of-fit of GLM(M)s based scaled model residuals.
+
+-   `RRMSE_RMAD_RBIAS()` is used for models with continuous or integer response variables (e.g., models with Gaussian, Poisson, negative binomial, Tweedie, or gamma distributions).
+
+-   `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression).
+
+-   Both functions accept models with or without random effects, but the predictive performance of models with random effects are based on population-level predictions i.e., random effects are ignored in the model predictions.
+
+*An important thing to note here - and something that may not be universally accepted - is that the functions in this package take an existing model fit to [all]{.underline} the available data, and then assess the performance of that model (or, more specifically, the model structure) by (1) re-fitting the model to training data i.e., a subset of the original data, and (2) evaluating in- and out-of-sample predictive performance by predicting to training (the subset of data used to fit the model) and testing data (the withheld data not included in the training subset). I, for one, think this is fine and that it's preferable to use ALL the available data for model-fitting and associated inferences, and then this approach can be used to evaluate predictive performance of the general model structure using testing and training data. Why toss 20% of the data at the outset just to withhold a testing data set, especially in ecological studies where data sets are often small?*
+
+###### Getting started
+
+If you don't have it installed already, you can install the Compressed Archive Folder (GLAMMGoF_1.0.0.0.tar) directly in RStudio by opening RStudio and navigating to the Packages window –\> Install –\> Install From: Package Archive File (.zip; .tar.gz) and RStudio should do the rest. Provided you've managed to successfully download and install it, you can now load and attach GLAMMGoF just like any other R package. Note that `ggplot2` is a dependency, and functions from numerous other R packages are imported and used as well.
+
+```{r, warning=FALSE, message = FALSE, comment=NA}
+library(GLAMMGoF)
+```
+
+```{r, warning=FALSE, message = FALSE, comment=NA, echo=FALSE}
+library(dplyr)
+library(tidyr)
+```
+
+###### How do I use GLAMMGoF?
+
+There are only two functions in this package, and which one you need to use depends on the type of model you're assessing:
+
+-   `RRMSE_RMAD_RBIAS()` : used for models with continuous or integer response variables and bootstraps three performance statistics: RRMSE, RMAD, and RBIAS. For all three statistics, values closer to 0 indicate a better performing model (see `?RRMSE_RMAD` for details).
+
+-   `BRIER_AUC()` : used for models with binary response variables and bootstraps two performance statistics, AUC and Brier scores. AUC scores closer to 1 and Brier scores closer to 0 indicate a better performing model (see `?BRIER_AUC` for details).
+
+These functions bootstrap RRMSE, RMAD, and RBIAS (RRMSE_RMAD_RBIAS) statistics and Brier and AUC scores (BRIER_AUC) to assess in- and out-of-sample predictive performance for GLM(M)s with and without random effects.
+
+Generally, they both work by taking a model and its data, splitting the data into two pieces, one with 80% (by default it's 80% but this can be changed) of the observations and one with the remaining 20% of observations, refitting the model, and calculating performance statistics...and this is done over and over and over again to generate a bunch of (bootstrapped) statistics.
+
+The 80% data set, also known as the training data set, is used to refit the original models and assess in-sample performance (how well can the model predict the data used to fit the model?). The model fit to the 80% data set is also then used to predict the response variable in the "test" data set, or the data set with 20% of the remaining observations that the model has never seen; this is used to assess out-of-sample predictive performance.
+
+This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE/RMAD/RBIAS and/or Brier/AUC scores are bootstrapped in each function because they are slightly different yet complementary measures of predictive performance.
+
+There are two example data sets, `countData` and `logitData` , with integer and binary response variables, respectively. Each data set has a variety of continuous and categorical predictor variable as well. Additionally, there are 12 example model objects (6 for `count` and 6 for `logit`: `Model_GLM`, `ModelGLMM`, `ModelGLMM2`, `ModelGAM`, `ModelGAMM`, and `ModelGAMM2`. Models ending `M` include only fixed effects, whereas models ending in `MM` and `MM2` contain one and two random effects, respectively. All 12 example models were fitted using the R package `glmmTMB`, but a variety of R packages that fit GL(A)M(M)s are also compatible with `GLAMMGoF`.
+
+###### Using the RRMSE_RMAD_RBIAS function
+
+To use this function properly, you must:
+
+1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (glmmTMB, lme4 (including glmer.nb), MASS (glm.nb), mgcv (gams), and glm/lm from the stats package).
+
+    1.  Note that if you include a random effect in a gam from mgcv, that variable MUST be a factor or else mgcv will throw an error.
+
+2.  The only other choices you need to make are:
+
+    1.  The number of bootstrap replicates you want to (the default is 100 but this should be at least 500 or 1000).
+
+    2.  The proportion of data you want to use for assessing in-sample predictive performance (the default is 80%).
+
+    3.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is TRUE), and how many simulation replicates you want DHARMa to use (the default is 1000).
+
+Now let's run it and see what happens...
+
+```{r, warning=FALSE, comment=NA}
+rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+rr_rm$rrmse_rmad_results <- rr_rm$rrmse_rmad_results %>% mutate_at(vars(value), funs(round(., 2)))
+```
+
+Look at `nReps` values of the fit statistics...
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(rr_rm$rrmse_rmad_results))
+```
+
+ 
+
+And then look at a summary of the `nReps` values...
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+rr_rm$rrmse_rmad_summary <- rr_rm$rrmse_rmad_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(rr_rm$rrmse_rmad_summary))
+```
+
+ 
+
+And now look at a plot of the summaries
+
+```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
+rr_rm$rrmse_rmad_hist
+```
+
+ 
+
+###### Using the BRIER_AUC function
+
+To use this function properly, you must:
+
+1.  Be sure you're using it with the correct model type, which in this case is only a logistic regression with a binary response variable. Additionally, logistic regression models fit using the R packages glmmTMB, lme4, and glm/lm from the stats package are all supported.
+
+2.  The only other choices you need to make are:
+
+    1.  The proportion of data you want to use for assessing in-sample predictive performance (the default is 80%)
+
+    2.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is "Yes").
+
+```{r, warning=FALSE, comment=NA}
+br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+br_auc$brier_auc_results <- br_auc$brier_auc_results %>% mutate_at(vars(value), funs(round(., 2)))
+```
+
+Look at 25 `nReps` values of the fit statistics...
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(br_auc$brier_auc_results, 25))
+```
+
+ 
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+```
+
+ 
+
+And then look at a summary of the `nReps` values...
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(br_auc$brier_auc_summary, 25))
+```
+
+ 
+
+And now look at a plot of the summaries
+
+```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
+br_auc$brier_auc_hist
+```
+
+ 
+
+###### Error messages when using RRMSE_RMAD
+
+For obvious reasons, the code below will cause `RRMSE_RMAD()` quit and throw an error message:
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+RRMSE_RMAD_RBIAS(nReps = 1000, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+try(RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42))
+```
+
+###### Error messages when using BRIER_AUC
+
+For equally obvious reasons, the code below will cause `BRIER_AUC()` quit and throw an error message:
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+try(BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42))
+```
