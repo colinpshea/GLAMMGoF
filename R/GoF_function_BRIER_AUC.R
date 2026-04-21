@@ -167,7 +167,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     message(n_failed, " of ", nReps, " bootstrap replicates failed (", round(n_failed / nReps*100, 1), "%). If this percentage is high, consider reviewing your model structure or increasing propTrain to use a larger proportion of data for model-fitting.")
 
   # ---- count up, report, and omit results with NA
-  n_na <- sum(apply(results_clean, function(x) sum(is.na())))
+  n_na <- sum(unlist(lapply(results_clean, function(x) sum(is.na(x)))))
   if (n_na > 0) message(n_na, " NA values removed from ", nrow(results_df), " total bootstrap observations. ", "This may indicate model instability or sparse data.")
   results_df <- results_df[!is.na(results_df$value), ]
 
