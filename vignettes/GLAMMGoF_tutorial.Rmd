@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 
 ####### What does GLAMMGoF do?
 
-GLAMMGoF is an R package that uses bootstrapping to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `RRMSE_RMAD_RBIAS()` and `BRIER_AUC`(), bootstrap several performance statistics and support model objects from a variety of R packages, including glmmTMB() from glmmTMB, glmer() and glmer.nb() from lme4, glm.nb() from MASS, gam() from mgcv, and glm() and lm() from the stats package). This package also uses the R package DHARMa to assess goodness-of-fit of GLM(M)s based scaled model residuals.
+`GLAMMGoF` is an R package that uses bootstrapping to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `RRMSE_RMAD_RBIAS()` and `BRIER_AUC`(), bootstrap several performance statistics and support model objects from a variety of R packages, including glmmTMB() from `glmmTMB`, glmer() and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the `stats` package). This package also uses the R package `DHARMa` to assess goodness-of-fit of GLM(M)s based scaled model residuals.
 
 -   `RRMSE_RMAD_RBIAS()` is used for models with continuous or integer response variables (e.g., models with Gaussian, Poisson, negative binomial, Tweedie, or gamma distributions).
 
@@ -35,7 +35,7 @@ GLAMMGoF is an R package that uses bootstrapping to assess goodness-of-fit and p
 
 ###### Getting started
 
-If you don't have it installed already, you can install the Compressed Archive Folder (GLAMMGoF_1.0.0.0.zip) directly in RStudio by opening RStudio and navigating to the Packages window –\> Install –\> Install From: Package Archive File (.zip; .tar.gz) and RStudio should do the rest. Provided you've managed to successfully download and install it, you can now load and attach GLAMMGoF just like any other R package. Note that `ggplot2` is a dependency, and functions from numerous other R packages are imported and used as well.
+You've either downloaded and installed `GLAMMGoF` from R-universe, GitHub, DevOps, or a local zipped package file. Once installed, you can access the vignette by running `browseVignettes("GLAMMGoF")`. Note that `ggplot2` is a dependency, and functions from numerous other R packages are imported and used as well.
 
 ```{r, warning=FALSE, message = FALSE, comment=NA}
 library(GLAMMGoF)
@@ -68,7 +68,7 @@ There are two example data sets, `countData` and `logitData` , with integer and 
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (glmmTMB, lme4 (including glmer.nb), MASS (glm.nb), mgcv (gams), and glm/lm from the stats package).
+1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer.nb`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package).
 
     1.  Note that if you include a random effect in a gam from mgcv, that variable MUST be a factor or else mgcv will throw an error.
 
@@ -122,7 +122,7 @@ rr_rm$rrmse_rmad_hist
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is only a logistic regression with a binary response variable. Additionally, logistic regression models fit using the R packages glmmTMB, lme4, and glm/lm from the stats package are all supported.
+1.  Be sure you're using it with the correct model type, which in this case is only a logistic regression with a binary response variable. Additionally, logistic regression models fit using the R packages `glmmTMB`, `lme4`, and `glm`/`lm` from the `stats` package are all supported.
 
 2.  The only other choices you need to make are:
 
