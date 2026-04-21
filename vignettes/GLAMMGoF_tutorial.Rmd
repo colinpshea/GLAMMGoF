@@ -35,7 +35,7 @@ GLAMMGoF is an R package that uses bootstrapping to assess goodness-of-fit and p
 
 ###### Getting started
 
-If you don't have it installed already, you can install the Compressed Archive Folder (GLAMMGoF_1.0.0.0.tar) directly in RStudio by opening RStudio and navigating to the Packages window –\> Install –\> Install From: Package Archive File (.zip; .tar.gz) and RStudio should do the rest. Provided you've managed to successfully download and install it, you can now load and attach GLAMMGoF just like any other R package. Note that `ggplot2` is a dependency, and functions from numerous other R packages are imported and used as well.
+If you don't have it installed already, you can install the Compressed Archive Folder (GLAMMGoF_1.0.0.0.zip) directly in RStudio by opening RStudio and navigating to the Packages window –\> Install –\> Install From: Package Archive File (.zip; .tar.gz) and RStudio should do the rest. Provided you've managed to successfully download and install it, you can now load and attach GLAMMGoF just like any other R package. Note that `ggplot2` is a dependency, and functions from numerous other R packages are imported and used as well.
 
 ```{r, warning=FALSE, message = FALSE, comment=NA}
 library(GLAMMGoF)
