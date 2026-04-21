@@ -194,6 +194,11 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
       Metric = factor(Metric, levels = c("RRMSE", "RMAD", "RBIAS"))
     )
 
+  # ---- count up, report, and omit results with NA
+  n_na <- sum(is.na(results_df$value))
+  if (n_na > 0) message(n_na, " NA values removed from ", nrow(results_df), " total bootstrap observations. ", "This may indicate model instability or sparse data.")
+  results_df <- results_df[!is.na(results_df$value), ]
+
   results_summary <- results_df %>%
     group_by(Group, Metric) %>%
     summarise(mn    = mean(value),
