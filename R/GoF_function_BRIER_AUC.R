@@ -162,6 +162,10 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   if (length(results_clean) == 0)
     stop("All model fits failed - no results to summarise.")
 
+  n_failed <- nReps - length(results_clean)
+  if (n_failed > 0)
+    message(n_failed, " of ", nReps, " bootstrap replicates failed (", round(n_failed / nReps*100, 1), "%). If this percentage is high, consider reviewing your model structure or increasing propTrain to use a larger proportion of data for model-fitting.")
+
   # --- Tidy results ---
   # Note: separate() splits on "_" giving Metric (auc/brier) then Group (train/test),
   # which is the reverse order from RRMSE_RMAD_RBIAS where Group comes first.
