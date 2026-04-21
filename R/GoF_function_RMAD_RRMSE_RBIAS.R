@@ -195,9 +195,9 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
     )
 
   # ---- count up, report, and omit results with NA
-  n_na <- sum(is.na(results_df$value))
+  n_na <- sum(is.na(results_df$value) | is.infinite(results_df$value))
   if (n_na > 0)
-    message(n_na, " NA values removed from ", nrow(results_df),
+    message(n_na, " NA of Inf values removed from ", nrow(results_df),
             " total bootstrap observations. ",
             "This may indicate model instability or sparse data.")
   results_df <- results_df[!is.na(results_df$value), ]
