@@ -178,7 +178,7 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
   # Guard against all replicates failing
   results_clean <- results[!vapply(results, is.null, logical(1))]
   if (length(results_clean) == 0)
-    stop("All model fits failed — no results to summarise.")
+    stop("All model fits failed - no results to summarise.")
 
   # --- Tidy results ---
   results_df <- bind_rows(results_clean, .id = "simRep") %>%

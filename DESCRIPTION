@@ -1,11 +1,11 @@
 Package: GLAMMGoF
-Title: Boostrap generalized linear model fit statistics (RRMSE, RMAD, RBIAS, Brier, and AUC)
-Version: 1.0.0.0
+Title: Bootstrap Generalized Linear Model Fit Statistics (RRMSE, RMAD, RBIAS, Brier, and AUC)
+Version: 1.0.0
 Authors@R: 
     person("Colin", "Shea", , "colin.shea@myfwc.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-2906-250X"))
 Description: Description: This package takes generalized linear and generalized additive models (with or without random effects) fitted using various packages (glmmTMB, mgcv, stats, lme4, MASS, etc.) to bootstrap fit statistics and assess in- and out-of-sample predictive performance. For models with a continuous or integer response, the fit statistics are relative root mean squared error (RRMSE), relative median absolute deviation (RMAD), and relative bias (RBIAS). For binary response models, the fit statistics are Brier scores and AUC statistics. By default, 80% of the data are used for model fitting and to assess in-sample or training performance, and the remaining 20% are used to assess out-of-sample or testing performance. Users can optionally use DHARMa package functions to assess model residuals. 
-License: use_mit_license()
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
@@ -16,15 +16,13 @@ Imports:
     ,rms (>= 6.0-0)
     ,DHARMa (>= 0.4.0)
     ,glmmTMB  (>= 1.1.5)
-    ,TMB  (>= 1.9.2)
-    ,magrittr
     ,lme4
     ,MASS
+    ,magrittr
+    ,mgcViz
     ,mgcv
-    ,stringr
 Depends: 
     ggplot2,
-    mgcViz,
     R (>= 3.5)
 Suggests: 
     knitr,

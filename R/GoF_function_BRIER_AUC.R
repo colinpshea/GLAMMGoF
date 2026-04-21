@@ -61,7 +61,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   is_gam     <- "gam"      %in% mc
   is_glmer   <- "glmerMod" %in% mc
   is_glm     <- "glm"      %in% mc && !is_gam
-  # Note: lmer/negbin not included — not applicable to binary outcomes
+  # Note: lmer and negbin not included as they are not applicable to binary outcomes
 
   # --- Pre-compute GAM RE metadata (once, outside loop) ---
   # smooth$label passed to exclude= (e.g. "s(Site)"); smooth$term is the column name.
@@ -160,7 +160,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   # Guard against all replicates failing
   results_clean <- results[!vapply(results, is.null, logical(1))]
   if (length(results_clean) == 0)
-    stop("All model fits failed — no results to summarise.")
+    stop("All model fits failed - no results to summarise.")
 
   # --- Tidy results ---
   # Note: separate() splits on "_" giving Metric (auc/brier) then Group (train/test),

@@ -83,7 +83,7 @@ To use this function properly, you must:
 Now let's run it and see what happens...
 
 ```{r, warning=FALSE, comment=NA}
-rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -131,7 +131,7 @@ To use this function properly, you must:
     2.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is "Yes").
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -173,11 +173,11 @@ br_auc$brier_auc_hist
 For obvious reasons, the code below will cause `RRMSE_RMAD()` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-RRMSE_RMAD_RBIAS(nReps = 1000, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42))
+try(RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42))
 ```
 
 ###### Error messages when using BRIER_AUC
