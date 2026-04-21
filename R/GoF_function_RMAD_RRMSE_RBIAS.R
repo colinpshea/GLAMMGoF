@@ -184,11 +184,6 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
   if (n_failed > 0)
     message(n_failed, " of ", nReps, " bootstrap replicates failed (", round(n_failed / nReps*100, 1), "%). If this percentage is high, consider reviewing your model structure or increasing propTrain to use a larger proportion of data for model-fitting.")
 
-  # ---- count up, report, and omit results with NA
-  n_na <- sum(unlist(lapply(results_clean, function(x) sum(is.na(x)))))
-  if (n_na > 0) message(n_na, " NA values removed from ", nrow(results_df), " total bootstrap observations. ", "This may indicate model instability or sparse data.")
-  results_df <- results_df[!is.na(results_df$value), ]
-
   # --- Tidy results ---
   results_df <- bind_rows(results_clean, .id = "simRep") %>%
     pivot_longer(cols = -simRep, names_to = "metric", values_to = "value") %>%
@@ -198,6 +193,14 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
                       labels = c("In-sample performance", "Out-of-sample performance")),
       Metric = factor(Metric, levels = c("RRMSE", "RMAD", "RBIAS"))
     )
+
+  # ---- count up, report, and omit results with NA
+  n_na <- sum(is.na(results_df$value))
+  if (n_na > 0)
+    message(n_na, " NA values removed from ", nrow(results_df),
+            " total bootstrap observations. ",
+            "This may indicate model instability or sparse data.")
+  results_df <- results_df[!is.na(results_df$value), ]
 
   results_summary <- results_df %>%
     group_by(Group, Metric) %>%

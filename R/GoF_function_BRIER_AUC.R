@@ -166,11 +166,6 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   if (n_failed > 0)
     message(n_failed, " of ", nReps, " bootstrap replicates failed (", round(n_failed / nReps*100, 1), "%). If this percentage is high, consider reviewing your model structure or increasing propTrain to use a larger proportion of data for model-fitting.")
 
-  # ---- count up, report, and omit results with NA
-  n_na <- sum(unlist(lapply(results_clean, function(x) sum(is.na(x)))))
-  if (n_na > 0) message(n_na, " NA values removed from ", nrow(results_df), " total bootstrap observations. ", "This may indicate model instability or sparse data.")
-  results_df <- results_df[!is.na(results_df$value), ]
-
   # --- Tidy results ---
   # Note: separate() splits on "_" giving Metric (auc/brier) then Group (train/test),
   # which is the reverse order from RRMSE_RMAD_RBIAS where Group comes first.
@@ -183,6 +178,14 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
       Metric = factor(Metric, levels = c("auc", "brier"),
                       labels = c("AUC statistic", "Brier score"))
     )
+
+  # ---- count up, report, and omit results with NA
+  n_na <- sum(is.na(results_df$value))
+  if (n_na > 0)
+    message(n_na, " NA values removed from ", nrow(results_df),
+            " total bootstrap observations. ",
+            "This may indicate model instability or sparse data.")
+  results_df <- results_df[!is.na(results_df$value), ]
 
   results_summary <- results_df %>%
     group_by(Group, Metric) %>%
