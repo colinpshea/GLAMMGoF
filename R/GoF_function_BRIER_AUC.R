@@ -1,15 +1,16 @@
-#' Bootstrap Brier score and AUC fit statistics
+#' Bootstrap or Monte Carlo assessment of RRMSE, RMAD, and RBIAS predictive performance statistics
 #'
-#' @description Bootstrap Brier score and AUC fit statistics (see the `rms` package documentation for details) for generalized linear and generalized additive models with binary response variables and with or without random effects. Brier scores range from 0 to 1, with values closer to 0 indicating a better-predicting model, and where sqrt(Brier score) is the average difference, across all observations, between the predicted probability and the observed value (0 or 1). The AUC score is an aggregated metric that evaluates how well a logistic regression model classifies positive and negative outcomes at all possible cutoffs (i.e., probability cutoffs for defining positive (1) vs negative (0) cases). AUC statistics range from 0 to 1, where values closer to 1 indicate a better-predicting model (i.e., a better classifier), and where an AUC score of 0.5 suggests a model performs no better than random guessing. Note that although this function works with GLMMs and GAMMs fitted using a variety of packages/functions, all performance measures are based on model predictions that ignore random effects when present in a model (i.e., performance statistics are based on marginal or population-level model predictions).
-#' @param nReps Desired number of bootstrap replicates. The default value is 100, but this number should be at least 1000 in practice.
+#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with binary response variables and with or without random effects, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Two performance statistics are reported: Brier scores (see the `rms` package documentation for details), which range from 0 to 1 with values closer to 0 indicating a better-predicting model and where sqrt(Brier score) is the average difference between the predicted probability and the observed value (0 or 1); and AUC, an aggregated metric that evaluates how well a model classifies positive and negative outcomes at all possible probability cutoffs, ranging from 0 to 1 with values closer to 1 indicating a better classifier and where an AUC of 0.5 suggests performance no better than random guessing. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored when present).
+#' @param nReps Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.
 #' @param testModel A logistic regression model fitted to testData using `glmmTMB` (with or without random effects), `glmer` (with random effects), `glm` (without random effects), or `gam` (with or without random effects).
 #' @param testData A data frame with a binary response variable and continuous and/or categorical predictor variables.
-#' @param propTrain The proportion of `testData` that is used for model-fitting and in-sample predictive performance (the default value is 0.8). The remaining % is used to assess out-of-sample predictive performance.
+#' @param propTrain The proportion of `testData` used for model-fitting and in-sample predictive performance when method = `holdout` (the default value is 0.8). The remaining proportion is used to assess out-of-sample predictive performance. This argument is ignored when method = `bootstrap`.
 #' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the `simulateResiduals()` function of the `DHARMa` package? The default is `TRUE`.
 #' @param DHARMaReps If DHARMaPlot is `TRUE`, you can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
 #' @param seed Optional integer seed for reproducibility. If `NULL` (the default), no seed is set and results will differ across runs.
+#' @param method The resampling method to use. The default, `holdout`, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas `bootstrap` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
 #' @note This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects  (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s
-#' @return This function returns four objects: a data frame with all of the bootstrapping results (i.e., all `nReps` bootstrapped values for each performance statistic), a data frame with a summary (mean and 95% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If DHARMaPlot = `FALSE`, then `simulateResiduals()` isn't used to assess the model's residuals and only three of the four objects are returned.
+#' @return This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the `simulateResiduals()` function of the `DHARMa` package. If `DHARMaPlot = FALSE`, then `simulateResiduals` is not used to assess the model residuals and only three of the four objects are returned.
 #'
 #' This package contains an example data set to fit a logistic regression called logitData. Six example logistic regression model objects are also included: logitModel_GLM is a GLM with no random effects; logitModel_GLMM is a GLMM with one random effect; logitModel_GLMM2 is a GLMM with two random effects; logitModel_GAM is a GAM with no random effects; logitModel_GAMM is a GAMM with one random effect; and logitModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using `glmmTMB`, whereas GAMs and GAMMs were fitted using `mgcv`:
 #'
@@ -25,9 +26,9 @@
 #'
 #' logitModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = binomial, data = logitData)
 #'
-#' Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want to use DHARMa to assess the residuals (the default is TRUE), how many simulation replicates you want to use in DHARMa's `simulateResiduals()` function (the default is 1000), and an optional integer seed for reproducibility:
+#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method `holdout` or `bootstrap`, the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
 #'
-#' BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+#' BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
@@ -40,7 +41,10 @@
 #' @export
 BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
                       propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
-                      seed = NULL) {
+                      seed = NULL, method = c("holdout", "bootstrap")) {
+
+  # --- specify bootstrapping method
+  method = match.arg(method)
 
   # --- Optional seed ---
   if (!is.null(seed)) set.seed(seed)
@@ -136,9 +140,15 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   results <- vector("list", nReps)
 
   for (j in seq_len(nReps)) {
-    train_idx <- sample(seq_len(nrow(testData)), size = floor(propTrain * nrow(testData)))
-    train <- testData[ train_idx, ]
-    test  <- testData[-train_idx, ]
+    if (method == "holdout"){
+      train_idx <- sample(seq_len(nrow(testData)), size = floor(propTrain * nrow(testData)))
+      train <- testData[ train_idx, ]
+      test  <- testData[-train_idx, ]
+    } else {
+      train_idx <- sample(seq_len(nrow(testData)), size = nrow(testData), replace = TRUE)
+      train <- testData[ train_idx, ]
+      test  <- testData[setdiff(seq_len(nrow(testData)), unique(train_idx)), ]
+    }
 
     m_train <- fit_model(train)
     if (is.null(m_train)) next  # skip failed fits cleanly; no stale model carried forward

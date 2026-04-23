@@ -2,7 +2,7 @@
 % Please edit documentation in R/GoF_function_RMAD_RRMSE_RBIAS.R
 \name{RRMSE_RMAD_RBIAS}
 \alias{RRMSE_RMAD_RBIAS}
-\title{Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics}
+\title{Bootstrap or Monte Carlo assessment of RRMSE, RMAD, and RBIAS predictive performance statistics}
 \usage{
 RRMSE_RMAD_RBIAS(
   nReps = 100,
@@ -11,26 +11,29 @@ RRMSE_RMAD_RBIAS(
   propTrain = 0.8,
   DHARMaPlot = TRUE,
   DHARMaReps = 1000,
-  seed = NULL
+  seed = NULL,
+  method = c("holdout", "bootstrap")
 )
 }
 \arguments{
-\item{nReps}{Desired number of bootstrap replicates. The default value is 100, but this number should be at least 1000 in practice.}
+\item{nReps}{Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.}
 
 \item{testModel}{A regression model fit to testData in \code{glmmTMB} (with or without random effects), \code{glmer} (with random effects), \code{glm}/\code{lm} (without random effects), or \code{gam} (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
 
 \item{testData}{A data frame with a continuous or integer response variable and continuous and/or categorical predictors.}
 
-\item{propTrain}{Proportion of \code{testData} that is used for model-fitting and in-sample predictive performance (the remaining \% is used to assess out-of-sample predictive performance). The default value is 0.8.}
+\item{propTrain}{The proportion of \code{testData} used for model-fitting and in-sample predictive performance when method = \code{holdout} (the default value is 0.8). The remaining proportion is used to assess out-of-sample predictive performance. This argument is ignored when method = \code{bootstrap}.}
 
 \item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is \code{TRUE}.}
 
 \item{DHARMaReps}{You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
 
 \item{seed}{Optional integer seed for reproducibility. If \code{NULL} (the default), no seed is set and results will differ across runs.}
+
+\item{method}{The resampling method to use. The default, \code{holdout}, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas \code{bootstrap} samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample.}
 }
 \value{
-This function returns four objects: a data frame with all of the bootstrapping results (i.e., all nReps bootstrapped values for each performance statistic), a data frame with a summary (mean and 95\% CLs) of all bootstrap replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If DHARMaPlot = \code{FALSE}, then \code{simulateResiduals()} isn't used to assess the model's residuals, and only three of the four objects are returned.
+This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If \code{DHARMaPlot = FALSE}, then \code{simulateResiduals} is not used to assess the model residuals and only three of the four objects are returned.
 
 This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using \code{glmmTMB}, whereas GAMs and GAMMs were fitted using \code{mgcv}:
 
@@ -46,12 +49,12 @@ countModel_GAMM <- gam(y ~ Season + s(Temp) + s(Site, bs = "re"), family = nb, d
 
 countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
 
-Bootstrapping the performance statistics requires specifying the data and model being tested, the desired number of bootstrap replicates (the default is 100 but it should be higher in practice), the proportion of data used in the training (in-sample performance) data set, whether you want to use DHARMa to assess the residuals (the default is \code{TRUE}), how many simulation replicates you want to use in DHARMa's simulateResiduals() function (the default is 1000), and an optional integer seed for reproducibility:
+Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method \code{holdout} or \code{bootstrap}, the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use \code{DHARMa} residual diagnostics (the default is \code{TRUE}), the number of \code{DHARMa} simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
 
-RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42)
+RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
 }
 \description{
-Bootstrap RRMSE, RMAD, and RBIAS predictive performance statistics for generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation. The performance statistics are relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100, relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100, and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that although this function works with GLMMs and GAMMs fitted using a variety of packages/functions, all performance measures are based on model predictions that ignore random effects when present in a model (i.e., performance statistics are based on marginal or population-level model predictions). For models with a zero-inflation component, the performance statistics are based on predictions that account for zero-inflation (e.g., for glmmTMB and model objects, the predicted value represents the product of the mean_count and (1 - prob_zero)).
+Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
 }
 \note{
 This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use BRIER_AUC(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.

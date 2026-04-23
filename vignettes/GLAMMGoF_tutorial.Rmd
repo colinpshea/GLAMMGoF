@@ -21,17 +21,19 @@ knitr::opts_chunk$set(
 )
 ```
 
-####### What does GLAMMGoF do?
+###### What does GLAMMGoF do?
 
-`GLAMMGoF` is an R package that uses bootstrapping to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `RRMSE_RMAD_RBIAS()` and `BRIER_AUC`(), bootstrap several performance statistics and support model objects from a variety of R packages, including glmmTMB() from `glmmTMB`, glmer() and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the `stats` package). This package also uses the R package `DHARMa` to assess goodness-of-fit of GLM(M)s based scaled model residuals.
+`GLAMMGoF` is an R package that uses resampling to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `RRMSE_RMAD_RBIAS()` and `BRIER_AUC()`, resample several performance statistics and support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the `stats` package. This package also uses the R package `DHARMa` to assess goodness-of-fit based on scaled model residuals.
 
--   `RRMSE_RMAD_RBIAS()` is used for models with continuous or integer response variables (e.g., models with Gaussian, Poisson, negative binomial, Tweedie, or gamma distributions).
+- `RRMSE_RMAD_RBIAS()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or gamma distributions).
+- `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression).
+- Both functions accept models with or without random effects, but predictive performance is based on population-level predictions (i.e., random effects are 
+  ignored).
+- Two resampling methods are available via the `method` argument: repeated random holdout (`method = "holdout"`, the default), which splits data into fixed training 
+  and test sets across replicates and is intuitive and widely used; and bootstrap resampling with out-of-bag evaluation (`method = "bootstrap"`), which samples with 
+  replacement and tends to make more efficient use of the available data, particularly for smaller datasets.
 
--   `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression).
-
--   Both functions accept models with or without random effects, but the predictive performance of models with random effects are based on population-level predictions i.e., random effects are ignored in the model predictions.
-
-*An important thing to note here - and something that may not be universally accepted - is that the functions in this package take an existing model fit to [all]{.underline} the available data, and then assess the performance of that model (or, more specifically, the model structure) by (1) re-fitting the model to training data i.e., a subset of the original data, and (2) evaluating in- and out-of-sample predictive performance by predicting to training (the subset of data used to fit the model) and testing data (the withheld data not included in the training subset). I, for one, think this is fine and that it's preferable to use ALL the available data for model-fitting and associated inferences, and then this approach can be used to evaluate predictive performance of the general model structure using testing and training data. Why toss 20% of the data at the outset just to withhold a testing data set, especially in ecological studies where data sets are often small?*
+**Note:** The functions in this package take an existing model fit to all available data and assess the performance of that model structure by (1) refitting the model to a training subset and (2) evaluating in- and out-of-sample predictive performance. This approach is intentional — using all available data for model fitting and inference is preferable, particularly in ecological studies where sample sizes are often limited, and resampling-based performance assessment provides a practical alternative to withholding a test set at the outset. This philosophy is especially relevant when using `method = "bootstrap"`, where the full dataset is always used for training and out-of-bag observations serve as the test set.
 
 ###### Getting started
 
@@ -50,19 +52,25 @@ library(tidyr)
 
 There are only two functions in this package, and which one you need to use depends on the type of model you're assessing:
 
--   `RRMSE_RMAD_RBIAS()` : used for models with continuous or integer response variables and bootstraps three performance statistics: RRMSE, RMAD, and RBIAS. For all three statistics, values closer to 0 indicate a better performing model (see `?RRMSE_RMAD` for details).
+-   `RRMSE_RMAD_RBIAS()` : used for models with continuous or integer response variables and bootstraps three performance statistics: RRMSE, RMAD, and RBIAS. For all three statistics, values closer to 0 indicate a better performing model (see `?RRMSE_RMAD_RBIAS` for details).
 
 -   `BRIER_AUC()` : used for models with binary response variables and bootstraps two performance statistics, AUC and Brier scores. AUC scores closer to 1 and Brier scores closer to 0 indicate a better performing model (see `?BRIER_AUC` for details).
 
-These functions bootstrap RRMSE, RMAD, and RBIAS (RRMSE_RMAD_RBIAS) statistics and Brier and AUC scores (BRIER_AUC) to assess in- and out-of-sample predictive performance for GLM(M)s with and without random effects.
+These functions assess in- and out-of-sample predictive performance for GL(A)MM(M)s with and without random effects by repeatedly resampling data and evaluating RRMSE, 
+RMAD, and RBIAS (RRMSE_RMAD_RBIAS) or Brier scores and AUC (BRIER_AUC) statistics.
 
-Generally, they both work by taking a model and its data, splitting the data into two pieces, one with 80% (by default it's 80% but this can be changed) of the observations and one with the remaining 20% of observations, refitting the model, and calculating performance statistics...and this is done over and over and over again to generate a bunch of (bootstrapped) statistics.
+Two resampling methods are available via the `method` argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 
-The 80% data set, also known as the training data set, is used to refit the original models and assess in-sample performance (how well can the model predict the data used to fit the model?). The model fit to the 80% data set is also then used to predict the response variable in the "test" data set, or the data set with 20% of the remaining observations that the model has never seen; this is used to assess out-of-sample predictive performance.
+Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where the training set is the same size as the original data and out-of-sample 
+performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average, a consequence of sampling 
+with replacement). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller datasets, but is slightly less intuitive than the holdout approach.
 
-This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE/RMAD/RBIAS and/or Brier/AUC scores are bootstrapped in each function because they are slightly different yet complementary measures of predictive performance.
+For well-behaved models and reasonably sized datasets, both methods should produce similar results. Differences are most likely to emerge with small datasets, highly 
+overdispersed data, or poorly specified models.
 
-There are two example data sets, `countData` and `logitData` , with integer and binary response variables, respectively. Each data set has a variety of continuous and categorical predictor variable as well. Additionally, there are 12 example model objects (6 for `count` and 6 for `logit`: `Model_GLM`, `ModelGLMM`, `ModelGLMM2`, `ModelGAM`, `ModelGAMM`, and `ModelGAMM2`. Models ending `M` include only fixed effects, whereas models ending in `MM` and `MM2` contain one and two random effects, respectively. All 12 example models were fitted using the R package `glmmTMB`, but a variety of R packages that fit GL(A)M(M)s are also compatible with `GLAMMGoF`.
+This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE, RMAD, and RBIAS, and/or Brier scores and AUC are reported because they are complementary measures of predictive performance.
+
+There are two example data sets, `countData` and `logitData` , with integer and binary response variables, respectively. Each data set has a variety of continuous and categorical predictor variable as well. Additionally, there are 12 example model objects (6 starting with `count` and 6 starting with `logit`: `Model_GLM`, `ModelGLMM`, `ModelGLMM2`, `ModelGAM`, `ModelGAMM`, and `ModelGAMM2`. Models ending `M` include only fixed effects, whereas models ending in `MM` and `MM2` contain one and two random effects, respectively. All 12 example models were fitted using the R package `glmmTMB`, but a variety of R packages that fit Generalized Linear and Additive Mixed Models are also compatible with `GLAMMGoF`.
 
 ###### Using the RRMSE_RMAD_RBIAS function
 
@@ -74,23 +82,23 @@ To use this function properly, you must:
 
 2.  The only other choices you need to make are:
 
-    1.  The number of bootstrap replicates you want to (the default is 100 but this should be at least 500 or 1000).
+    1.  The number of bootstrap or Monte Carlo replicates you want to (the default is 100 but this should be at least 500 or 1000).
 
-    2.  The proportion of data you want to use for assessing in-sample predictive performance (the default is 80%).
+    2.  For method = "holdout" only: The proportion of data you want to use for assessing in-sample predictive performance (the default is 80%).
 
     3.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is TRUE), and how many simulation replicates you want DHARMa to use (the default is 1000).
 
 Now let's run it and see what happens...
 
 ```{r, warning=FALSE, comment=NA}
-rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
+rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
 rr_rm$rrmse_rmad_results <- rr_rm$rrmse_rmad_results %>% mutate_at(vars(value), funs(round(., 2)))
 ```
 
-Look at `nReps` values of the fit statistics...
+Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
 knitr::kable(head(rr_rm$rrmse_rmad_results))
@@ -118,6 +126,28 @@ rr_rm$rrmse_rmad_hist
 
  
 
+Now let's compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
+
+```{r, warning=FALSE, comment=NA}
+rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "bootstrap")
+```
+
+Summary of `bootstrap` method
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+rr_rm$rrmse_rmad_summary <- rr_rm$rrmse_rmad_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(rr_rm$rrmse_rmad_summary))
+```
+
+And now look at a plot of the summaries
+
+```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
+rr_rm$rrmse_rmad_hist
+```
+
 ###### Using the BRIER_AUC function
 
 To use this function properly, you must:
@@ -126,22 +156,22 @@ To use this function properly, you must:
 
 2.  The only other choices you need to make are:
 
-    1.  The proportion of data you want to use for assessing in-sample predictive performance (the default is 80%)
+    1.  For method = "holdout" only: The proportion of data you want to use for assessing in-sample predictive performance (the default is 80%)
 
-    2.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is "Yes").
+    2.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is TRUE).
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
+br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
 br_auc$brier_auc_results <- br_auc$brier_auc_results %>% mutate_at(vars(value), funs(round(., 2)))
 ```
 
-Look at 25 `nReps` values of the fit statistics...
+Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_results, 25))
+knitr::kable(head(br_auc$brier_auc_results))
 ```
 
  
@@ -155,7 +185,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate_at(vars(mn, lwr9
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_summary, 25))
+knitr::kable(head(br_auc$brier_auc_summary))
 ```
 
  
@@ -168,16 +198,38 @@ br_auc$brier_auc_hist
 
  
 
+Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
+
+```{r, warning=FALSE, comment=NA}
+br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "bootstrap")
+```
+
+Summary of `bootstrap` method
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(br_auc$brier_auc_summary))
+```
+
+And now look at a plot of the summaries
+
+```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
+br_auc$brier_auc_hist
+```
+
 ###### Error messages when using RRMSE_RMAD
 
 For obvious reasons, the code below will cause `RRMSE_RMAD()` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
+RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42))
+try(RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout"))
 ```
 
 ###### Error messages when using BRIER_AUC
@@ -185,9 +237,9 @@ try(RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitD
 For equally obvious reasons, the code below will cause `BRIER_AUC()` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42)
+BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42))
+try(BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout"))
 ```
