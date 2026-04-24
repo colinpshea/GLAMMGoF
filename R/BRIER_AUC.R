@@ -32,7 +32,7 @@
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
-#' @importFrom ggplot2 ggplot aes geom_histogram facet_grid theme_bw theme element_blank element_line element_text labs unit scale_x_continuous expansion
+#' @importFrom ggplot2 ggplot aes geom_histogram geom_vline facet_grid theme_bw theme element_blank element_line element_text labs unit scale_x_continuous scale_y_continuous expansion
 #' @importFrom DHARMa simulateResiduals
 #' @importFrom rms val.prob
 #' @importFrom glmmTMB glmmTMB
