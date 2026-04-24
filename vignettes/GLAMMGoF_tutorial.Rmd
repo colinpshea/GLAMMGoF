@@ -33,7 +33,7 @@ knitr::opts_chunk$set(
   and test sets across replicates and is intuitive and widely used; and bootstrap resampling with out-of-bag evaluation (`method = "bootstrap"`), which samples with 
   replacement and tends to make more efficient use of the available data, particularly for smaller datasets.
 
-**Note:** The functions in this package take an existing model fit to all available data and assess the performance of that model structure by (1) refitting the model to a training subset and (2) evaluating in- and out-of-sample predictive performance. This approach is intentional — using all available data for model fitting and inference is preferable, particularly in ecological studies where sample sizes are often limited, and resampling-based performance assessment provides a practical alternative to withholding a test set at the outset. This philosophy is especially relevant when using `method = "bootstrap"`, where the full dataset is always used for training and out-of-bag observations serve as the test set.
+**Note:** The functions in this package take an existing model fit to all available data and assess the performance of that model structure by (1) refitting the model to a training subset and (2) evaluating in- and out-of-sample predictive performance. This approach is intentional: using all available data for model fitting and inference is preferable, particularly in ecological studies where sample sizes are often limited, and resampling-based performance assessment provides a practical alternative to withholding a test set at the outset. This philosophy is especially relevant when using `method = "bootstrap"`, where the full dataset is always used for training and out-of-bag observations serve as the test set.
 
 ###### Getting started
 
@@ -52,7 +52,7 @@ library(tidyr)
 
 There are only two functions in this package, and which one you need to use depends on the type of model you're assessing:
 
--   `BIAS_PRECISION()` : used for models with continuous or integer response variables and bootstraps three performance statistics: RRMSE, RMAD, and RBIAS. For all three statistics, values closer to 0 indicate a better performing model (see `?BIAS_PRECISION` for details).
+-   `BIAS_PRECISION()` : used for models with continuous or integer response variables and bootstraps four performance statistics: RRMSE, RMAD, RMAE, and RBIAS. For all four statistics, values closer to 0 indicate a better performing model (see `?BIAS_PRECISION` for details).
 
 -   `BRIER_AUC()` : used for models with binary response variables and bootstraps two performance statistics, AUC and Brier scores. AUC scores closer to 1 and Brier scores closer to 0 indicate a better performing model (see `?BRIER_AUC` for details).
 
@@ -60,12 +60,9 @@ These functions assess in- and out-of-sample predictive performance for Generali
 
 Two resampling methods are available via the `method` argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 
-Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where the training set is the same size as the original data and out-of-sample 
-performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average, a consequence of sampling 
-with replacement). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller datasets, but is slightly less intuitive than the holdout approach.
+Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where the training set is the same size as the original data and out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average, a consequence of sampling with replacement). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller datasets, but is slightly less intuitive than the holdout approach.
 
-For well-behaved models and reasonably sized datasets, both methods should produce similar results. Differences are most likely to emerge with small datasets, highly 
-overdispersed data, or poorly specified models.
+For well-behaved models and reasonably sized datasets, both methods should produce similar results. Differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
 
 This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE, RMAD, RMAE, and RBIAS, and/or Brier scores and AUC are reported because they are complementary measures of predictive performance.
 
