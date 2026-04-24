@@ -1,7 +1,7 @@
 #' Simulated count data
 #'
 #' A simulated dataset with an integer count response and predictor variables
-#' for demonstrating the RRMSE_RMAD_RBIAS function.
+#' for demonstrating the BIAS_PRECISION function.
 #'
 #' @format A data frame with 1000 rows and 5 variables:
 #' \describe{

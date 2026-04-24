@@ -19,6 +19,6 @@ countData
 }
 \description{
 A simulated dataset with an integer count response and predictor variables
-for demonstrating the RRMSE_RMAD_RBIAS function.
+for demonstrating the BIAS_PRECISION function.
 }
 \keyword{datasets}

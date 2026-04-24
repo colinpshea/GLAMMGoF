@@ -1,6 +1,6 @@
-#' Bootstrap or Monte Carlo assessment of RRMSE, RMAD, and RBIAS predictive performance statistics
+#' Bootstrap or Monte Carlo assessment of RRMSE, RMAD, RMAE, and RBIAS predictive performance statistics
 #'
-#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
+#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((observed - predicted)))/mean(observed)*100;and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
 #' @param nReps Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.
 #' @param testModel A regression model fit to testData in `glmmTMB` (with or without random effects), `glmer` (with random effects), `glm`/`lm` (without random effects), or `gam` (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
 #' @param testData A data frame with a continuous or integer response variable and continuous and/or categorical predictors.
@@ -28,7 +28,7 @@
 #'
 #' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method `holdout` or `bootstrap`, the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
 #'
-#' RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
+#' BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
@@ -39,7 +39,7 @@
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
 #' @export
-RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
+BIAS_PRECISION <- function(nReps = 100, testModel = NULL, testData = NULL,
                              propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
                              seed = NULL, method = c("holdout", "bootstrap")) {
 
@@ -52,6 +52,7 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
   # --- Cost functions ---
   fit_cost_rrmse <- function(y, yhat) sqrt(mean((y - yhat)^2)) / mean(y) * 100
   fit_cost_rmad  <- function(y, yhat) median(abs(y - yhat)) / mean(y) * 100
+  fit_cost_rmae  <- function(y, yhat) mean(abs(y - yhat)) / mean(y) * 100
   fit_cost_rbias <- function(y, yhat) mean(y - yhat) / mean(y) * 100
 
   # --- Validate inputs ---
@@ -69,7 +70,7 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
   is_cbind  <- is.call(resp_expr) && deparse(resp_expr[[1]]) == "cbind"
   is_prop   <- is.call(resp_expr) && grepl("/", deparse(resp_expr))
   stopifnot(
-    "cbind() and proportion binomial responses are not supported. See ?RRMSE_RMAD_RBIAS for details." =
+    "cbind() and proportion binomial responses are not supported. See ?BIAS_PRECISION for details." =
       !is_cbind && !is_prop
   )
 
@@ -179,6 +180,8 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
       test_RRMSE  = fit_cost_rrmse(y_test,  yhat_test),
       train_RMAD  = fit_cost_rmad(y_train,  yhat_train),
       test_RMAD   = fit_cost_rmad(y_test,   yhat_test),
+      train_RMAE  = fit_cost_rmae(y_train,  yhat_train),
+      test_RMAE   = fit_cost_rmae(y_test,   yhat_test),
       train_RBIAS = fit_cost_rbias(y_train, yhat_train),
       test_RBIAS  = fit_cost_rbias(y_test,  yhat_test)
     )
@@ -200,7 +203,7 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
     mutate(
       Group  = factor(Group, levels = c("train", "test"),
                       labels = c("In-sample performance", "Out-of-sample performance")),
-      Metric = factor(Metric, levels = c("RRMSE", "RMAD", "RBIAS"))
+      Metric = factor(Metric, levels = c("RRMSE", "RMAD", "RMAE", "RBIAS"))
     )
 
   # ---- count up, report, and omit results with NA
@@ -220,13 +223,15 @@ RRMSE_RMAD_RBIAS <- function(nReps = 100, testModel = NULL, testData = NULL,
   results_plot <- ggplot(results_df, aes(x = value)) +
     geom_histogram(color = "black", fill = "grey") +
     facet_grid(Group ~ Metric, scales = "free") +
+    geom_vline(data = results_summary, aes(xintercept = mn), color = "blue", linetype = "dotted", linewidth = 0.8) +
     theme_bw() +
     theme(panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"),
           panel.grid.minor.y = element_line(colour = "grey90", linetype = "dashed"),
           axis.text          = element_text(colour = "black"),
           panel.spacing      = unit(1.5, "lines")) +
-    labs(x = "% relative to true mean", y = "Frequency")
+    labs(x = "% relative to true mean", y = "Frequency") +
+    scale_y_continuous(expand = expansion(mult = c(0,0.01)))
 
   if (DHARMaPlot) {
     dharmaPlot <- tryCatch(

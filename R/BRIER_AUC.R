@@ -1,4 +1,4 @@
-#' Bootstrap or Monte Carlo assessment of RRMSE, RMAD, and RBIAS predictive performance statistics
+#' Bootstrap or Monte Carlo assessment of Brier and AUC predictive performance statistics
 #'
 #' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with binary response variables and with or without random effects, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Two performance statistics are reported: Brier scores (see the `rms` package documentation for details), which range from 0 to 1 with values closer to 0 indicating a better-predicting model and where sqrt(Brier score) is the average difference between the predicted probability and the observed value (0 or 1); and AUC, an aggregated metric that evaluates how well a model classifies positive and negative outcomes at all possible probability cutoffs, ranging from 0 to 1 with values closer to 1 indicating a better classifier and where an AUC of 0.5 suggests performance no better than random guessing. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored when present).
 #' @param nReps Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.
@@ -56,7 +56,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   resp_var  <- all.vars(formula(testModel))[1]
   is_binary <- function(x) length(unique(x)) == 2 && all(x %in% c(0, 1))
-  stopifnot("Response variable is not binary! Use RRMSE_RMAD_RBIAS() instead" =
+  stopifnot("Response variable is not binary! Use BIAS_PRECISION() instead" =
               is_binary(testData[[resp_var]]))
 
   # --- Pre-compute model class flags (once, outside loop) ---
@@ -178,7 +178,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   # --- Tidy results ---
   # Note: separate() splits on "_" giving Metric (auc/brier) then Group (train/test),
-  # which is the reverse order from RRMSE_RMAD_RBIAS where Group comes first.
+  # which is the reverse order from BIAS_PRECISION where Group comes first.
   results_df <- bind_rows(results_clean, .id = "simRep") %>%
     pivot_longer(cols = -simRep, names_to = "metric", values_to = "value") %>%
     separate(metric, into = c("Metric", "Group")) %>%
@@ -206,6 +206,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   results_plot <- ggplot(results_df, aes(x = value)) +
     geom_histogram(color = "black", fill = "grey") +
     facet_grid(Group ~ Metric) +
+    geom_vline(data = results_summary, aes(xintercept = mn), color = "blue", linetype = "dotted", linewidth = 0.8) +
     theme_bw() +
     theme(panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"),
@@ -214,7 +215,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
           panel.spacing      = unit(1.5, "lines")) +
     labs(x = "Value", y = "Frequency") +
     scale_x_continuous(breaks = seq(0, 1, 0.2),
-                       expand = expansion(add = c(0.05, 0.05))) +
+                       expand = expansion(add = c(0, 0.05))) +
     coord_cartesian(xlim = c(0, 1))
 
   if (DHARMaPlot) {

@@ -30,7 +30,8 @@ the default) and bootstrap resampling with out-of-bag evaluation
 The following flagged words are intentional technical terminology and not 
 misspellings:
 * RRMSE (Relative Root Mean Square Error)
-* RMAD (Relative Mean Absolute Deviation)
+* RMAD (Relative Median Absolute Deviation)
+* RMAE (Relative Mean Absolute Error)
 * RBIAS (Relative Bias)
 * Brier (Brier score, a standard predictive performance metric)
 * DHARMa (R package name)

@@ -23,9 +23,9 @@ knitr::opts_chunk$set(
 
 ###### What does GLAMMGoF do?
 
-`GLAMMGoF` is an R package that uses resampling to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `RRMSE_RMAD_RBIAS()` and `BRIER_AUC()`, resample several performance statistics and support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the `stats` package. This package also uses the R package `DHARMa` to assess goodness-of-fit based on scaled model residuals.
+`GLAMMGoF` is an R package that uses resampling to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `BIAS_PRECISION()` and `BRIER_AUC()`, resample several performance statistics and support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the `stats` package. This package also uses the R package `DHARMa` to assess goodness-of-fit based on scaled model residuals.
 
-- `RRMSE_RMAD_RBIAS()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or gamma distributions).
+- `BIAS_PRECISION()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or gamma distributions).
 - `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression).
 - Both functions accept models with or without random effects, but predictive performance is based on population-level predictions (i.e., random effects are 
   ignored).
@@ -52,12 +52,11 @@ library(tidyr)
 
 There are only two functions in this package, and which one you need to use depends on the type of model you're assessing:
 
--   `RRMSE_RMAD_RBIAS()` : used for models with continuous or integer response variables and bootstraps three performance statistics: RRMSE, RMAD, and RBIAS. For all three statistics, values closer to 0 indicate a better performing model (see `?RRMSE_RMAD_RBIAS` for details).
+-   `BIAS_PRECISION()` : used for models with continuous or integer response variables and bootstraps three performance statistics: RRMSE, RMAD, and RBIAS. For all three statistics, values closer to 0 indicate a better performing model (see `?BIAS_PRECISION` for details).
 
 -   `BRIER_AUC()` : used for models with binary response variables and bootstraps two performance statistics, AUC and Brier scores. AUC scores closer to 1 and Brier scores closer to 0 indicate a better performing model (see `?BRIER_AUC` for details).
 
-These functions assess in- and out-of-sample predictive performance for GL(A)MM(M)s with and without random effects by repeatedly resampling data and evaluating RRMSE, 
-RMAD, and RBIAS (RRMSE_RMAD_RBIAS) or Brier scores and AUC (BRIER_AUC) statistics.
+These functions assess in- and out-of-sample predictive performance for Generalized Linear and Additive Mixed Models with and without random effects by repeatedly resampling data and evaluating RRMSE, RMAD, RMAE, and RBIAS (`BIAS_PRECISION`) or Brier scores and AUC (`BRIER_AUC`) statistics.
 
 Two resampling methods are available via the `method` argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 
@@ -68,11 +67,11 @@ with replacement). This method makes more efficient use of the available data an
 For well-behaved models and reasonably sized datasets, both methods should produce similar results. Differences are most likely to emerge with small datasets, highly 
 overdispersed data, or poorly specified models.
 
-This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE, RMAD, and RBIAS, and/or Brier scores and AUC are reported because they are complementary measures of predictive performance.
+This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE, RMAD, RMAE, and RBIAS, and/or Brier scores and AUC are reported because they are complementary measures of predictive performance.
 
 There are two example data sets, `countData` and `logitData` , with integer and binary response variables, respectively. Each data set has a variety of continuous and categorical predictor variable as well. Additionally, there are 12 example model objects (6 starting with `count` and 6 starting with `logit`: `Model_GLM`, `ModelGLMM`, `ModelGLMM2`, `ModelGAM`, `ModelGAMM`, and `ModelGAMM2`. Models ending `M` include only fixed effects, whereas models ending in `MM` and `MM2` contain one and two random effects, respectively. All 12 example models were fitted using the R package `glmmTMB`, but a variety of R packages that fit Generalized Linear and Additive Mixed Models are also compatible with `GLAMMGoF`.
 
-###### Using the RRMSE_RMAD_RBIAS function
+###### Using the BIAS_PRECISION function
 
 To use this function properly, you must:
 
@@ -91,7 +90,7 @@ To use this function properly, you must:
 Now let's run it and see what happens...
 
 ```{r, warning=FALSE, comment=NA}
-rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
+rr_rm <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -129,7 +128,7 @@ rr_rm$rrmse_rmad_hist
 Now let's compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
 
 ```{r, warning=FALSE, comment=NA}
-rr_rm <- RRMSE_RMAD_RBIAS(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "bootstrap")
+rr_rm <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "bootstrap")
 ```
 
 Summary of `bootstrap` method
@@ -222,19 +221,19 @@ br_auc$brier_auc_hist
 
 ###### Error messages when using RRMSE_RMAD
 
-For obvious reasons, the code below will cause `RRMSE_RMAD()` quit and throw an error message:
+For obvious reasons, the code below will cause `BIAS_PRECISION` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
+BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(RRMSE_RMAD_RBIAS(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout"))
+try(BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout"))
 ```
 
 ###### Error messages when using BRIER_AUC
 
-For equally obvious reasons, the code below will cause `BRIER_AUC()` quit and throw an error message:
+For equally obvious reasons, the code below will cause `BRIER_AUC` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
