@@ -1,5 +1,5 @@
 ## R CMD check results
-0 errors | 1 warning | 0 notes
+0 errors | 1 warning | 1 note
 
 ### Warning
 * "package 'ggplot2' was built under R version 4.5.3" — this is a local 
