@@ -87,7 +87,7 @@ To use this function properly, you must:
 Now let's run it and see what happens...
 
 ```{r, warning=FALSE, comment=NA}
-rr_rm <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
+bias_precision <- BIAS_PRECISION(nReps = 10, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
