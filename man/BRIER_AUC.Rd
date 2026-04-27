@@ -2,7 +2,7 @@
 % Please edit documentation in R/BRIER_AUC.R
 \name{BRIER_AUC}
 \alias{BRIER_AUC}
-\title{Bootstrap or Monte Carlo assessment of AUC, Brier, and log loss predictive performance statistics}
+\title{Bootstrap or Monte Carlo assessment of AUC, Brier score, and log loss predictive performance statistics}
 \usage{
 BRIER_AUC(
   nReps = 100,
