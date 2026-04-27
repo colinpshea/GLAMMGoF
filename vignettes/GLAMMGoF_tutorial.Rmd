@@ -54,9 +54,9 @@ There are only two functions in this package, and which one you need to use depe
 
 -   `BIAS_PRECISION()` : used for models with continuous or integer response variables and bootstraps four performance statistics: RRMSE, RMAE, RMedAE, and RBIAS. For all four statistics, values closer to 0 indicate a better performing model (see `?BIAS_PRECISION` for details).
 
--   `BRIER_AUC()` : used for models with binary response variables and bootstraps three performance statistics, AUC statistics, Brier scores, and log loss. AUC scores closer to 1 (lower bound of 0), Brier scores closer to 0 (upper bound of 1), and log losses closer to 0 (no upper bound) indicate a better performing model (see `?BRIER_AUC` for details).
+-   `BRIER_AUC()` : used for models with binary response variables and bootstraps three performance statistics, AUC statistics, Brier scores, and log loss. AUC scores closer to 1 (lower bound of 0), Brier scores closer to 0 (upper bound of 1), and log loss closer to 0 (no upper bound) indicate a better performing model (see `?BRIER_AUC` for details).
 
-These functions assess in- and out-of-sample predictive performance for Generalized Linear and Additive Mixed Models with and without random effects by repeatedly resampling data and evaluating RRMSE, RMAE, RMedAE, and RBIAS (`BIAS_PRECISION`) or Brier, AUC, and log loss (`BRIER_AUC`) metrics.
+These functions assess in- and out-of-sample predictive performance for Generalized Linear and Additive Mixed Models with and without random effects by repeatedly resampling data and evaluating RRMSE, RMAE, RMedAE, and RBIAS (`BIAS_PRECISION`) or AUC, Brier, and log loss (`BRIER_AUC`) metrics.
 
 Two resampling methods are available via the `method` argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 

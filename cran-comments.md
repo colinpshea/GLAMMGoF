@@ -30,10 +30,12 @@ the default) and bootstrap resampling with out-of-bag evaluation
 The following flagged words are intentional technical terminology and not 
 misspellings:
 * RRMSE (Relative Root Mean Square Error)
-* RMAD (Relative Median Absolute Deviation)
 * RMAE (Relative Mean Absolute Error)
+* RMedAE (Relative Median Absolute Error)
 * RBIAS (Relative Bias)
+* AUC (Area Under Curve statistic, a standard predictive performance metric)
 * Brier (Brier score, a standard predictive performance metric)
+* log loss (a standard predictive performance metric)
 * DHARMa (R package name)
 * glmmTMB (R package name)
 * lme (as in lme4, an R package name)

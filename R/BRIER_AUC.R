@@ -1,6 +1,6 @@
-#' Bootstrap or Monte Carlo assessment of Brier, AUC, and log loss predictive performance statistics
+#' Bootstrap or Monte Carlo assessment of AUC, Brier, and log loss predictive performance statistics
 #'
-#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with binary response variables and with or without random effects, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: Brier scores (see the `rms` package documentation for details), which range from 0 to 1 with values closer to 0 indicating a better-predicting model and where sqrt(Brier score) is the average difference between the predicted probability and the observed value (0 or 1); AUC, an aggregated metric that evaluates how well a model classifies positive and negative outcomes at all possible probability cutoffs, ranging from 0 to 1 with values closer to 1 indicating a better classifier and where an AUC of 0.5 suggests performance no better than random guessing; and log loss (cross-entropy), which penalises confident wrong predictions logarithmically and is particularly sensitive to miscalibration at the extremes of the predicted probability distribution, with lower values indicating better performance and no upper bound. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored when present).
+#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with binary response variables and with or without random effects, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: Brier scores (see the `rms` package documentation for details), which range from 0 to 1 with values closer to 0 indicating a better-predicting model and where sqrt(Brier score) is the average difference between the predicted probability and the observed value (0 or 1); AUC, an aggregated metric that evaluates how well a model classifies positive and negative outcomes at all possible probability cutoffs, ranging from 0 to 1 with values closer to 1 indicating a better classifier and where an AUC of 0.5 suggests performance no better than random guessing; and log loss (cross-entropy), which penalizes confident wrong predictions logarithmically and is particularly sensitive to miscalibration at the extremes of the predicted probability distribution, with lower values indicating better performance and no upper bound. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored when present).
 #' @param nReps Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.
 #' @param testModel A logistic regression model fitted to testData using `glmmTMB` (with or without random effects), `glmer` (with random effects), `glm` (without random effects), or `gam` (with or without random effects).
 #' @param testData A data frame with a binary response variable and continuous and/or categorical predictor variables.
@@ -28,7 +28,7 @@
 #'
 #' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method `holdout` or `bootstrap`, the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
 #'
-#' BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
+#' BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
@@ -42,23 +42,23 @@
 BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
                       propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
                       seed = NULL, method = c("holdout", "bootstrap")) {
-  
+
   # --- specify bootstrapping method
   method = match.arg(method)
-  
+
   # --- Optional seed ---
   if (!is.null(seed)) set.seed(seed)
-  
+
   # --- Validate inputs ---
   stopifnot("testModel cannot be NULL" = !is.null(testModel))
   stopifnot("testData cannot be NULL"  = !is.null(testData))
   stopifnot("propTrain must be between 0 and 1" = propTrain > 0 && propTrain < 1)
-  
+
   resp_var  <- all.vars(formula(testModel))[1]
   is_binary <- function(x) length(unique(x)) == 2 && all(x %in% c(0, 1))
   stopifnot("Response variable is not binary! Use BIAS_PRECISION() instead" =
               is_binary(testData[[resp_var]]))
-  
+
   # --- Pre-compute model class flags (once, outside loop) ---
   mc         <- class(testModel)
   is_glmmTMB <- "glmmTMB"  %in% mc
@@ -66,7 +66,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   is_glmer   <- "glmerMod" %in% mc
   is_glm     <- "glm"      %in% mc && !is_gam
   # Note: lmer and negbin not included as they are not applicable to binary outcomes
-  
+
   # --- Pre-compute GAM RE metadata (once, outside loop) ---
   # smooth$label passed to exclude= (e.g. "s(Site)"); smooth$term is the column name.
   # Using smooth object fields directly avoids any regex on the label string.
@@ -79,7 +79,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
       gam_re_terms  <- sapply(re_smooths, function(s) s$term)   # retained for metadata
     }
   }
-  
+
   # --- Fit helper: dispatch on model class, return NULL on failure ---
   fit_model <- function(train) {
     tryCatch({
@@ -101,7 +101,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
       NULL
     })
   }
-  
+
   # --- Predict helper: marginal/population-level predictions, RE excluded ---
   # glmmTMB: allow.new.levels = TRUE handles RE groups absent from training data
   # GAM:     exclude= + newdata.guaranteed=TRUE drops all RE smooths cleanly;
@@ -127,7 +127,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
       predict(m, type = "response", newdata = newdata)
     }
   }
-  
+
   # --- val.prob helper: call once per dataset, extract both metrics ---
   # val.prob() computes AUC and Brier simultaneously; calling it twice
   # (once per metric) would be redundant and twice as slow.
@@ -135,7 +135,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     vp <- val.prob(p = phat, y = y, smooth = FALSE, pl = FALSE)
     c(auc = unname(vp["C (ROC)"]), brier = unname(vp["Brier"]))
   }
-  
+
   # --- Log loss helper ---
   # eps clipping is essential: log(0) = -Inf if predictions hit the boundary,
   # which can occur with some families/link combinations.
@@ -143,10 +143,10 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     p <- pmax(pmin(p, 1 - eps), eps)
     -mean(y * log(p) + (1 - y) * log(1 - p))
   }
-  
+
   # --- Bootstrap loop ---
   results <- vector("list", nReps)
-  
+
   for (j in seq_len(nReps)) {
     if (method == "holdout"){
       train_idx <- sample(seq_len(nrow(testData)), size = floor(propTrain * nrow(testData)))
@@ -157,16 +157,16 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
       train <- testData[ train_idx, ]
       test  <- testData[setdiff(seq_len(nrow(testData)), unique(train_idx)), ]
     }
-    
+
     m_train <- fit_model(train)
     if (is.null(m_train)) next  # skip failed fits cleanly; no stale model carried forward
-    
+
     yhat_train <- get_preds(m_train, train)
     yhat_test  <- get_preds(m_train, test)
-    
+
     stats_train <- get_stats(yhat_train, train[[resp_var]])
     stats_test  <- get_stats(yhat_test,  test[[resp_var]])
-    
+
     results[[j]] <- data.frame(
       train_auc     = stats_train["auc"],
       train_brier   = stats_train["brier"],
@@ -176,16 +176,16 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
       test_logloss  = log_loss(test[[resp_var]],  yhat_test)
     )
   }
-  
+
   # Guard against all replicates failing
   results_clean <- results[!vapply(results, is.null, logical(1))]
   if (length(results_clean) == 0)
     stop("All model fits failed - no results to summarise.")
-  
+
   n_failed <- nReps - length(results_clean)
   if (n_failed > 0)
     message(n_failed, " of ", nReps, " bootstrap replicates failed (", round(n_failed / nReps*100, 1), "%). If this percentage is high, consider reviewing your model structure or increasing propTrain to use a larger proportion of data for model-fitting.")
-  
+
   # --- Tidy results ---
   # Note: separate() splits on "_" giving Group (train/test) then Metric (auc/brier/logloss).
   results_df <- bind_rows(results_clean, .id = "simRep") %>%
@@ -197,21 +197,21 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
       Metric = factor(Metric, levels = c("auc", "brier", "logloss"),
                       labels = c("AUC statistic", "Brier score", "Log loss"))
     )
-  
+
   # ---- count up, report, and omit results with NA
   n_na <- sum(is.na(results_df$value) | is.infinite(results_df$value))
-  
+
   if (n_na > 0) cat(n_na, " NA or Inf values removed from ", nrow(results_df)," total bootstrap observations. ", "This may indicate model instability or sparse data.")
-  
+
   results_df <- results_df[!is.na(results_df$value) & !is.infinite(results_df$value), ]
-  
+
   results_summary <- results_df %>%
     group_by(Group, Metric) %>%
     summarise(mn    = mean(value),
               lwr95 = quantile(value, 0.025),
               upr95 = quantile(value, 0.975),
               .groups = "drop")
-  
+
   # scales = "free_x" allows log loss (unbounded above) to use its own x axis,
   # while AUC and Brier retain their natural [0, 1] range.
   results_plot <- ggplot(results_df, aes(x = value)) +
@@ -225,7 +225,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
           axis.text          = element_text(colour = "black"),
           panel.spacing      = unit(1.5, "lines")) +
     labs(x = "Value", y = "Frequency")
-  
+
   if (DHARMaPlot) {
     dharmaPlot <- tryCatch(
       withCallingHandlers(
@@ -245,7 +245,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
                 brier_auc_summary  = results_summary,
                 dharmaPlot         = dharmaPlot))
   }
-  
+
   list(brier_auc_results = results_df,
        brier_auc_hist    = results_plot,
        brier_auc_summary = results_summary)

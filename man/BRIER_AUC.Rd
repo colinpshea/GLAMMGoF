@@ -2,7 +2,7 @@
 % Please edit documentation in R/BRIER_AUC.R
 \name{BRIER_AUC}
 \alias{BRIER_AUC}
-\title{Bootstrap or Monte Carlo assessment of Brier and AUC predictive performance statistics}
+\title{Bootstrap or Monte Carlo assessment of AUC, Brier, and log loss predictive performance statistics}
 \usage{
 BRIER_AUC(
   nReps = 100,
@@ -54,7 +54,7 @@ Bootstrapping or Monte Carlo resampling of the performance statistics requires s
 BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
 }
 \description{
-Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with binary response variables and with or without random effects, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Two performance statistics are reported: Brier scores (see the \code{rms} package documentation for details), which range from 0 to 1 with values closer to 0 indicating a better-predicting model and where sqrt(Brier score) is the average difference between the predicted probability and the observed value (0 or 1); and AUC, an aggregated metric that evaluates how well a model classifies positive and negative outcomes at all possible probability cutoffs, ranging from 0 to 1 with values closer to 1 indicating a better classifier and where an AUC of 0.5 suggests performance no better than random guessing. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored when present).
+Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with binary response variables and with or without random effects, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: Brier scores (see the \code{rms} package documentation for details), which range from 0 to 1 with values closer to 0 indicating a better-predicting model and where sqrt(Brier score) is the average difference between the predicted probability and the observed value (0 or 1); AUC, an aggregated metric that evaluates how well a model classifies positive and negative outcomes at all possible probability cutoffs, ranging from 0 to 1 with values closer to 1 indicating a better classifier and where an AUC of 0.5 suggests performance no better than random guessing; and log loss (cross-entropy), which penalizes confident wrong predictions logarithmically and is particularly sensitive to miscalibration at the extremes of the predicted probability distribution, with lower values indicating better performance and no upper bound. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored when present).
 }
 \note{
 This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects  (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s
