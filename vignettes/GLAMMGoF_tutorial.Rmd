@@ -87,7 +87,7 @@ To use this function properly, you must:
 Now let's run it and see what happens...
 
 ```{r, warning=FALSE, comment=NA}
-bias_precision <- BIAS_PRECISION(nReps = 10, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 100, seed = 42, method = "holdout")
+bias_precision <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -125,7 +125,7 @@ bias_precision$bias_precision_hist
 Now let's compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
 
 ```{r, warning=FALSE, comment=NA}
-bias_precision <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "bootstrap")
+bias_precision <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
 ```
 
 Summary of `bootstrap` method
@@ -157,7 +157,7 @@ To use this function properly, you must:
     2.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is TRUE).
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
+br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -197,7 +197,7 @@ br_auc$brier_auc_hist
 Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "bootstrap")
+br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
 ```
 
 Summary of `bootstrap` method
@@ -221,11 +221,11 @@ br_auc$brier_auc_hist
 For obvious reasons, the code below will cause `BIAS_PRECISION` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
+BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout"))
+try(BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
 ```
 
 ###### Error messages when using `BRIER_AUC()`
@@ -233,9 +233,9 @@ try(BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitDat
 For equally obvious reasons, the code below will cause `BRIER_AUC` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
+BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout"))
+try(BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
 ```
