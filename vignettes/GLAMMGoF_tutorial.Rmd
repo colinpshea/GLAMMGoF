@@ -52,11 +52,11 @@ library(tidyr)
 
 There are only two functions in this package, and which one you need to use depends on the type of model you're assessing:
 
--   `BIAS_PRECISION()` : used for models with continuous or integer response variables and bootstraps four performance statistics: RRMSE, RMAD, RMAE, and RBIAS. For all four statistics, values closer to 0 indicate a better performing model (see `?BIAS_PRECISION` for details).
+-   `BIAS_PRECISION()` : used for models with continuous or integer response variables and bootstraps four performance statistics: RRMSE, RMAE, RMedAE, and RBIAS. For all four statistics, values closer to 0 indicate a better performing model (see `?BIAS_PRECISION` for details).
 
 -   `BRIER_AUC()` : used for models with binary response variables and bootstraps two performance statistics, AUC and Brier scores. AUC scores closer to 1 and Brier scores closer to 0 indicate a better performing model (see `?BRIER_AUC` for details).
 
-These functions assess in- and out-of-sample predictive performance for Generalized Linear and Additive Mixed Models with and without random effects by repeatedly resampling data and evaluating RRMSE, RMAD, RMAE, and RBIAS (`BIAS_PRECISION`) or Brier scores and AUC (`BRIER_AUC`) statistics.
+These functions assess in- and out-of-sample predictive performance for Generalized Linear and Additive Mixed Models with and without random effects by repeatedly resampling data and evaluating RRMSE, RMAE, RMedAE, and RBIAS (`BIAS_PRECISION`) or Brier scores and AUC (`BRIER_AUC`) statistics.
 
 Two resampling methods are available via the `method` argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 
@@ -64,11 +64,11 @@ Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement
 
 For well-behaved models and reasonably sized datasets, both methods should produce similar results. Differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
 
-This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE, RMAD, RMAE, and RBIAS, and/or Brier scores and AUC are reported because they are complementary measures of predictive performance.
+This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE, RMAE, RMedAE, and RBIAS, and/or Brier scores and AUC are reported because they are complementary measures of predictive performance.
 
-There are two example data sets, `countData` and `logitData` , with integer and binary response variables, respectively. Each data set has a variety of continuous and categorical predictor variable as well. Additionally, there are 12 example model objects (6 starting with `count` and 6 starting with `logit`: `Model_GLM`, `ModelGLMM`, `ModelGLMM2`, `ModelGAM`, `ModelGAMM`, and `ModelGAMM2`. Models ending `M` include only fixed effects, whereas models ending in `MM` and `MM2` contain one and two random effects, respectively. All 12 example models were fitted using the R package `glmmTMB`, but a variety of R packages that fit Generalized Linear and Additive Mixed Models are also compatible with `GLAMMGoF`.
+There are two example data sets, `countData` and `logitData` , with integer and binary response variables, respectively. Each data set has a variety of continuous and categorical predictor variable as well. Additionally, there are 12 example model objects (6 starting with `count` and 6 starting with `logit`: `Model_GLM`, `ModelGLMM`, `ModelGLMM2`, `ModelGAM`, `ModelGAMM`, and `ModelGAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` contain one and two random effects, respectively. All 12 example models were fitted using the R package `glmmTMB`, but a variety of R packages that fit Generalized Linear and Additive Mixed Models are also compatible with `GLAMMGoF`.
 
-###### Using the BIAS_PRECISION function
+###### Using the `BIAS_PRECISION()` function
 
 To use this function properly, you must:
 
@@ -91,13 +91,13 @@ rr_rm <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = cou
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-rr_rm$rrmse_rmad_results <- rr_rm$rrmse_rmad_results %>% mutate_at(vars(value), funs(round(., 2)))
+bias_precision$bias_precision_results <- bias_precision$bias_precision_results %>% mutate_at(vars(value), funs(round(., 2)))
 ```
 
 Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(rr_rm$rrmse_rmad_results))
+knitr::kable(head(bias_precision$bias_precision_results))
 ```
 
  
@@ -105,11 +105,11 @@ knitr::kable(head(rr_rm$rrmse_rmad_results))
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-rr_rm$rrmse_rmad_summary <- rr_rm$rrmse_rmad_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+bias_precision$bias_precision_summary <- bias_precision$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(rr_rm$rrmse_rmad_summary))
+knitr::kable(head(bias_precision$bias_precision_summary))
 ```
 
  
@@ -117,7 +117,7 @@ knitr::kable(head(rr_rm$rrmse_rmad_summary))
 And now look at a plot of the summaries
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
-rr_rm$rrmse_rmad_hist
+bias_precision$bias_precision_hist
 ```
 
  
@@ -125,26 +125,26 @@ rr_rm$rrmse_rmad_hist
 Now let's compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
 
 ```{r, warning=FALSE, comment=NA}
-rr_rm <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "bootstrap")
+bias_precision <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "bootstrap")
 ```
 
 Summary of `bootstrap` method
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-rr_rm$rrmse_rmad_summary <- rr_rm$rrmse_rmad_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+bias_precision$bias_precision_summary <- bias_precision$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(rr_rm$rrmse_rmad_summary))
+knitr::kable(head(bias_precision$bias_precision_summary))
 ```
 
 And now look at a plot of the summaries
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
-rr_rm$rrmse_rmad_hist
+bias_precision$bias_precision_hist
 ```
 
-###### Using the BRIER_AUC function
+###### Using the `BRIER_AUC()` function
 
 To use this function properly, you must:
 
@@ -216,7 +216,7 @@ And now look at a plot of the summaries
 br_auc$brier_auc_hist
 ```
 
-###### Error messages when using RRMSE_RMAD
+###### Error messages when using `BIAS_PRECISION()`
 
 For obvious reasons, the code below will cause `BIAS_PRECISION` quit and throw an error message:
 
@@ -228,7 +228,7 @@ BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, p
 try(BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout"))
 ```
 
-###### Error messages when using BRIER_AUC
+###### Error messages when using `BRIER_AUC()`
 
 For equally obvious reasons, the code below will cause `BRIER_AUC` quit and throw an error message:
 

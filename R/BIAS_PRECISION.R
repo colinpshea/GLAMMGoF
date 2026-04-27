@@ -1,6 +1,6 @@
-#' Bootstrap or Monte Carlo assessment of RRMSE, RMAD, RMAE, and RBIAS predictive performance statistics
+#' Bootstrap or Monte Carlo assessment of RRMSE, RMAE, RMedAE, and RBIAS predictive performance statistics
 #'
-#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((observed - predicted)))/mean(observed)*100;and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
+#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((observed - predicted)))/mean(observed)*100; relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
 #' @param nReps Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.
 #' @param testModel A regression model fit to testData in `glmmTMB` (with or without random effects), `glmer` (with random effects), `glm`/`lm` (without random effects), or `gam` (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
 #' @param testData A data frame with a continuous or integer response variable and continuous and/or categorical predictors.
@@ -51,7 +51,7 @@ BIAS_PRECISION <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   # --- Cost functions ---
   fit_cost_rrmse <- function(y, yhat) sqrt(mean((y - yhat)^2)) / mean(y) * 100
-  fit_cost_rmad  <- function(y, yhat) median(abs(y - yhat)) / mean(y) * 100
+  fit_cost_rmedae  <- function(y, yhat) median(abs(y - yhat)) / mean(y) * 100
   fit_cost_rmae  <- function(y, yhat) mean(abs(y - yhat)) / mean(y) * 100
   fit_cost_rbias <- function(y, yhat) mean(y - yhat) / mean(y) * 100
 
@@ -178,8 +178,8 @@ BIAS_PRECISION <- function(nReps = 100, testModel = NULL, testData = NULL,
     results[[j]] <- data.frame(
       train_RRMSE = fit_cost_rrmse(y_train, yhat_train),
       test_RRMSE  = fit_cost_rrmse(y_test,  yhat_test),
-      train_RMAD  = fit_cost_rmad(y_train,  yhat_train),
-      test_RMAD   = fit_cost_rmad(y_test,   yhat_test),
+      train_RMedAE  = fit_cost_rmedae(y_train,  yhat_train),
+      test_RMedAE   = fit_cost_rmedae(y_test,   yhat_test),
       train_RMAE  = fit_cost_rmae(y_train,  yhat_train),
       test_RMAE   = fit_cost_rmae(y_test,   yhat_test),
       train_RBIAS = fit_cost_rbias(y_train, yhat_train),
@@ -203,7 +203,7 @@ BIAS_PRECISION <- function(nReps = 100, testModel = NULL, testData = NULL,
     mutate(
       Group  = factor(Group, levels = c("train", "test"),
                       labels = c("In-sample performance", "Out-of-sample performance")),
-      Metric = factor(Metric, levels = c("RRMSE", "RMAD", "RMAE", "RBIAS"))
+      Metric = factor(Metric, levels = c("RRMSE", "RMAE", "RMedAE", "RBIAS"))
     )
 
   # ---- count up, report, and omit results with NA
@@ -247,13 +247,13 @@ BIAS_PRECISION <- function(nReps = 100, testModel = NULL, testData = NULL,
         NULL
       }
     )
-    return(list(rrmse_rmad_results  = results_df,
-                rrmse_rmad_hist     = results_plot,
-                rrmse_rmad_summary  = results_summary,
+    return(list(bias_precision_results  = results_df,
+                bias_precision_hist     = results_plot,
+                bias_precision_summary  = results_summary,
                 dharmaPlot          = dharmaPlot))
   }
 
-  list(rrmse_rmad_results = results_df,
-       rrmse_rmad_hist    = results_plot,
-       rrmse_rmad_summary = results_summary)
+  list(bias_precision_results = results_df,
+       bias_precision_hist    = results_plot,
+       bias_precision_summary = results_summary)
 }

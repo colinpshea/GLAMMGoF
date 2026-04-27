@@ -160,10 +160,10 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
     stats_test  <- get_stats(yhat_test,  test[[resp_var]])
 
     results[[j]] <- data.frame(
-      auc_train   = stats_train["auc"],
-      brier_train = stats_train["brier"],
-      auc_test    = stats_test["auc"],
-      brier_test  = stats_test["brier"]
+      train_auc   = stats_train["auc"],
+      train_brier = stats_train["brier"],
+      test_auc    = stats_test["auc"],
+      test_brier  = stats_test["brier"]
     )
   }
 
@@ -181,7 +181,7 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   # which is the reverse order from BIAS_PRECISION where Group comes first.
   results_df <- bind_rows(results_clean, .id = "simRep") %>%
     pivot_longer(cols = -simRep, names_to = "metric", values_to = "value") %>%
-    separate(metric, into = c("Metric", "Group")) %>%
+    separate(metric, into = c("Group", "Metric")) %>%
     mutate(
       Group  = factor(Group, levels = c("train", "test"),
                       labels = c("In-sample performance", "Out-of-sample performance")),

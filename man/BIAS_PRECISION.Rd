@@ -2,7 +2,7 @@
 % Please edit documentation in R/BIAS_PRECISION.R
 \name{BIAS_PRECISION}
 \alias{BIAS_PRECISION}
-\title{Bootstrap or Monte Carlo assessment of RRMSE, RMAD, RMAE, and RBIAS predictive performance statistics}
+\title{Bootstrap or Monte Carlo assessment of RRMSE, RMAE, RMedAE, and RBIAS predictive performance statistics}
 \usage{
 BIAS_PRECISION(
   nReps = 100,
@@ -54,7 +54,7 @@ Bootstrapping or Monte Carlo resampling of the performance statistics requires s
 BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 42, method = "holdout")
 }
 \description{
-Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((observed - predicted)))/mean(observed)*100;and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
+Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((observed - predicted)))/mean(observed)*100; relative median absolute deviation (RMAD), calculated as median(abs((observed - predicted)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
 }
 \note{
 This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use BRIER_AUC(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
