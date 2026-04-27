@@ -23,17 +23,16 @@ knitr::opts_chunk$set(
 
 ###### What does GLAMMGoF do?
 
-`GLAMMGoF` is an R package that uses resampling to assess goodness-of-fit and predictive performance of generalized linear and generalized additive models. The two main functions in this package, `BIAS_PRECISION()` and `BRIER_AUC()`, resample several performance statistics and support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the `stats` package. This package also uses the R package `DHARMa` to assess goodness-of-fit based on scaled model residuals.
+`GLAMMGoF` is an R package for resampling-based predictive validation of generalized linear and generalized additive models. The two main functions in this package, `BIAS_PRECISION()` and `BRIER_AUC()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to resampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics can also be performed using the `DHARMa` package.
 
-- `BIAS_PRECISION()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or gamma distributions).
-- `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression).
-- Both functions accept models with or without random effects, but predictive performance is based on population-level predictions (i.e., random effects are 
-  ignored).
-- Two resampling methods are available via the `method` argument: repeated random holdout (`method = "holdout"`, the default), which splits data into fixed training 
-  and test sets across replicates and is intuitive and widely used; and bootstrap resampling with out-of-bag evaluation (`method = "bootstrap"`), which samples with 
-  replacement and tends to make more efficient use of the available data, particularly for smaller datasets.
+-   `BIAS_PRECISION()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or Gamma distributions) and returns relative root mean squared error (RRMSE), relative mean absolute error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS).
+-   `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression) and returns AUC, Brier score, and log loss.
+-   Both functions accept models with or without random effects, but predictive performance is based on population-level predictions, meaning random effects are excluded during prediction.
+-   Two resampling methods are available via the `method` argument:
+    -   repeated random holdout (`method = "holdout"`, the default), which splits data into fixed training and test sets across replicates and is intuitive and widely used; and
+    -   bootstrap resampling with out-of-bag evaluation (`method = "bootstrap"`), which samples with replacement and tends to make more efficient use of the available data, particularly for smaller datasets.
 
-**Note:** The functions in this package take an existing model fit to all available data and assess the performance of that model structure by (1) refitting the model to a training subset and (2) evaluating in- and out-of-sample predictive performance. This approach is intentional: using all available data for model fitting and inference is preferable, particularly in ecological studies where sample sizes are often limited, and resampling-based performance assessment provides a practical alternative to withholding a test set at the outset. This philosophy is especially relevant when using `method = "bootstrap"`, where the full dataset is always used for training and out-of-bag observations serve as the test set.
+**Important note:** The functions in this package take an existing model fitted to the full dataset and assess the predictive performance of that model structure through repeated resampling. In each replicate, the model is refit to a resampled training dataset and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information for inference, while resampling-based predictive validation provides a practical way to assess generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited. In general, `method = "holdout"` more closely reflects prediction to independent unseen observations and may be more intuitive for assessing generalization, whereas `method = "bootstrap"` makes more efficient use of the available data by evaluating performance on out-of-bag observations and may provide more stable estimates of predictive performance when sample sizes are small.
 
 ###### Getting started
 
@@ -50,23 +49,23 @@ library(tidyr)
 
 ###### How do I use GLAMMGoF?
 
-There are only two functions in this package, and which one you need to use depends on the type of model you're assessing:
+There are only two functions in this package, and which one you use depends on the type of model being assessed:
 
--   `BIAS_PRECISION()` : used for models with continuous or integer response variables and bootstraps four performance statistics: RRMSE, RMAE, RMedAE, and RBIAS. For all four statistics, values closer to 0 indicate a better performing model (see `?BIAS_PRECISION` for details).
+-   `BIAS_PRECISION()`: used for models with continuous or integer response variables and estimates four predictive performance metrics using repeated resampling: `RRMSE`, `RMAE`, `RMedAE`, and `RBIAS`. For all four metrics, values closer to 0 indicate better predictive performance (see `?BIAS_PRECISION` for details).
 
--   `BRIER_AUC()` : used for models with binary response variables and bootstraps three performance statistics, AUC statistics, Brier scores, and log loss. AUC scores closer to 1 (lower bound of 0), Brier scores closer to 0 (upper bound of 1), and log loss closer to 0 (no upper bound) indicate a better performing model (see `?BRIER_AUC` for details).
+-   `BRIER_AUC()`: used for models with binary response variables and estimates three predictive performance metrics using repeated resampling: `AUC`, `Brier score`, and `log loss`. `AUC` values closer to 1 (bounded between 0 and 1) indicate better classification performance, whereas `Brier score` (bounded between 0 and 1) and `log loss` (lower bound of 0, no upper bound) values closer to 0 indicate better probabilistic predictions (see `?BRIER_AUC` for details).
 
-These functions assess in- and out-of-sample predictive performance for Generalized Linear and Additive Mixed Models with and without random effects by repeatedly resampling data and evaluating RRMSE, RMAE, RMedAE, and RBIAS (`BIAS_PRECISION`) or AUC, Brier, and log loss (`BRIER_AUC`) metrics.
+These functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates.
 
-Two resampling methods are available via the `method` argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
+Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 
-Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where the training set is the same size as the original data and out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average, a consequence of sampling with replacement). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller datasets, but is slightly less intuitive than the holdout approach.
+Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training dataset contains the same number of observations as the original dataset, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller datasets, but is slightly less intuitive than the holdout approach.
 
 For well-behaved models and reasonably sized datasets, both methods should produce similar results. Differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
 
-This entire process is repeated `nReps` times and the sampling distributions of the fit statistics are then summarized. RRMSE, RMAE, RMedAE, and RBIAS, and/or Brier scores and AUC are reported because they are complementary measures of predictive performance.
+This entire process is repeated `nReps` times, and the resulting sampling distributions of the performance metrics are summarized. Because `RRMSE`, `RMAE`, `RMedAE`, `RBIAS`, `AUC`, `Brier score`, and `log loss` quantify different aspects of predictive performance, they should be interpreted as complementary rather than interchangeable
 
-There are two example data sets, `countData` and `logitData` , with integer and binary response variables, respectively. Each data set has a variety of continuous and categorical predictor variable as well. Additionally, there are 12 example model objects (6 starting with `count` and 6 starting with `logit`: `Model_GLM`, `ModelGLMM`, `ModelGLMM2`, `ModelGAM`, `ModelGAMM`, and `ModelGAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` contain one and two random effects, respectively. All 12 example models were fitted using the R package `glmmTMB`, but a variety of R packages that fit Generalized Linear and Additive Mixed Models are also compatible with `GLAMMGoF`.
+There are two example datasets, `countData` and `logitData`, with integer and binary response variables, respectively. Each dataset also includes a variety of continuous and categorical predictor variables. Additionally, there are 12 example model objects (6 beginning with `count` and 6 beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible R packages
 
 ###### Using the `BIAS_PRECISION()` function
 
@@ -122,7 +121,7 @@ bias_precision$bias_precision_hist
 
  
 
-Now let's compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
+Now let's compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets.
 
 ```{r, warning=FALSE, comment=NA}
 bias_precision <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
@@ -194,7 +193,7 @@ br_auc$brier_auc_hist
 
  
 
-Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets. 
+Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets.
 
 ```{r, warning=FALSE, comment=NA}
 br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
