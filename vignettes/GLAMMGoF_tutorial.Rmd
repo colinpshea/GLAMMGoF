@@ -97,7 +97,7 @@ bias_precision$bias_precision_results <- bias_precision$bias_precision_results %
 Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bias_precision$bias_precision_results))
+knitr::kable(head(bias_precision$bias_precision_results, 8))
 ```
 
  
@@ -109,7 +109,7 @@ bias_precision$bias_precision_summary <- bias_precision$bias_precision_summary %
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bias_precision$bias_precision_summary))
+knitr::kable(head(bias_precision$bias_precision_summary, 8))
 ```
 
  
@@ -135,7 +135,7 @@ bias_precision$bias_precision_summary <- bias_precision$bias_precision_summary %
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bias_precision$bias_precision_summary))
+knitr::kable(head(bias_precision$bias_precision_summary, 8))
 ```
 
 And now look at a plot of the summaries
@@ -167,7 +167,7 @@ br_auc$brier_auc_results <- br_auc$brier_auc_results %>% mutate_at(vars(value), 
 Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_results))
+knitr::kable(head(br_auc$brier_auc_results, 6))
 ```
 
  
@@ -181,7 +181,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate_at(vars(mn, lwr9
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_summary))
+knitr::kable(head(br_auc$brier_auc_summary, 6))
 ```
 
  
@@ -207,7 +207,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate_at(vars(mn, lwr9
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_summary))
+knitr::kable(head(br_auc$brier_auc_summary, 6))
 ```
 
 And now look at a plot of the summaries
