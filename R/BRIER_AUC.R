@@ -5,7 +5,9 @@
 #' The three binary metrics each capture a different aspect of predictive performance and are most informative when interpreted together.
 #'
 #' `AUC (Area Under the ROC Curve)`: The probability that a randomly chosen positive case receives a higher predicted probability than a randomly chosen negative case, ranging from 0.5 (no discrimination) to 1 (perfect discrimination). `AUC` is purely a measure of discrimination (the model's ability to rank cases by their probability of the outcome) and is insensitive to how well the predicted probabilities are calibrated in absolute terms.
+#'
 #' `Brier Score`: The mean squared difference between predicted probabilities and observed binary outcomes (0/1), ranging from 0 (perfect) to 1 (worst). The `Brier score` jointly rewards good discrimination and good calibration, penalizing confident but wrong predictions more heavily than uncertain ones. A model can have high `AUC` but a poor `Brier score` if its predicted probabilities are systematically too high or too low even while correctly ordering cases.
+#'
 #' `Log Loss (Binary Cross-Entropy)`: The negative mean log-likelihood of the observed outcomes under the predicted probabilities, where lower values indicate better performance. Like the `Brier score`, `log loss` rewards calibration, but its logarithmic scale means it penalizes extreme, confident mispredictions far more aggressively. `Log loss` is therefore the most sensitive of the three to cases where the model assigns near-zero probability to an outcome that actually occurs.
 #'
 #'Reporting all three together is recommended: `AUC` reflects whether the model correctly separates cases from non-cases; `Brier score` provides an overall summary of probability accuracy on a squared-error scale; and `log loss` highlights whether the model is making any dangerously overconfident errors that the `Brier score` might underweight.
