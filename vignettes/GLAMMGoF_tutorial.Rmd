@@ -51,11 +51,33 @@ library(tidyr)
 
 There are only two functions in this package, and which one you use depends on the type of model being assessed:
 
--   `BIAS_PRECISION()`: used for models with continuous or integer response variables and estimates four predictive performance metrics using repeated resampling: `RRMSE`, `RMAE`, `RMedAE`, and `RBIAS`. For all four metrics, values closer to 0 indicate better predictive performance (see `?BIAS_PRECISION` for details).
+`BIAS_PRECISION()`: used for models with continuous or integer response variables and estimates four predictive performance metrics using repeated resampling: `RRMSE`, `RMAE`, `RMedAE`, and `RBIAS`. For all four metrics, values closer to 0 indicate better predictive performance (see `?BIAS_PRECISION` for details).
 
--   `BRIER_AUC()`: used for models with binary response variables and estimates three predictive performance metrics using repeated resampling: `AUC`, `Brier score`, and `log loss`. `AUC` values closer to 1 (bounded between 0 and 1) indicate better classification performance, whereas `Brier score` (bounded between 0 and 1) and `log loss` (lower bound of 0, no upper bound) values closer to 0 indicate better probabilistic predictions (see `?BRIER_AUC` for details).
+-   All three accuracy statistics (`RRMSE`, `RMAE`, and `RMedAE`) express prediction error as a percentage of the mean observed value, which makes them interpretable on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an RRMSE of 18% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
 
-These functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates.
+-   `RRMSE (Relative Root Mean Squared Error)`: The square root of average squared prediction errors, expressed as a percentage of the mean observed value. Because errors are squared before averaging, RRMSE penalises large individual errors more heavily than small ones, making it sensitive to cases where the model produces occasional extreme mispredictions.
+
+-   `RMAE (Relative Mean Absolute Error)`: The average absolute prediction error expressed as a percentage of the mean observed value. RMAE treats all errors proportionally to their size without the extra weight that squaring applies, and is often the most intuitive summary of typical prediction accuracy.
+
+-   `RMedAE (Relative Median Absolute Error)`: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, RMedAE is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
+
+-   Taken together, these three statistics tell a more complete story than any one alone. If `RRMSE` is notably larger than `RMAE`, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
+
+-   `RBIAS (Relative Bias)`: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic under-prediction and negative values indicate systematic over-prediction. `RBIAS` is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting `RBIAS` alongside RRMSE and RMAE therefore distinguishes random prediction noise from systematic directional error.
+
+`BRIER_AUC()`: used for models with binary response variables and estimates three predictive performance metrics using repeated resampling: `AUC`, `Brier score`, and `log loss`. `AUC` values closer to 1 (bounded between 0 and 1) indicate better classification performance, whereas `Brier score` (bounded between 0 and 1) and `log loss` (lower bound of 0, no upper bound) values closer to 0 indicate better probabilistic predictions (see `?BRIER_AUC` for details).
+
+-   The three binary metrics each capture a different aspect of predictive performance and are most informative when interpreted together.
+
+-   `AUC (Area Under the ROC Curve)`: The probability that a randomly chosen positive case receives a higher predicted probability than a randomly chosen negative case, ranging from 0.5 (no discrimination) to 1 (perfect discrimination). `AUC` is purely a measure of discrimination (the model's ability to rank cases by their probability of the outcome) and is insensitive to how well the predicted probabilities are calibrated in absolute terms.
+
+-   `Brier Score`: The mean squared difference between predicted probabilities and observed binary outcomes (0/1), ranging from 0 (perfect) to 1 (worst). The `Brier score` jointly rewards good discrimination and good calibration, penalising confident but wrong predictions more heavily than uncertain ones. A model can have high `AUC` but a poor `Brier score`if its predicted probabilities are systematically too high or too low even while correctly ordering cases.
+
+-   `Log Loss (Binary Cross-Entropy)`: The negative mean log-likelihood of the observed outcomes under the predicted probabilities, where lower values indicate better performance. Like the Brier score, log loss rewards calibration, but its logarithmic scale means it penalizes extreme, confident mispredictions far more aggressively. `Log loss` is therefore the most sensitive of the three to cases where the model assigns near-zero probability to an outcome that actually occurs.
+
+-   Reporting all three together is recommended: AUC reflects whether the model correctly separates cases from non-cases; Brier score provides an overall summary of probability accuracy on a squared-error scale; and log loss highlights whether the model is making any dangerously overconfident errors that the Brier score might underweight.
+
+Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates.
 
 Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 
