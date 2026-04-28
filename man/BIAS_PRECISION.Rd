@@ -18,7 +18,7 @@ BIAS_PRECISION(
 \arguments{
 \item{nReps}{Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.}
 
-\item{testModel}{A regression model fit to testData in \code{glmmTMB} (with or without random effects), \code{glmer} (with random effects), \code{glm}/\code{lm} (without random effects), or \code{gam} (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
+\item{testModel}{A regression model fit to testData in \code{glmmTMB} (with or without random effects), \code{glmer}/\code{glmer.nb}/\verb{lmer' (with random effects), }glm\code{/}glm.nb\code{/}lm\verb{(without random effects), or}gam` (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
 
 \item{testData}{A data frame with a continuous or integer response variable and continuous and/or categorical predictors.}
 

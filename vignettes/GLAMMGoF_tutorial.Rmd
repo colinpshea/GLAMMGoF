@@ -3,6 +3,7 @@ title: "GLAMMGoF Tutorial"
 output: 
   rmarkdown::html_document:
     toc: true
+    code_overflow: wrap
     number_sections: false
 vignette: >
   %\VignetteIndexEntry{GLAMMGoF Tutorial}
@@ -21,9 +22,9 @@ knitr::opts_chunk$set(
 )
 ```
 
-###### What does GLAMMGoF do?
+#### What does GLAMMGoF do?
 
-`GLAMMGoF` is an R package for resampling-based predictive validation of generalized linear and generalized additive models. The two main functions in this package, `BIAS_PRECISION()` and `BRIER_AUC()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to resampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics can also be performed using the `DHARMa` package.
+`GLAMMGoF` is an R package for resampling-based predictive validation of generalized linear and generalized additive models. The two main functions in this package, `BIAS_PRECISION()` and `BRIER_AUC()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to resampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `lmer`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics can also be performed using the `DHARMa` package.
 
 -   `BIAS_PRECISION()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or Gamma distributions) and returns relative root mean squared error (RRMSE), relative mean absolute error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS).
 -   `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression) and returns AUC, Brier score, and log loss.
@@ -34,7 +35,7 @@ knitr::opts_chunk$set(
 
 **Important note:** The functions in this package take an existing model fitted to the full dataset and assess the predictive performance of that model structure through repeated resampling. In each replicate, the model is refit to a resampled training dataset and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information for inference, while resampling-based predictive validation provides a practical way to assess generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited. In general, `method = "holdout"` more closely reflects prediction to independent unseen observations and may be more intuitive for assessing generalization, whereas `method = "bootstrap"` makes more efficient use of the available data by evaluating performance on out-of-bag observations and may provide more stable estimates of predictive performance when sample sizes are small.
 
-###### Getting started
+#### Getting started
 
 You've either downloaded and installed `GLAMMGoF` from R-universe, GitHub, DevOps, or a local zipped package file. Once installed, you can access the vignette by running `browseVignettes("GLAMMGoF")`. Note that `ggplot2` is a dependency, and functions from numerous other R packages are imported and used as well.
 
@@ -47,7 +48,7 @@ library(dplyr)
 library(tidyr)
 ```
 
-###### How do I use GLAMMGoF?
+#### How do I use GLAMMGoF?
 
 There are only two functions in this package, and which one you use depends on the type of model being assessed:
 
@@ -59,7 +60,7 @@ There are only two functions in this package, and which one you use depends on t
 
 -   `RMedAE (Relative Median Absolute Error)`: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, RMedAE is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
 
--   Taken together, these three statistics tell a more complete story than any one alone. If `RRMSE` is notably larger than `RMAE`, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
+    -   Taken together, these three statistics tell a more complete story than any one alone. If `RRMSE` is notably larger than `RMAE`, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
 
 -   `RBIAS (Relative Bias)`: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic under-prediction and negative values indicate systematic over-prediction. `RBIAS` is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting `RBIAS` alongside RRMSE and RMAE therefore distinguishes random prediction noise from systematic directional error.
 
@@ -73,7 +74,7 @@ There are only two functions in this package, and which one you use depends on t
 
 -   `Log Loss (Binary Cross-Entropy)`: Across all observations, the mean negative log-likelihood of the observed outcomes under the predicted probabilities, where lower values indicate better performance. Like the `Brier score`, `log loss` rewards calibration, but its logarithmic scale means it penalizes extreme, confident mispredictions far more aggressively. `Log loss` is therefore the most sensitive of the three to cases where the model assigns near-zero probability to an outcome that actually occurs.
 
--   Reporting all three together is recommended: `AUC` reflects whether the model correctly separates cases from non-cases; `Brier score` provides an overall summary of probability accuracy on a squared-error scale; and `log loss` highlights whether the model is making any dangerously overconfident errors that the `Brier score` might underweight.
+    -   Reporting all three together is recommended: `AUC` reflects whether the model correctly separates cases from non-cases; `Brier score` provides an overall summary of probability accuracy on a squared-error scale; and `log loss` highlights whether the model is making any dangerously overconfident errors that the `Brier score` might underweight.
 
 Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates.
 
@@ -87,13 +88,13 @@ This entire process is repeated `nReps` times, and the resulting sampling distri
 
 There are two example datasets, `countData` and `logitData`, with integer and binary response variables, respectively. Each dataset also includes a variety of continuous and categorical predictor variables. Additionally, there are 12 example model objects (6 beginning with `count` and 6 beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible R packages
 
-###### Using the `BIAS_PRECISION()` function
+#### Using the `BIAS_PRECISION()` function
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer.nb`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package).
+1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer`, `glmer.nb`, and `lmer`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package).
 
-    1.  Note that if you include a random effect in a gam from mgcv, that variable MUST be a factor or else mgcv will throw an error.
+    1.  Note that if you include a random effect in a gam from `mgcv`, that variable nust be a factor or else `mgcv` will throw an error.
 
 2.  The only other choices you need to make are:
 
@@ -163,7 +164,7 @@ And now look at a plot of the summaries
 bias_precision$bias_precision_hist
 ```
 
-###### Using the `BRIER_AUC()` function
+#### Using the `BRIER_AUC()` function
 
 To use this function properly, you must:
 
@@ -235,7 +236,7 @@ And now look at a plot of the summaries
 br_auc$brier_auc_hist
 ```
 
-###### Error messages when using `BIAS_PRECISION()`
+#### Error messages when using `BIAS_PRECISION()`
 
 For obvious reasons, the code below will cause `BIAS_PRECISION` quit and throw an error message:
 
@@ -247,7 +248,7 @@ BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, p
 try(BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
 ```
 
-###### Error messages when using `BRIER_AUC()`
+#### Error messages when using `BRIER_AUC()`
 
 For equally obvious reasons, the code below will cause `BRIER_AUC` quit and throw an error message:
 
