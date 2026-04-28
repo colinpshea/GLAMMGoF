@@ -18,24 +18,24 @@ BIAS_PRECISION(
 \arguments{
 \item{nReps}{Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.}
 
-\item{testModel}{A regression model fit to testData in \code{glmmTMB} (with or without random effects), \code{glmer}/\code{glmer.nb}/\verb{lmer' (with random effects), }glm\code{/}glm.nb\code{/}lm\verb{(without random effects), or}gam` (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
+\item{testModel}{A regression model fit to testData in glmmTMB (with or without random effects), glmer/glmer.nb/lmer (with random effects), glm/glm.nb/lm (without random effects), or gam (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.}
 
 \item{testData}{A data frame with a continuous or integer response variable and continuous and/or categorical predictors.}
 
 \item{propTrain}{The proportion of \code{testData} used for model-fitting and in-sample predictive performance when method = \code{holdout} (the default value is 0.8). The remaining proportion is used to assess out-of-sample predictive performance. This argument is ignored when method = \code{bootstrap}.}
 
-\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the \code{simulateResiduals()} function of the \code{DHARMa} package? The default is \code{TRUE}.}
+\item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the simulateResiduals() function of the DHARMa package? The default is TRUE.}
 
 \item{DHARMaReps}{You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
 
-\item{seed}{Optional integer seed for reproducibility. If \code{NULL} (the default), no seed is set and results will differ across runs.}
+\item{seed}{Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.}
 
 \item{method}{The resampling method to use. The default, \code{holdout}, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas \code{bootstrap} samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8\% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.}
 }
 \value{
-This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the \code{simulateResiduals()} function of the \code{DHARMa} package. If \code{DHARMaPlot = FALSE}, then \code{simulateResiduals} is not used to assess the model residuals and only three of the four objects are returned.
+This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the simulateResiduals() function of the DHARMa package. If DHARMaPlot = FALSE, then simulateResiduals is not used to assess the model residuals and only three of the four objects are returned.
 
-This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using \code{glmmTMB}, whereas GAMs and GAMMs were fitted using \code{mgcv}:
+This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using glmmTMB, whereas GAMs and GAMMs were fitted using mgcv:
 
 countModel_GLM <- glmmTMB(y ~ Season + Temp, family = nbinom2, data = countData)
 
@@ -62,11 +62,11 @@ All three accuracy statistics (\code{RRMSE}, \code{RMAE}, and \code{RMedAE}) exp
 
 \verb{RMAE (Relative Mean Absolute Error)}: The average absolute prediction error expressed as a percentage of the mean observed value. \code{RMAE} treats all errors proportionally to their size without the extra weight that squaring applies, and is often the most intuitive summary of typical prediction accuracy.
 
-\verb{RMedAE (Relative Median Absolute Error)}: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, \code{RMedAE} is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
+\verb{RMedAE (Relative Median Absolute Error)}: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, RMedAE is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
 
-Taken together, these three statistics tell a more complete story than any one alone. If \code{RRMSE} is notably larger than \code{RMAE}, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern \code{RMedAE} will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
+Taken together, these three statistics tell a more complete story than any one alone. If RRMSE is notably larger than \code{RMAE}, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern \code{RMedAE} will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
 
-\verb{RBIAS (Relative Bias)}: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic under-prediction and negative values indicate systematic over-prediction. \code{RBIAS} is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting \code{RBIAS} alongside \code{RRMSE} and \code{RMAE} therefore distinguishes random prediction noise from systematic directional error.
+\verb{RBIAS (Relative Bias)}: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic under-prediction and negative values indicate systematic over-prediction. RBIAS is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting RBIAS alongside RRMSE and RMAE therefore distinguishes random prediction noise from systematic directional error.
 }
 \note{
 This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use BRIER_AUC(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
