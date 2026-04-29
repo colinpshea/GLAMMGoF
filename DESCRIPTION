@@ -1,6 +1,6 @@
 Package: GLAMMGoF
 Title: Resampling-Based Predictive Validation for Generalized Linear and Generalized Additive Models
-Version: 1.0.3
+Version: 1.0.4
 Authors@R: 
     person("Colin", "Shea", , "colin.shea@myfwc.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-2906-250X"))

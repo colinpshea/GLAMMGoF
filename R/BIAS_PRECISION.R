@@ -1,6 +1,6 @@
 #' Bootstrap or Monte Carlo assessment of RRMSE, RMAE, RMedAE, and RBIAS predictive performance statistics
 #'
-#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((observed - predicted)^2))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((observed - predicted)))/mean(observed)*100; relative median absolute error (RMedAE), calculated as median(abs((observed - predicted)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((observed - predicted))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
+#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((predicted - observed)^2))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((predicted - observed)))/mean(observed)*100; relative median absolute error (RMedAE), calculated as median(abs((predicted - observed)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((predicted - observed))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
 #'
 #' All three accuracy statistics (`RRMSE`, `RMAE`, and `RMedAE`) express prediction error as a percentage of the mean observed value, which makes them interpretable on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an RRMSE of 18% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
 #'
@@ -12,7 +12,7 @@
 #'
 #' Taken together, these three statistics tell a more complete story than any one alone. If RRMSE is notably larger than `RMAE`, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
 #'
-#' `RBIAS (Relative Bias)`: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic under-prediction and negative values indicate systematic over-prediction. RBIAS is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting RBIAS alongside RRMSE and RMAE therefore distinguishes random prediction noise from systematic directional error.
+#' `RBIAS (Relative Bias)`: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic over-prediction and negative values indicate systematic under-prediction. RBIAS is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting RBIAS alongside RRMSE and RMAE therefore distinguishes random prediction noise from systematic directional error.
 #'
 #' @param nReps Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.
 #' @param testModel A regression model fit to testData in glmmTMB (with or without random effects), glmer/glmer.nb/lmer (with random effects), glm/glm.nb/lm (without random effects), or gam (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
@@ -63,10 +63,10 @@ BIAS_PRECISION <- function(nReps = 100, testModel = NULL, testData = NULL,
   if (!is.null(seed)) set.seed(seed)
 
   # --- Cost functions ---
-  fit_cost_rrmse <- function(y, yhat) sqrt(mean((y - yhat)^2)) / mean(y) * 100
-  fit_cost_rmedae  <- function(y, yhat) median(abs(y - yhat)) / mean(y) * 100
-  fit_cost_rmae  <- function(y, yhat) mean(abs(y - yhat)) / mean(y) * 100
-  fit_cost_rbias <- function(y, yhat) mean(y - yhat) / mean(y) * 100
+  fit_cost_rrmse <- function(y, yhat) sqrt(mean((yhat - y)^2)) / mean(y) * 100
+  fit_cost_rmedae  <- function(y, yhat) median(abs(yhat - y)) / mean(y) * 100
+  fit_cost_rmae  <- function(y, yhat) mean(abs(yhat - y)) / mean(y) * 100
+  fit_cost_rbias <- function(y, yhat) mean(yhat - y) / mean(y) * 100
 
   # --- Validate inputs ---
   stopifnot("testModel cannot be NULL" = !is.null(testModel))
