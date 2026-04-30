@@ -1,18 +1,26 @@
 #' Bootstrap or Monte Carlo assessment of RRMSE, RMAE, RMedAE, and RBIAS predictive performance statistics
 #'
-#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((predicted - observed)^2))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((predicted - observed)))/mean(observed)*100; relative median absolute error (RMedAE), calculated as median(abs((predicted - observed)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((predicted - observed))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
+#' @description Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Four performance statistics are reported: relative root mean squared error (RRMSE), relative Mean Absolute Error (RMAE), relative median ab0solute error (RMedAE), and relative bias (RBIAS). Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
 #'
 #' All three accuracy statistics (`RRMSE`, `RMAE`, and `RMedAE`) express prediction error as a percentage of the mean observed value, which makes them interpretable on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an RRMSE of 18% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
 #'
 #' `RRMSE (Relative Root Mean Squared Error)`: The square root of average squared prediction errors, expressed as a percentage of the mean observed value. Because errors are squared before averaging, `RRMSE` penalizes large individual errors more heavily than small ones, making it sensitive to cases where the model produces occasional extreme mispredictions.
 #'
+#'  `RRMSE = sqrt(mean((predicted - observed)^2))/mean(observed)*100`
+#'
 #' `RMAE (Relative Mean Absolute Error)`: The average absolute prediction error expressed as a percentage of the mean observed value. `RMAE` treats all errors proportionally to their size without the extra weight that squaring applies, and is often the most intuitive summary of typical prediction accuracy.
 #'
-#' `RMedAE (Relative Median Absolute Error)`: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, RMedAE is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
+#'  `RMAE = mean(abs((predicted - observed)))/mean(observed)*100`
+#'
+#' `RMedAE (Relative Median Absolute Error)`: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, `RMedAE` is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
+#'
+#'  `RMedAE = median(abs((predicted - observed)))/mean(observed)*100`
 #'
 #' Taken together, these three statistics tell a more complete story than any one alone. If RRMSE is notably larger than `RMAE`, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
 #'
 #' `RBIAS (Relative Bias)`: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic over-prediction and negative values indicate systematic under-prediction. RBIAS is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting RBIAS alongside RRMSE and RMAE therefore distinguishes random prediction noise from systematic directional error.
+#'
+#'  `RBIAS = mean((predicted - observed))/mean(observed)*100`
 #'
 #' @param nReps Desired number of bootstrap or Monte Carlo replicates. The default value is 100, but this number should be at least 1000 in practice.
 #' @param testModel A regression model fit to testData in glmmTMB (with or without random effects), glmer/glmer.nb/lmer (with random effects), glm/glm.nb/lm (without random effects), or gam (with or without random effects). The response variable can be continuous or an integer, and possible statistical distributions include Poisson, negative binomial, gamma, tweedie, and gaussian.
@@ -86,6 +94,13 @@ BIAS_PRECISION <- function(nReps = 100, testModel = NULL, testData = NULL,
     "cbind() and proportion binomial responses are not supported. See ?BIAS_PRECISION for details." =
       !is_cbind && !is_prop
   )
+
+  # Make sure that NA values in the response variable are omitted and reported
+  n_before <- nrow(testData)
+  testData <- testData[!is.na(testData[[resp_var]]),]
+  n_dropped <- n_before - nrow(testData)
+  if (n_dropped == 1) warning(n_dropped, " row with a missing value for the response variable was removed before resampling.")
+  if (n_dropped > 1) warning(n_dropped, " rows with missing values for the response variable were removed before resampling.")
 
   # --- Pre-compute model class flags (once, outside loop) ---
   mc         <- class(testModel)

@@ -70,6 +70,13 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
   stopifnot("Response variable is not binary! Use BIAS_PRECISION() instead" =
               is_binary(testData[[resp_var]]))
 
+  # Make sure that NA values in the response variable are omitted and reported
+  n_before <- nrow(testData)
+  testData <- testData[!is.na(testData[[resp_var]]),]
+  n_dropped <- n_before - nrow(testData)
+  if (n_dropped == 1) warning(n_dropped, " row with a missing value for the response variable was removed before resampling.")
+  if (n_dropped > 1) warning(n_dropped, " rows with missing values for the response variable were removed before resampling.")
+
   # --- Pre-compute model class flags (once, outside loop) ---
   mc         <- class(testModel)
   is_glmmTMB <- "glmmTMB"  %in% mc

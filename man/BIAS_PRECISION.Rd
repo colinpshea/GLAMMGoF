@@ -54,19 +54,27 @@ Bootstrapping or Monte Carlo resampling of the performance statistics requires s
 BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 }
 \description{
-Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: relative root mean squared error (RRMSE), calculated as sqrt(mean((predicted - observed)^2))/mean(observed)*100; relative mean absolute error (RMAE), calculated as mean(abs((predicted - observed)))/mean(observed)*100; relative median absolute error (RMedAE), calculated as median(abs((predicted - observed)))/mean(observed)*100; and relative bias (RBIAS), calculated as mean((predicted - observed))/mean(observed)*100. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
+Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Four performance statistics are reported: relative root mean squared error (RRMSE), relative Mean Absolute Error (RMAE), relative median ab0solute error (RMedAE), and relative bias (RBIAS). Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
 
 All three accuracy statistics (\code{RRMSE}, \code{RMAE}, and \code{RMedAE}) express prediction error as a percentage of the mean observed value, which makes them interpretable on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an RRMSE of 18\% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
 
 \verb{RRMSE (Relative Root Mean Squared Error)}: The square root of average squared prediction errors, expressed as a percentage of the mean observed value. Because errors are squared before averaging, \code{RRMSE} penalizes large individual errors more heavily than small ones, making it sensitive to cases where the model produces occasional extreme mispredictions.
 
+\code{RRMSE = sqrt(mean((predicted - observed)^2))/mean(observed)*100}
+
 \verb{RMAE (Relative Mean Absolute Error)}: The average absolute prediction error expressed as a percentage of the mean observed value. \code{RMAE} treats all errors proportionally to their size without the extra weight that squaring applies, and is often the most intuitive summary of typical prediction accuracy.
 
-\verb{RMedAE (Relative Median Absolute Error)}: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, RMedAE is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
+\code{RMAE = mean(abs((predicted - observed)))/mean(observed)*100}
+
+\verb{RMedAE (Relative Median Absolute Error)}: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, \code{RMedAE} is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
+
+\code{RMedAE = median(abs((predicted - observed)))/mean(observed)*100}
 
 Taken together, these three statistics tell a more complete story than any one alone. If RRMSE is notably larger than \code{RMAE}, that signals a handful of high-leverage mispredictions are inflating the squared-error average, which is a pattern \code{RMedAE} will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
 
 \verb{RBIAS (Relative Bias)}: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic over-prediction and negative values indicate systematic under-prediction. RBIAS is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting RBIAS alongside RRMSE and RMAE therefore distinguishes random prediction noise from systematic directional error.
+
+\code{RBIAS = mean((predicted - observed))/mean(observed)*100}
 }
 \note{
 This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use BRIER_AUC(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
