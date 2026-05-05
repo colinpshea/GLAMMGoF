@@ -39,7 +39,7 @@
 #'
 #' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method `holdout` or `bootstrap`, the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use DHARMa residual diagnostics (the default is TRUE), the number of DHARMa simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
 #'
-#' BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+#' brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
@@ -50,7 +50,7 @@
 #' @importFrom lme4 glmer
 #' @importFrom mgcv gam predict.gam
 #' @export
-BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
+brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
                       propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
                       seed = NULL, method = c("holdout", "bootstrap")) {
 
@@ -67,8 +67,17 @@ BRIER_AUC <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   resp_var  <- all.vars(formula(testModel))[1]
   is_binary <- function(x) length(unique(x)) == 2 && all(x %in% c(0, 1))
-  stopifnot("Response variable is not binary! Use BIAS_PRECISION() instead" =
+  stopifnot("Response variable is not binary! Use bias_precision() instead" =
               is_binary(testData[[resp_var]]))
+
+  # Check for unsupported binomial response types
+  resp_expr <- formula(testModel)[[2]]
+  is_cbind  <- is.call(resp_expr) && deparse(resp_expr[[1]]) == "cbind"
+  is_prop   <- is.call(resp_expr) && grepl("/", deparse(resp_expr))
+  stopifnot(
+    "cbind() and proportion binomial responses are not supported. See ?bias_precision for details." =
+      !is_cbind && !is_prop
+  )
 
   # Make sure that NA values in the response variable are omitted and reported
   n_before <- nrow(testData)

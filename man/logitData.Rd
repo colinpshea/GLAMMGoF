@@ -19,6 +19,6 @@ logitData
 }
 \description{
 A simulated dataset with a binary response and predictor variables
-for demonstrating the BRIER_AUC function.
+for demonstrating the brier_auc function.
 }
 \keyword{datasets}

@@ -24,10 +24,10 @@ knitr::opts_chunk$set(
 
 #### What does GLAMMGoF do?
 
-`GLAMMGoF` is an R package for resampling-based predictive validation of generalized linear and generalized additive models. The two main functions in this package, `BIAS_PRECISION()` and `BRIER_AUC()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to resampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `lmer`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics can also be performed using the `DHARMa` package.
+`GLAMMGoF` is an R package for resampling-based predictive validation of generalized linear and generalized additive models. The two main functions in this package, `bias_precision()` and `brier_auc()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to resampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `lmer()`, `glmer()` and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics can also be performed using the `DHARMa` package.
 
--   `BIAS_PRECISION()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or Gamma distributions) and returns relative root mean squared error (RRMSE), relative mean absolute error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS).
--   `BRIER_AUC()` is used for models with binary response variables (i.e., logistic regression) and returns AUC, Brier score, and log loss.
+-   `bias_precision()` is used for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or Gamma distributions) and returns relative root mean squared error (RRMSE), relative mean absolute error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS).
+-   `brier_auc()` is used for models with binary response variables (i.e., logistic regression) and returns AUC, Brier score, and log loss.
 -   Both functions accept models with or without random effects, but predictive performance is based on population-level predictions, meaning random effects are excluded during prediction.
 -   Two resampling methods are available via the `method` argument:
     -   repeated random holdout (`method = "holdout"`, the default), which splits data into fixed training and test sets across replicates and is intuitive and widely used; and
@@ -52,7 +52,7 @@ library(tidyr)
 
 There are only two functions in this package, and which one you use depends on the type of model being assessed:
 
-`BIAS_PRECISION()`: used for models with continuous or integer response variables and estimates four predictive performance metrics using repeated resampling: `RRMSE`, `RMAE`, `RMedAE`, and `RBIAS`. For all four metrics, values closer to 0 indicate better predictive performance (see `?BIAS_PRECISION` for details). All three accuracy statistics (`RRMSE`, `RMAE`, and `RMedAE`) express prediction error as a percentage of the mean observed value, which makes them interpretable on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an RRMSE of 18% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
+`bias_precision()`: used for models with continuous or integer response variables and estimates four predictive performance metrics using repeated resampling: `RRMSE`, `RMAE`, `RMedAE`, and `RBIAS`. For all four metrics, values closer to 0 indicate better predictive performance (see `?bias_precision` for details). All three accuracy statistics (`RRMSE`, `RMAE`, and `RMedAE`) express prediction error as a percentage of the mean observed value, which makes them interpretable on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an RRMSE of 18% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
 
 -   `RRMSE (Relative Root Mean Squared Error)`: The square root of average squared prediction errors, expressed as a percentage of the mean observed value. Because errors are squared before averaging, RRMSE penalises large individual errors more heavily than small ones, making it sensitive to cases where the model produces occasional extreme mispredictions.
 
@@ -72,7 +72,7 @@ There are only two functions in this package, and which one you use depends on t
 
         fit_cost_rbias <- function(y, yhat) mean(yhat - y) / mean(y) * 100
 
-`BRIER_AUC()`: used for models with binary response variables and estimates three predictive performance metrics using repeated resampling: `AUC`, `Brier score`, and `log loss`. `AUC` values closer to 1 (bounded between 0 and 1) indicate better classification performance, whereas `Brier score` (bounded between 0 and 1) and `log loss` (lower bound of 0, no upper bound) values closer to 0 indicate better probabilistic predictions (see `?BRIER_AUC` for details).
+`brier_auc()`: used for models with binary response variables and estimates three predictive performance metrics using repeated resampling: `AUC`, `Brier score`, and `log loss`. `AUC` values closer to 1 (bounded between 0 and 1) indicate better classification performance, whereas `Brier score` (bounded between 0 and 1) and `log loss` (lower bound of 0, no upper bound) values closer to 0 indicate better probabilistic predictions (see `?brier_auc` for details).
 
 -   The three binary metrics each capture a different aspect of predictive performance and are most informative when interpreted together.
 
@@ -98,7 +98,7 @@ This entire process is repeated `nReps` times, and the resulting sampling distri
 
 There are two example datasets, `countData` and `logitData`, with integer and binary response variables, respectively. Each dataset also includes a variety of continuous and categorical predictor variables. Additionally, there are 12 example model objects (6 beginning with `count` and 6 beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible R packages
 
-#### Using the `BIAS_PRECISION()` function
+#### Using the `bias_precision()` function
 
 To use this function properly, you must:
 
@@ -117,17 +117,17 @@ To use this function properly, you must:
 Now let's run it and see what happens...
 
 ```{r, warning=FALSE, comment=NA}
-bias_precision <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-bias_precision$bias_precision_results <- bias_precision$bias_precision_results %>% mutate_at(vars(value), funs(round(., 2)))
+bp$bias_precision_results <- bp$bias_precision_results %>% mutate_at(vars(value), funs(round(., 2)))
 ```
 
 Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bias_precision$bias_precision_results, 8))
+knitr::kable(head(bp$bias_precision_results, 8))
 ```
 
  
@@ -135,11 +135,11 @@ knitr::kable(head(bias_precision$bias_precision_results, 8))
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-bias_precision$bias_precision_summary <- bias_precision$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bias_precision$bias_precision_summary, 8))
+knitr::kable(head(bp$bias_precision_summary, 8))
 ```
 
  
@@ -147,7 +147,7 @@ knitr::kable(head(bias_precision$bias_precision_summary, 8))
 And now look at a plot of the summaries
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
-bias_precision$bias_precision_hist
+bp$bias_precision_hist
 ```
 
  
@@ -155,26 +155,26 @@ bias_precision$bias_precision_hist
 Now let's compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets.
 
 ```{r, warning=FALSE, comment=NA}
-bias_precision <- BIAS_PRECISION(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
+bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
 ```
 
 Summary of `bootstrap` method
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-bias_precision$bias_precision_summary <- bias_precision$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bias_precision$bias_precision_summary, 8))
+knitr::kable(head(bp$bias_precision_summary, 8))
 ```
 
 And now look at a plot of the summaries
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
-bias_precision$bias_precision_hist
+bp$bias_precision_hist
 ```
 
-#### Using the `BRIER_AUC()` function
+#### Using the `brier_auc()` function
 
 To use this function properly, you must:
 
@@ -187,7 +187,7 @@ To use this function properly, you must:
     2.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess the model's residuals (the default is TRUE).
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -227,7 +227,7 @@ br_auc$brier_auc_hist
 Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets.
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- BRIER_AUC(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
+br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
 ```
 
 Summary of `bootstrap` method
@@ -246,26 +246,26 @@ And now look at a plot of the summaries
 br_auc$brier_auc_hist
 ```
 
-#### Error messages when using `BIAS_PRECISION()`
+#### Error messages when using `bias_precision()`
 
-For obvious reasons, the code below will cause `BIAS_PRECISION` quit and throw an error message:
+For obvious reasons, the code below will cause `bias_precision` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(BIAS_PRECISION(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
+try(bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
 ```
 
-#### Error messages when using `BRIER_AUC()`
+#### Error messages when using `brier_auc()`
 
-For equally obvious reasons, the code below will cause `BRIER_AUC` quit and throw an error message:
+For equally obvious reasons, the code below will cause `brier_auc` quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
-BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+brier_auc(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(BRIER_AUC(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
+try(brier_auc(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
 ```

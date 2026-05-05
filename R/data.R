@@ -1,7 +1,7 @@
 #' Simulated count data
 #'
 #' A simulated dataset with an integer count response and predictor variables
-#' for demonstrating the BIAS_PRECISION function.
+#' for demonstrating the bias_precision function.
 #'
 #' @format A data frame with 1000 rows and 5 variables:
 #' \describe{
@@ -16,7 +16,7 @@
 #' Simulated binary data
 #'
 #' A simulated dataset with a binary response and predictor variables
-#' for demonstrating the BRIER_AUC function.
+#' for demonstrating the brier_auc function.
 #'
 #' @format A data frame with 1000 rows and 5 variables:
 #' \describe{
