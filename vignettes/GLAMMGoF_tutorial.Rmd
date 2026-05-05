@@ -104,8 +104,6 @@ To use this function properly, you must:
 
 1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer`, `glmer.nb`, and `lmer`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package).
 
-    1.  Note that if you include a random effect in a gam from `mgcv`, that variable nust be a factor or else `mgcv` will throw an error.
-
 2.  The only other choices you need to make are:
 
     1.  The number of bootstrap or Monte Carlo replicates you want to (the default is 100 but this should be at least 500 or 1000).
@@ -121,7 +119,7 @@ bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countD
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-bp$bias_precision_results <- bp$bias_precision_results %>% mutate_at(vars(value), funs(round(., 2)))
+bp$bias_precision_results <- bp$bias_precision_results %>% mutate(across(value, ~ round(., 2)))
 ```
 
 Look at the first few fit statistics...
@@ -135,7 +133,7 @@ knitr::kable(head(bp$bias_precision_results, 8))
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -161,7 +159,7 @@ bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countD
 Summary of `bootstrap` method
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -191,7 +189,7 @@ br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitDa
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-br_auc$brier_auc_results <- br_auc$brier_auc_results %>% mutate_at(vars(value), funs(round(., 2)))
+br_auc$brier_auc_results <- br_auc$brier_auc_results %>% mutate(across(value, ~ round(., 2)))
 ```
 
 Look at the first few fit statistics...
@@ -203,7 +201,7 @@ knitr::kable(head(br_auc$brier_auc_results, 6))
  
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
 ```
 
  
@@ -233,7 +231,7 @@ br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitDa
 Summary of `bootstrap` method
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate_at(vars(mn, lwr95, upr95), funs(round(., 2)))
+br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
