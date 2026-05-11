@@ -20,8 +20,10 @@
 #' @param DHARMaReps If DHARMaPlot is TRUE, you can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
 #' @param seed Optional integer seed for reproducibility. If `NULL` (the default), no seed is set and results will differ across runs.
 #' @param method The resampling method to use. The default, `holdout`, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas `bootstrap` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
-#' @note This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects  (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s
-#' @return This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the simulateResiduals() function of the DHARMa package. If DHARMaPlot = FALSE, then simulateResiduals() is not used to assess the model residuals and only three of the four objects are returned.
+#' @note This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
+#'
+#' To cite this package: Shea C (2026). GLAMMGoF: Resampling-Based Predictive Validation for Generalized Linear and Generalized Additive Models. R package version 1.0.5. https://cshea15.r-universe.dev/GLAMMGoF
+#' @return This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the simulateResiduals() function of the DHARMa package. If DHARMaPlot = FALSE, then simulateResiduals() is not used to assess the model residuals and only three of the four objects are returned. This function also returns the null (i.e., intercept-only) model log loss for reference, which allows for comparison to the summarized log loss metrics. A null model reference is not required for Brier and AUC, as they both have natural reference points (0 for Brier score, 0.5 for AUC). In the histogram, a blue dotted vertical line indicates the mean across replicates and a red dashed vertical line indicates the null (intercept-only) log loss baseline in the log loss panels.
 #'
 #' This package contains an example data set to fit a logistic regression called logitData. Six example logistic regression model objects are also included: logitModel_GLM is a GLM with no random effects; logitModel_GLMM is a GLMM with one random effect; logitModel_GLMM2 is a GLMM with two random effects; logitModel_GAM is a GAM with no random effects; logitModel_GAMM is a GAMM with one random effect; and logitModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using glmmTMB, whereas GAMs and GAMMs were fitted using mgcv:
 #'
@@ -41,7 +43,7 @@
 #'
 #' brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 #' @importFrom magrittr %>%
-#' @importFrom dplyr group_by summarise mutate bind_rows
+#' @importFrom dplyr group_by summarise mutate bind_rows filter
 #' @importFrom tidyr pivot_longer separate
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_vline facet_grid theme_bw theme element_blank element_line element_text labs unit scale_x_continuous scale_y_continuous expansion
 #' @importFrom DHARMa simulateResiduals
@@ -85,6 +87,10 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   n_dropped <- n_before - nrow(testData)
   if (n_dropped == 1) warning(n_dropped, " row with a missing value for the response variable was removed before resampling.")
   if (n_dropped > 1) warning(n_dropped, " rows with missing values for the response variable were removed before resampling.")
+
+  # --- Null log loss (intercept-only baseline) ---
+  p_bar <- mean(testData[[resp_var]], na.rm = TRUE)
+  null_logloss <- -(p_bar * log(p_bar) + (1 - p_bar) * log(1 - p_bar))
 
   # --- Pre-compute model class flags (once, outside loop) ---
   mc         <- class(testModel)
@@ -239,12 +245,27 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
               upr95 = quantile(value, 0.975),
               .groups = "drop")
 
+  null_row <- data.frame(
+    Group  = factor("Null model (baseline)", levels = c("In-sample performance", "Out-of-sample performance", "Null model (baseline)")),
+    Metric = factor("Log loss", levels = levels(results_summary$Metric)),
+    mn     = null_logloss,
+    lwr95  = NA_real_,
+    upr95  = NA_real_
+  )
+  results_summary <- bind_rows(results_summary, null_row)
+
+  null_ref <- data.frame(
+    Metric = factor("Log loss", levels = levels(results_df$Metric)),
+    null_logloss = null_logloss
+  )
+
   # scales = "free_x" allows log loss (unbounded above) to use its own x axis,
   # while AUC and Brier retain their natural [0, 1] range.
   results_plot <- ggplot(results_df, aes(x = value)) +
     geom_histogram(color = "black", fill = "grey") +
     facet_grid(Group ~ Metric, scales = "free_x") +
-    geom_vline(data = results_summary, aes(xintercept = mn), color = "blue", linetype = "dotted", linewidth = 0.8) +
+    geom_vline(data = dplyr::filter(results_summary, !is.na(lwr95)), aes(xintercept = mn), color = "blue", linetype = "dotted", linewidth = 0.8) +
+    geom_vline(data = null_ref, aes(xintercept = null_logloss), color = "red", linetype = "dashed", linewidth = 0.8) +
     theme_bw() +
     theme(panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"),

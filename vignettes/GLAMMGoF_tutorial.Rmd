@@ -80,13 +80,13 @@ There are only two functions in this package, and which one you use depends on t
 
 -   `Brier Score`: Across all observations, the mean squared difference between predicted probabilities and observed binary outcomes (0/1), ranging from 0 (perfect) to 1 (worst). The `Brier score` jointly rewards good discrimination and good calibration, penalizing confident but wrong predictions more heavily than uncertain ones. A model can have high `AUC` but a poor `Brier score`if its predicted probabilities are systematically too high or too low even while correctly ordering cases.
 
--   `Log Loss (Binary Cross-Entropy)`: Across all observations, the mean negative log-likelihood of the observed outcomes under the predicted probabilities, where lower values indicate better performance. Like the `Brier score`, `log loss` rewards calibration, but its logarithmic scale means it penalizes extreme, confident mispredictions far more aggressively. `Log loss` is therefore the most sensitive of the three to cases where the model assigns near-zero probability to an outcome that actually occurs.
+-   `Log Loss (Binary Cross-Entropy)`: Across all observations, the mean negative log-likelihood of the observed outcomes under the predicted probabilities, where lower values indicate better performance. Like the `Brier score`, `log loss` rewards calibration, but its logarithmic scale means it penalizes extreme, confident mispredictions far more aggressively. `Log loss` is therefore the most sensitive of the three to cases where the model assigns near-zero probability to an outcome that actually occurs. This function also returns the null (i.e., intercept-only) model log loss for reference, which allows for comparison to the summarized log loss metrics. A null model reference is not required for Brier and AUC, as they both have natural reference points (0 for Brier score, 0.5 for AUC).
 
         log_loss <- function(y, p, eps = 1e-15) {p <- pmax(pmin(p, 1 - eps), eps) -mean(y * log(p) + (1 - y) * log(1 - p))}
 
 -   Reporting all three together is recommended: `AUC` reflects whether the model correctly separates cases from non-cases; `Brier score` provides an overall summary of probability accuracy on a squared-error scale; and `log loss` highlights whether the model is making any dangerously overconfident errors that the `Brier score` might underweight.
 
-Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates.
+Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates. Results are stored across all replicates and reported as a summary table (mean and 95% confidence intervals) and a histogram of replicate values for each performance statistic, with a blue dotted vertical line indicating the mean across replicates. For brier_auc(), a red dashed vertical line is also displayed in the log loss panels, indicating the null (intercept-only) log loss baseline as a reference point for model comparison.
 
 Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full dataset, which can be a limitation for smaller datasets.
 
@@ -195,7 +195,7 @@ br_auc$brier_auc_results <- br_auc$brier_auc_results %>% mutate(across(value, ~ 
 Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_results, 6))
+knitr::kable(head(br_auc$brier_auc_results, 7))
 ```
 
  
@@ -209,7 +209,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_summary, 6))
+knitr::kable(head(br_auc$brier_auc_summary, 7))
 ```
 
  
@@ -235,7 +235,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_summary, 6))
+knitr::kable(head(br_auc$brier_auc_summary, 7))
 ```
 
 And now look at a plot of the summaries
