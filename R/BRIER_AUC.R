@@ -264,7 +264,7 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   results_plot <- ggplot(results_df, aes(x = value)) +
     geom_histogram(color = "black", fill = "grey") +
     facet_grid(Group ~ Metric, scales = "free_x") +
-    geom_vline(data = dplyr::filter(results_summary, !is.na(lwr95)), aes(xintercept = mn), color = "blue", linetype = "dotted", linewidth = 0.8) +
+    geom_vline(data = dplyr::filter(results_summary, !is.na(.data[["lwr95"]])), aes(xintercept = mn), color = "blue", linetype = "dotted", linewidth = 0.8) +
     geom_vline(data = null_ref, aes(xintercept = null_logloss), color = "red", linetype = "dashed", linewidth = 0.8) +
     theme_bw() +
     theme(panel.grid.major.x = element_blank(),
