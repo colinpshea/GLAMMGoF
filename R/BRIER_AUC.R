@@ -165,8 +165,9 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   # --- val.prob helper: call once per dataset, extract both metrics ---
   # val.prob() computes AUC and Brier simultaneously; calling it twice
   # (once per metric) would be redundant and twice as slow.
+  # SuppressWarnings is used to suppress occasional (and harmless) warnings about deleted observations near 1 or 0
   get_stats <- function(phat, y) {
-    vp <- val.prob(p = phat, y = y, smooth = FALSE, pl = FALSE)
+    vp <- suppressWarnings(val.prob(p = phat, y = y, smooth = FALSE, pl = FALSE))
     c(auc = unname(vp["C (ROC)"]), brier = unname(vp["Brier"]))
   }
 
