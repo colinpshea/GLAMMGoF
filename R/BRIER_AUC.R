@@ -92,7 +92,8 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   # --- Null log loss (intercept-only baseline) ---
   # p_bar is the arithmetic mean of the response, which approximates but is not
   # identical to plogis(intercept) from a fitted intercept-only logistic model.
-  # The difference is negligible in practice and avoids the overhead of model fitting  p_bar <- mean(testData[[resp_var]], na.rm = TRUE)
+  # The difference is negligible in practice and avoids the overhead of model fitting
+  p_bar <- mean(testData[[resp_var]], na.rm = TRUE)
   null_logloss <- -(p_bar * log(p_bar) + (1 - p_bar) * log(1 - p_bar))
 
   # --- Pre-compute model class flags (once, outside loop) ---
