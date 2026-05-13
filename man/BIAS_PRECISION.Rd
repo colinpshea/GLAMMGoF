@@ -10,7 +10,7 @@ bias_precision(
   testData = NULL,
   propTrain = 0.8,
   DHARMaPlot = TRUE,
-  testZI = FALSE,
+  testZI = TRUE,
   DHARMaReps = 1000,
   seed = NULL,
   method = c("holdout", "bootstrap")
@@ -52,9 +52,9 @@ countModel_GAMM <- gam(y ~ Season + s(Temp) + s(Site, bs = "re"), family = nb, d
 
 countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
 
-Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use \code{DHARMa} residual diagnostics (the default is \code{TRUE}), whether to use \code{DHARMa} to test for zero-inflation (the default is \code{FALSE}), the number of \code{DHARMa} simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method \code{holdout} or \code{bootstrap}:
+Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use \code{DHARMa} residual diagnostics (the default is \code{TRUE}), whether to use \code{DHARMa} to test for zero-inflation (the default is \code{TRUE}), the number of \code{DHARMa} simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method \code{holdout} or \code{bootstrap}:
 
-bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = FALSE, DHARMaReps = 1000, seed = 123, method = "holdout")
+bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 }
 \description{
 Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Four performance statistics are reported: relative root mean squared error (RRMSE), relative Mean Absolute Error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS). Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).

@@ -48,9 +48,9 @@
 #'
 #' countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
 #'
-#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `FALSE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`:
+#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`:
 #'
-#' bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = FALSE, DHARMaReps = 1000, seed = 123, method = "holdout")
+#' bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
@@ -62,7 +62,7 @@
 #' @importFrom mgcv gam predict.gam
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
-                             propTrain = 0.8, DHARMaPlot = TRUE, testZI = FALSE, DHARMaReps = 1000,
+                             propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
                              seed = NULL, method = c("holdout", "bootstrap")) {
 
   # --- specify bootstrapping method
