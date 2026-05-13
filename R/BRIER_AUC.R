@@ -89,12 +89,16 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   if (n_dropped == 1) warning(n_dropped, " row with a missing value for the response variable was removed before resampling.")
   if (n_dropped > 1) warning(n_dropped, " rows with missing values for the response variable were removed before resampling.")
 
-  # --- Null log loss (intercept-only baseline) ---
+  # --- Null log loss, AUC, Brier scores (intercept-only baseline) ---
   # p_bar is the arithmetic mean of the response, which approximates but is not
   # identical to plogis(intercept) from a fitted intercept-only logistic model.
   # The difference is negligible in practice and avoids the overhead of model fitting
   p_bar <- mean(testData[[resp_var]], na.rm = TRUE)
-  null_logloss <- -(p_bar * log(p_bar) + (1 - p_bar) * log(1 - p_bar))
+  null_logloss <- if (p_bar > 0 & p_bar < 1) {
+    -(p_bar * log(p_bar) + (1 - p_bar) * log(1 - p_bar))
+  } else NA_real_
+  null_brier <- p_bar * (1 - p_bar)
+  null_auc <- 0.5
 
   # --- Pre-compute model class flags (once, outside loop) ---
   mc         <- class(testModel)
@@ -250,18 +254,18 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
               upr95 = quantile(value, 0.975),
               .groups = "drop")
 
-  null_row <- data.frame(
+  null_rows <- data.frame(
     Group  = factor("Null model (baseline)", levels = c("In-sample performance", "Out-of-sample performance", "Null model (baseline)")),
-    Metric = factor("Log loss", levels = levels(results_summary$Metric)),
-    mn     = null_logloss,
+    Metric = factor(c("Log loss", "Brier score", "AUC statistic"), levels = levels(results_summary$Metric)),
+    mn     = c(null_logloss, null_brier, 0.5),
     lwr95  = NA_real_,
     upr95  = NA_real_
   )
-  results_summary <- bind_rows(results_summary, null_row)
+  results_summary <- bind_rows(results_summary, null_rows)
 
-  null_ref <- data.frame(
-    Metric = factor("Log loss", levels = levels(results_df$Metric)),
-    null_logloss = null_logloss
+  null_refs <- data.frame(
+    Metric       = factor(c("Log loss", "Brier score", "AUC statistic"), levels = levels(results_df$Metric)),
+    null_value   = c(null_logloss, null_brier, 0.5)
   )
 
   # scales = "free_x" allows log loss (unbounded above) to use its own x axis,
@@ -270,7 +274,7 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
     geom_histogram(color = "black", fill = "grey") +
     facet_grid(Group ~ Metric, scales = "free_x") +
     geom_vline(data = dplyr::filter(results_summary, !is.na(.data[["lwr95"]])), aes(xintercept = mn), color = "blue", linetype = "dotted", linewidth = 0.8) +
-    geom_vline(data = null_ref, aes(xintercept = null_logloss), color = "red", linetype = "dashed", linewidth = 0.8) +
+    geom_vline(data = null_refs, aes(xintercept = null_value), color = "red", linetype = "dashed", linewidth = 0.8) +
     theme_bw() +
     theme(panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_line(colour = "grey90", linetype = "solid"),
