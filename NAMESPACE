@@ -3,6 +3,7 @@
 export(bias_precision)
 export(brier_auc)
 importFrom(DHARMa,simulateResiduals)
+importFrom(DHARMa,testZeroInflation)
 importFrom(MASS,glm.nb)
 importFrom(dplyr,bind_rows)
 importFrom(dplyr,filter)

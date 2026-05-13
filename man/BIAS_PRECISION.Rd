@@ -10,6 +10,7 @@ bias_precision(
   testData = NULL,
   propTrain = 0.8,
   DHARMaPlot = TRUE,
+  testZI = FALSE,
   DHARMaReps = 1000,
   seed = NULL,
   method = c("holdout", "bootstrap")
@@ -26,6 +27,8 @@ bias_precision(
 
 \item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the simulateResiduals() function of the DHARMa package? The default is TRUE.}
 
+\item{testZI}{Logical. If \code{TRUE} and \code{DHARMaPlot = TRUE}, runs \code{testZeroInflation} on the simulated residuals. Most relevant for count models (Poisson, negative binomial, ZIP, hurdle). Default is \code{FALSE}.}
+
 \item{DHARMaReps}{You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
 
 \item{seed}{Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.}
@@ -33,7 +36,7 @@ bias_precision(
 \item{method}{The resampling method to use. The default, \code{holdout}, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas \code{bootstrap} samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8\% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.}
 }
 \value{
-This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the simulateResiduals() function of the DHARMa package. If DHARMaPlot = FALSE, then simulateResiduals() is not used to assess the model residuals and only three of the four objects are returned. In the histogram, a blue dotted vertical line indicates the mean across replicates.
+This function returns either three, four, or five objects depending on the values of \code{DHARMaPlot} and \code{testZI}: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If \code{DHARMaPlot = TRUE}, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from \code{simulateResiduals()}. If \code{testZI = TRUE} and \code{DHARMaPlot = TRUE}, a fifth object \code{dharmaZI} is also returned containing the result of \code{testZeroInflation()}. In the histogram, a blue dotted vertical line indicates the mean across replicates.
 
 This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using glmmTMB, whereas GAMs and GAMMs were fitted using mgcv:
 
@@ -49,9 +52,9 @@ countModel_GAMM <- gam(y ~ Season + s(Temp) + s(Site, bs = "re"), family = nb, d
 
 countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
 
-Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method \code{holdout} or \code{bootstrap}, the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use \code{DHARMa} residual diagnostics (the default is \code{TRUE}), the number of \code{DHARMa} simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
+Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use \code{DHARMa} residual diagnostics (the default is \code{TRUE}), whether to use \code{DHARMa} to test for zero-inflation (the default is \code{FALSE}), the number of \code{DHARMa} simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method \code{holdout} or \code{bootstrap}:
 
-bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = FALSE, DHARMaReps = 1000, seed = 123, method = "holdout")
 }
 \description{
 Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Four performance statistics are reported: relative root mean squared error (RRMSE), relative Mean Absolute Error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS). Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).

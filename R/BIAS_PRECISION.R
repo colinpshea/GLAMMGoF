@@ -28,10 +28,11 @@
 #' @param propTrain The proportion of `testData` used for model-fitting and in-sample predictive performance when method = `holdout` (the default value is 0.8). The remaining proportion is used to assess out-of-sample predictive performance. This argument is ignored when method = `bootstrap`.
 #' @param DHARMaPlot Do you want to return a goodness-of-fit plot from the simulateResiduals() function of the DHARMa package? The default is TRUE.
 #' @param DHARMaReps You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
+#' @param testZI Logical. If `TRUE` and `DHARMaPlot = TRUE`, runs `testZeroInflation` on the simulated residuals. Most relevant for count models (Poisson, negative binomial, ZIP, hurdle). Default is `FALSE`.
 #' @param seed Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.
 #' @param method The resampling method to use. The default, `holdout`, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas `bootstrap` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
 #' @note This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use brier_auc(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
-#' @return This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the simulateResiduals() function of the DHARMa package. If DHARMaPlot = FALSE, then simulateResiduals() is not used to assess the model residuals and only three of the four objects are returned. In the histogram, a blue dotted vertical line indicates the mean across replicates.
+#' @return This function returns either three, four, or five objects depending on the values of `DHARMaPlot` and `testZI`: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If `DHARMaPlot = TRUE`, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from `simulateResiduals()`. If `testZI = TRUE` and `DHARMaPlot = TRUE`, a fifth object `dharmaZI` is also returned containing the result of `testZeroInflation()`. In the histogram, a blue dotted vertical line indicates the mean across replicates.
 #'
 #' This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using glmmTMB, whereas GAMs and GAMMs were fitted using mgcv:
 #'
@@ -47,21 +48,21 @@
 #'
 #' countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
 #'
-#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method `holdout` or `bootstrap`, the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
+#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `FALSE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`:
 #'
-#' bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+#' bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = FALSE, DHARMaReps = 1000, seed = 123, method = "holdout")
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_vline facet_grid theme_bw theme element_blank element_line element_text labs unit scale_y_continuous
-#' @importFrom DHARMa simulateResiduals
+#' @importFrom DHARMa simulateResiduals testZeroInflation
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
-                             propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
+                             propTrain = 0.8, DHARMaPlot = TRUE, testZI = FALSE, DHARMaReps = 1000,
                              seed = NULL, method = c("holdout", "bootstrap")) {
 
   # --- specify bootstrapping method
@@ -218,7 +219,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # Guard against all replicates failing
   results_clean <- results[!vapply(results, is.null, logical(1))]
   if (length(results_clean) == 0)
-    stop("All model fits failed - no results to summarise.")
+    stop("All model fits failed - no results to summarize.")
 
   n_failed <- nReps - length(results_clean)
   if (n_failed > 0)
@@ -275,13 +276,25 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
         NULL
       }
     )
+    dharmaZI <- if (testZI && !is.null(dharmaPlot)) {
+      tryCatch(
+        withCallingHandlers(
+          testZeroInflation(dharmaPlot),
+          warning = function(w) {
+            message("DHARMa ZI warning (", class(testModel)[1], "): ", conditionMessage(w))
+            invokeRestart("muffleWarning")
+          }
+        ),
+        error = function(e) {
+          message("DHARMa ZI test failed (", class(testModel)[1], "): ", conditionMessage(e))
+          NULL
+        }
+      )
+    } else NULL
     return(list(bias_precision_results  = results_df,
                 bias_precision_hist     = results_plot,
                 bias_precision_summary  = results_summary,
-                dharmaPlot          = dharmaPlot))
+                dharmaPlot             = dharmaPlot,
+                dharmaZI               = dharmaZI))
   }
-
-  list(bias_precision_results = results_df,
-       bias_precision_hist    = results_plot,
-       bias_precision_summary = results_summary)
 }

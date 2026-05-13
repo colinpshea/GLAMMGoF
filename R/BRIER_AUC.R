@@ -218,7 +218,7 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   # Guard against all replicates failing
   results_clean <- results[!vapply(results, is.null, logical(1))]
   if (length(results_clean) == 0)
-    stop("All model fits failed - no results to summarise.")
+    stop("All model fits failed - no results to summarize.")
 
   n_failed <- nReps - length(results_clean)
   if (n_failed > 0)
