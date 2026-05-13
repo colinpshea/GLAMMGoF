@@ -106,11 +106,11 @@ To use this function properly, you must:
 
 2.  The only other choices you need to make are:
 
-    1.  The number of bootstrap or Monte Carlo replicates you want to (the default is `nReps=100` but this should be at least 500 or 1000).
+    1.  The number of bootstrap or Monte Carlo replicates you want to use (the default is `nReps=100` but this should be at least 500 or 1000).
 
     2.  For `method = "holdout"` only: The proportion of data you want to use for assessing in-sample predictive performance (the default is 0.8).
 
-    3.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess and plot the model's residuals (the default is `DHARMaPlot=TRUE`), whether you also want DHARMa's to test for zero inflation using the `testZeroInflation()` function (the default is `testZI=FALSE`), and how many simulation replicates you want DHARMa to use (the default is DHARMaReps=1000).
+    3.  Whether you want to use the DHARMa package's `simulateResiduals()` function to assess and plot the model's residuals (the default is `DHARMaPlot=TRUE`), whether you also want DHARMa's to test for zero inflation using the `testZeroInflation()` function (the default is `testZI=FALSE`), and how many simulation replicates you want DHARMa to use (the default is `DHARMaReps=1000`).
 
 Now let's run it and see what happens...
 
@@ -180,7 +180,7 @@ To use this function properly, you must:
 
 2.  The only other choices you need to make are:
 
-    1.  The number of bootstrap or Monte Carlo replicates you want to (the default `nReps=100` but this should be at least 500 or 1000).
+    1.  The number of bootstrap or Monte Carlo replicates you want to use (the default `nReps=100` but this should be at least 500 or 1000).
 
     2.  For `method = "holdout"` only: The proportion of data you want to use for assessing in-sample predictive performance (the default is propTrain= 0.8).
 
