@@ -27,7 +27,7 @@ bias_precision(
 
 \item{DHARMaPlot}{Do you want to return a goodness-of-fit plot from the simulateResiduals() function of the DHARMa package? The default is TRUE.}
 
-\item{testZI}{Logical. If \code{TRUE} and \code{DHARMaPlot = TRUE}, runs \code{testZeroInflation} on the simulated residuals. Most relevant for count models (Poisson, negative binomial, ZIP, hurdle). Default is \code{FALSE}.}
+\item{testZI}{Logical. If \code{TRUE} and \code{DHARMaPlot = TRUE}, runs \code{testZeroInflation} on the simulated residuals. Most relevant for count models (Poisson, negative binomial, ZIP, hurdle). Default is \code{TRUE}.}
 
 \item{DHARMaReps}{You can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.}
 
