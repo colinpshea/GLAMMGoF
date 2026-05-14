@@ -255,7 +255,7 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   null_rows <- data.frame(
     Group  = factor("Null model (baseline)", levels = c("In-sample performance", "Out-of-sample performance", "Null model (baseline)")),
     Metric = factor(c("AUC statistic", "Brier score", "Log loss"), levels = levels(results_summary$Metric)),
-    mn     = c(null_logloss, null_brier, null_auc),
+    mn     = c(null_auc, null_brier, null_logloss),
     lwr95  = NA_real_,
     upr95  = NA_real_
   )
