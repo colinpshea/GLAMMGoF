@@ -68,6 +68,4 @@ Reporting all three together is recommended: AUC reflects whether the model corr
 }
 \note{
 This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
-
-To cite this package: Shea C (2026). GLAMMGoF: Resampling-Based Predictive Validation for Generalized Linear and Generalized Additive Models. R package version 1.0.5. https://cshea15.r-universe.dev/GLAMMGoF
 }
