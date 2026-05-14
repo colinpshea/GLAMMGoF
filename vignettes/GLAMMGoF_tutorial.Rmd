@@ -199,7 +199,7 @@ br_auc$brier_auc_results <- br_auc$brier_auc_results %>% mutate(across(value, ~ 
 Look at the first few fit statistics...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_results, 7))
+knitr::kable(head(br_auc$brier_auc_results, 9))
 ```
 
  
@@ -213,7 +213,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_summary, 7))
+knitr::kable(head(br_auc$brier_auc_summary, 9))
 ```
 
  
@@ -239,7 +239,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(br_auc$brier_auc_summary, 7))
+knitr::kable(head(br_auc$brier_auc_summary, 9))
 ```
 
 And now look at a plot of the summaries
