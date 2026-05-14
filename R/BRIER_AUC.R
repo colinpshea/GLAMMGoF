@@ -254,7 +254,7 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   null_rows <- data.frame(
     Group  = factor("Null model (baseline)", levels = c("In-sample performance", "Out-of-sample performance", "Null model (baseline)")),
-    Metric = factor(c("Log loss", "Brier score", "AUC statistic"), levels = levels(results_summary$Metric)),
+    Metric = factor(c("AUC statistic", "Brier score", "Log loss"), levels = levels(results_summary$Metric)),
     mn     = c(null_logloss, null_brier, null_auc),
     lwr95  = NA_real_,
     upr95  = NA_real_
@@ -262,8 +262,8 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   results_summary <- bind_rows(results_summary, null_rows)
 
   null_refs <- data.frame(
-    Metric       = factor(c("Log loss", "Brier score", "AUC statistic"), levels = levels(results_df$Metric)),
-    null_value   = c(null_logloss, null_brier, 0.5)
+    Metric       = factor(c("AUC statistic", "Brier score", "Log loss"), levels = levels(results_df$Metric)),
+    null_value   = c(0.5, null_brier, null_logloss)
   )
 
   # scales = "free_x" allows log loss (unbounded above) to use its own x axis,
