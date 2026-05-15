@@ -32,6 +32,7 @@
 #' @param seed Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.
 #' @param method The resampling method to use. The default, `holdout`, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas `bootstrap` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
 #' @note This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use brier_auc(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
+#' @references Hyndman, R.J. and Koehler, A.B. (2006) Another look at measures of forecast accuracy. \emph{International Journal of Forecasting}, 22, 679--688.
 #' @return This function returns either three, four, or five objects depending on the values of `DHARMaPlot` and `testZI`: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If `DHARMaPlot = TRUE`, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from `simulateResiduals()`. If `testZI = TRUE` and `DHARMaPlot = TRUE`, a fifth object `dharmaZI` is also returned containing the result of `testZeroInflation()`. In the histogram, a blue dotted vertical line indicates the mean across replicates.
 #'
 #' This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using glmmTMB, whereas GAMs and GAMMs were fitted using mgcv:
@@ -62,8 +63,8 @@
 #' @importFrom mgcv gam predict.gam
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
-                             propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
-                             seed = NULL, method = c("holdout", "bootstrap")) {
+                           propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
+                           seed = NULL, method = c("holdout", "bootstrap")) {
 
   # --- specify bootstrapping method
   method = match.arg(method)
@@ -111,18 +112,16 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   is_lmer    <- "lmerMod"  %in% mc
   is_negbin  <- "negbin"   %in% mc
   is_glm     <- "glm"      %in% mc && !is_gam
-  is_lm      <- "lm"       %in% mc && !is_gam && !is_glm  # fixed: was !is_glm && !is_glm
+  is_lm      <- "lm"       %in% mc && !is_gam && !is_glm
 
   # --- Pre-compute GAM RE metadata (once, outside loop) ---
-  # smooth$label passed to exclude= (e.g. "s(Site)"); smooth$term is the column name.
-  # Using smooth object fields directly avoids any regex on the label string.
   gam_re_labels <- NULL
   gam_re_terms  <- NULL
   if (is_gam) {
     re_smooths <- Filter(function(s) isTRUE(s$random), testModel$smooth)
     if (length(re_smooths) > 0) {
-      gam_re_labels <- sapply(re_smooths, function(s) s$label)  # vector: one per RE smooth
-      gam_re_terms  <- sapply(re_smooths, function(s) s$term)   # retained for metadata
+      gam_re_labels <- sapply(re_smooths, function(s) s$label)
+      gam_re_terms  <- sapply(re_smooths, function(s) s$term)
     }
   }
 
@@ -157,11 +156,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     })
   }
 
-  # --- Predict helper: marginal/population-level predictions, RE excluded ---
-  # glmmTMB: allow.new.levels = TRUE handles RE groups absent from training data
-  # GAM:     exclude= + newdata.guaranteed=TRUE drops all RE smooths cleanly;
-  #          no column deletion needed, full newdata passed untouched
-  # lme4:    re.form = ~0 suppresses all random effects
+  # --- Predict helper ---
   get_preds <- function(m, newdata) {
     if (is_glmmTMB) {
       predict(m, type = "response", newdata = newdata,
@@ -169,9 +164,9 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     } else if (is_gam) {
       if (!is.null(gam_re_labels)) {
         predict(m, type = "response",
-                exclude            = gam_re_labels,  # vector: all RE smooth labels excluded
+                exclude            = gam_re_labels,
                 newdata            = newdata,
-                newdata.guaranteed = TRUE)            # mgcv won't look for RE columns in newdata
+                newdata.guaranteed = TRUE)
       } else {
         predict(m, type = "response", newdata = newdata)
       }
@@ -196,8 +191,9 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
       train <- testData[ train_idx, ]
       test  <- testData[setdiff(seq_len(nrow(testData)), unique(train_idx)), ]
     }
+
     m_train <- fit_model(train)
-    if (is.null(m_train)) next  # skip failed fits cleanly; no stale model carried forward
+    if (is.null(m_train)) next
 
     y_train    <- train[[resp_var]]
     y_test     <- test[[resp_var]]
@@ -205,14 +201,14 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     yhat_test  <- get_preds(m_train, test)
 
     results[[j]] <- data.frame(
-      train_RRMSE = fit_cost_rrmse(y_train, yhat_train),
-      test_RRMSE  = fit_cost_rrmse(y_test,  yhat_test),
-      train_RMedAE  = fit_cost_rmedae(y_train,  yhat_train),
-      test_RMedAE   = fit_cost_rmedae(y_test,   yhat_test),
-      train_RMAE  = fit_cost_rmae(y_train,  yhat_train),
-      test_RMAE   = fit_cost_rmae(y_test,   yhat_test),
-      train_RBIAS = fit_cost_rbias(y_train, yhat_train),
-      test_RBIAS  = fit_cost_rbias(y_test,  yhat_test)
+      train_RRMSE  = fit_cost_rrmse( y_train, yhat_train),
+      test_RRMSE   = fit_cost_rrmse( y_test,  yhat_test),
+      train_RMedAE = fit_cost_rmedae(y_train, yhat_train),
+      test_RMedAE  = fit_cost_rmedae(y_test,  yhat_test),
+      train_RMAE   = fit_cost_rmae(  y_train, yhat_train),
+      test_RMAE    = fit_cost_rmae(  y_test,  yhat_test),
+      train_RBIAS  = fit_cost_rbias( y_train, yhat_train),
+      test_RBIAS   = fit_cost_rbias( y_test,  yhat_test)
     )
   }
 
