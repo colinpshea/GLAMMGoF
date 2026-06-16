@@ -80,13 +80,16 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
       !is_cbind && !is_prop
   )
 
-  # Make sure that NA values in the response variable are omitted and reported
-  n_before <- nrow(testData)
-  testData <- testData[!is.na(testData[[resp_var]]),]
-  n_dropped <- n_before - nrow(testData)
-  if (n_dropped == 1) warning(n_dropped, " row with a missing value for the response variable was removed before resampling.")
-  if (n_dropped > 1) warning(n_dropped, " rows with missing values for the response variable were removed before resampling.")
-
+  # Remove rows with NA in any model variable (response or covariates)
+  model_vars    <- all.vars(formula(testModel))
+  model_vars    <- model_vars[model_vars %in% names(testData)]
+  n_before      <- nrow(testData)
+  complete_rows <- complete.cases(testData[, model_vars, drop = FALSE])
+  testData      <- testData[complete_rows, ]
+  n_dropped     <- n_before - nrow(testData)
+  if (n_dropped == 1) warning(n_dropped, " row with NA values in model variables (response or covariates) was removed before resampling.")
+  if (n_dropped > 1) warning(n_dropped, " rows with NA values in model variables (response or covariates) were removed before resampling.")
+  
   # --- Null log loss, AUC, Brier scores (intercept-only baseline) ---
   # p_bar is the arithmetic mean of the response, which approximates but is not
   # identical to plogis(intercept) from a fitted intercept-only logistic model.
