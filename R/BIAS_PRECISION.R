@@ -61,6 +61,7 @@
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
+#' @importFrom stats complete.cases
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,

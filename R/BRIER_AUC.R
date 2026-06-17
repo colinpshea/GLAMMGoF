@@ -50,6 +50,7 @@
 #' @importFrom lme4 glmer
 #' @importFrom mgcv gam predict.gam
 #' @importFrom rlang .data
+#' @importFrom stats complete.cases
 #' @export
 brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
                       propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
@@ -89,7 +90,7 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   n_dropped     <- n_before - nrow(testData)
   if (n_dropped == 1) warning(n_dropped, " row with NA values in model variables (response or covariates) was removed before resampling.")
   if (n_dropped > 1) warning(n_dropped, " rows with NA values in model variables (response or covariates) were removed before resampling.")
-  
+
   # --- Null log loss, AUC, Brier scores (intercept-only baseline) ---
   # p_bar is the arithmetic mean of the response, which approximates but is not
   # identical to plogis(intercept) from a fitted intercept-only logistic model.
