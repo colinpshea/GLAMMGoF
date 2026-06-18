@@ -157,8 +157,11 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   # lme4:    re.form = ~0 suppresses all random effects
   get_preds <- function(m, newdata) {
     if (is_glmmTMB) {
-      predict(m, type = "response", newdata = newdata, re.form = ~0,
-              allow.new.levels = TRUE, do.bias.correct = bias_adjust)
+      preds <- predict(m, type = "response", newdata = newdata, re.form = ~0,
+                       allow.new.levels = TRUE, do.bias.correct = bias_adjust)
+      # do.bias.correct = TRUE returns a matrix with columns Estimate, Std. Error,
+      # Est. (bias.correct), and Std. (bias.correct); extract the bias-corrected point estimate
+      if (is.matrix(preds)) preds[, "Est. (bias.correct)"] else preds
     } else if (is_gam) {
       if (!is.null(gam_re_labels)) {
         predict(m, type = "response",
