@@ -31,7 +31,7 @@
 #' @param testZI Logical. If `TRUE` and `DHARMaPlot = TRUE`, runs `testZeroInflation` on the simulated residuals. Most relevant for count models (Poisson, negative binomial, ZIP, hurdle). Default is `TRUE`.
 #' @param seed Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.
 #' @param method The resampling method to use. The default, `holdout`, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas `bootstrap` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
-#' @param bias_adjust Logical. If `TRUE` and the model is a `glmmTMB` fit, applies a bias correction to marginal predictions on the response scale via `do.bias.correct = TRUE` in `predict.glmmTMB`. This corrects for the systematic underestimation of the arithmetic mean that arises when backtransforming population-level predictions through a nonlinear link function in the presence of random effects (Jensen's inequality). The default is `FALSE`, which preserves the uncorrected marginal prediction behavior and allows `RBIAS` to reflect the full magnitude of RE-driven prediction bias. This argument is silently ignored for non-`glmmTMB` models. See the note below and Thorson & Kristensen (2016) for details.
+#' @param bias_adjust Character string specifying the bias adjustment method for marginal predictions in `glmmTMB` models. One of `"none"` (the default), `"manual"`, or `"tmb"`. `"none"` uses standard population-level predictions (`re.form = ~0`) with no correction, preserving the full RBIAS signal driven by Jensen's inequality and allowing it to be used diagnostically. `"manual"` applies an analytical lognormal correction to marginal predictions: population-level predictions (`re.form = ~0`) are multiplied by `exp(sigma^2 / 2)`, where `sigma^2` is the total random effect variance summed across all RE terms extracted from `VarCorr()`. `"tmb"` uses TMB's built-in bias correction (`do.bias.correct = TRUE`) applied to conditional predictions (`re.form = NULL`), which uses automatic differentiation to compute the corrected expected value accounting for RE uncertainty; note that this switches from marginal to conditional predictions. For most diagnostic purposes `"none"` is recommended; for calibrated response-scale predictions `"manual"` and `"tmb"` should give similar results and can be compared as a consistency check. This argument is silently ignored for non-`glmmTMB` models. See the note below and Thorson & Kristensen (2016) for details.
 #' @note This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use brier_auc(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
 #'
 #' **Random effects and Jensen's inequality:** All predictions are population-level (i.e., random effects are set to zero via `re.form = ~0`). For models with a nonlinear link function (e.g., log, logit) and random effects, backtransforming the linear predictor to the response scale introduces a systematic negative bias in the predicted arithmetic mean. This occurs because Jensen's inequality implies that `E[exp(eta)] > exp(E[eta])` for any random variable `eta`, so `exp(beta_0)` underestimates the true mean by a factor of approximately `exp(sigma^2 / 2)`, where `sigma^2` is the total random effect variance (summed across all RE terms). The magnitude of this bias grows rapidly with RE variance: a model with two random effects of modest size (e.g., SD = 0.3 and 0.4) can produce marginal predictions that underestimate observed values by 10% or more. Consistent negative `RBIAS` in the output of this function -- particularly when both in-sample and out-of-sample values are negative -- may therefore reflect this structural property of the model rather than misspecification. To obtain bias-corrected marginal predictions for `glmmTMB` models, set `bias_adjust = TRUE`. Note that this correction is not available for `lme4` or `mgcv` models; however, `lme4` and `mgcv` GAMMs already use marginal predictions that exclude random effects, and the Jensen bias is present in those models regardless.
@@ -70,10 +70,11 @@
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
                            seed = NULL, method = c("holdout", "bootstrap"),
-                           bias_adjust = FALSE) {
+                           bias_adjust = c("none", "manual", "tmb")) {
 
-  # --- specify bootstrapping method
-  method = match.arg(method)
+  # --- specify bootstrapping method and bias adjustment
+  method      <- match.arg(method)
+  bias_adjust <- match.arg(bias_adjust)
 
   # --- Optional seed ---
   if (!is.null(seed)) set.seed(seed)
@@ -168,11 +169,26 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # --- Predict helper ---
   get_preds <- function(m, newdata) {
     if (is_glmmTMB) {
-      preds <- predict(m, type = "response", newdata = newdata, re.form = ~0,
-                       allow.new.levels = TRUE, do.bias.correct = bias_adjust)
-      # do.bias.correct = TRUE returns a matrix with columns Estimate, Std. Error,
-      # Est. (bias.correct), and Std. (bias.correct); extract the bias-corrected point estimate
-      if (is.matrix(preds)) preds[, "Est. (bias.correct)"] else preds
+      if (bias_adjust == "manual") {
+        # Marginal predictions multiplied by analytical lognormal correction exp(sigma^2/2),
+        # where sigma^2 is summed across all RE terms from VarCorr()
+        re_vars     <- sapply(VarCorr(m)$cond, function(vc) vc[1, 1])
+        correction  <- exp(sum(re_vars) / 2)
+        predict(m, type = "response", newdata = newdata,
+                re.form = ~0, allow.new.levels = TRUE) * correction
+      } else if (bias_adjust == "tmb") {
+        # TMB's built-in bias correction via automatic differentiation;
+        # requires re.form = NULL (conditional predictions) to access RE variance
+        preds <- predict(m, type = "response", newdata = newdata,
+                         re.form = NULL, allow.new.levels = TRUE,
+                         do.bias.correct = TRUE)
+        # do.bias.correct = TRUE returns a matrix; extract bias-corrected point estimate
+        preds[, "Est. (bias.correct)"]
+      } else {
+        # "none": standard marginal predictions, RE zeroed out
+        predict(m, type = "response", newdata = newdata,
+                re.form = ~0, allow.new.levels = TRUE)
+      }
     } else if (is_gam) {
       if (!is.null(gam_re_labels)) {
         predict(m, type = "response",
@@ -262,7 +278,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # which is the signature of marginal prediction bias from strong random effects
   # on a nonlinear link scale. Only fires when bias_adjust = FALSE to avoid
   # misleading the user when the correction has already been applied.
-  if (!bias_adjust && is_glmmTMB) {
+  if (bias_adjust == "none" && is_glmmTMB) {
     rbias_summary <- results_summary[results_summary$Metric == "RBIAS", ]
     both_negative <- all(rbias_summary$mn < -10)
     if (both_negative) {
@@ -271,7 +287,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
         "This may indicate that strong random effects are causing marginal predictions to ",
         "underestimate the arithmetic mean on the response scale (Jensen's inequality): ",
         "exp(beta) underestimates the true mean when random effect variance is large. ",
-        "Consider re-running with bias_adjust = TRUE to apply a lognormal bias correction. ",
+        "Consider re-running with bias_adjust = 'manual' or bias_adjust = 'tmb' to apply ",
+        "a lognormal bias correction and confirm the source of the bias. ",
         "See ?bias_precision for details."
       )
     }
