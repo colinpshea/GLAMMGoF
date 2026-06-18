@@ -61,7 +61,7 @@
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
-#' @importFrom stats complete.cases
+#' @importFrom stats complete.cases formula
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
@@ -296,5 +296,9 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                 bias_precision_summary  = results_summary,
                 dharmaPlot             = dharmaPlot,
                 dharmaZI               = dharmaZI))
+  } else {
+    return(list(bias_precision_results  = results_df,
+                bias_precision_hist     = results_plot,
+                bias_precision_summary  = results_summary))
   }
 }
