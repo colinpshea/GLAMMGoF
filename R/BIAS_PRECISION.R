@@ -163,7 +163,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # --- Predict helper ---
   get_preds <- function(m, newdata) {
     if (is_glmmTMB) {
-      predict(m, type = "response", newdata = newdata,
+      predict(m, type = "response", newdata = newdata, re.form = ~0,
               allow.new.levels = TRUE)
     } else if (is_gam) {
       if (!is.null(gam_re_labels)) {
