@@ -38,7 +38,7 @@
 #'
 #' **Random slopes:** `bias_adjust = "manual"` assumes a random intercept-only structure. For models with random slopes, the variance of the linear predictor varies by observation as a function of the covariate associated with the random slope, so a single scalar correction `exp(sigma^2 / 2)` is not appropriate. In this case, use `bias_adjust = "tmb"`, which applies TMB's automatic differentiation over the full random effect covariance structure and correctly accounts for random slope variance. Applying `bias_adjust = "manual"` to a random slopes model will produce incorrect corrections and is not recommended.
 #'
-#' **Correction factor and out-of-sample leakage:** For `bias_adjust = "manual"`, the correction factor `exp(sigma^2 / 2)` is computed once from the full-data `testModel` via `VarCorr()` and applied uniformly across all resampling replicates, rather than being recomputed from each refitted training model. This introduces a minor form of information leakage into out-of-sample performance metrics, since the correction factor incorporates variance information from the full dataset including held-out observations. However, this approach is intentional: recomputing the correction from each training resample produces highly unstable correction factors at high RE variance, where small-sample RE variance estimates are noisy and `exp(sigma^2/2)` is sensitive to overestimation. The stability of the bias-corrected metrics is considered a greater practical benefit than strict out-of-sample purity of the correction factor, particularly given that the primary purpose of `bias_adjust = "manual"` is diagnostic confirmation that Jensen's inequality is the source of observed negative RBIAS rather than model misspecification. While `bias_adjust = "manual"` is an approximation rather than an exact correction -- unlike `bias_adjust = "tmb"` which uses TMB's automatic differentiation over the full RE covariance structure -- it is a close and reliable approximation for models with random intercepts, and is recommended as a fast and interpretable diagnostic tool: if switching from `bias_adjust = "none"` to `bias_adjust = "manual"` moves RBIAS toward zero, this is strong evidence that the observed negative bias is attributable to RE variance and Jensen's inequality rather than model misspecification or poor predictive generalization.
+#' **In-sample conditional predictions:** By default, in-sample and out-of-sample predictions are both made marginally (`re.form = ~0`) to ensure direct comparability. However, for `glmmTMB` models, setting `in_sample_conditional = TRUE` switches in-sample predictions to condition on the estimated random effects (`re.form = NULL`), which more accurately reflects how well the model fits the training data using all available information. This will generally produce lower in-sample error metrics and near-zero in-sample RBIAS regardless of RE variance, since the model has access to group-level estimates for all training observations. Users should be aware that in-sample and out-of-sample metrics are no longer directly comparable when `in_sample_conditional = TRUE`, as the gap between them reflects both predictive generalization and the marginal vs conditional prediction distinction., the correction factor `exp(sigma^2 / 2)` is computed once from the full-data `testModel` via `VarCorr()` and applied uniformly across all resampling replicates, rather than being recomputed from each refitted training model. This introduces a minor form of information leakage into out-of-sample performance metrics, since the correction factor incorporates variance information from the full dataset including held-out observations. However, this approach is intentional: recomputing the correction from each training resample produces highly unstable correction factors at high RE variance, where small-sample RE variance estimates are noisy and `exp(sigma^2/2)` is sensitive to overestimation. The stability of the bias-corrected metrics is considered a greater practical benefit than strict out-of-sample purity of the correction factor, particularly given that the primary purpose of `bias_adjust = "manual"` is diagnostic confirmation that Jensen's inequality is the source of observed negative RBIAS rather than model misspecification. While `bias_adjust = "manual"` is an approximation rather than an exact correction -- unlike `bias_adjust = "tmb"` which uses TMB's automatic differentiation over the full RE covariance structure -- it is a close and reliable approximation for models with random intercepts, and is recommended as a fast and interpretable diagnostic tool: if switching from `bias_adjust = "none"` to `bias_adjust = "manual"` moves RBIAS toward zero, this is strong evidence that the observed negative bias is attributable to RE variance and Jensen's inequality rather than model misspecification or poor predictive generalization.
 #' @references Hyndman, R.J. and Koehler, A.B. (2006) Another look at measures of forecast accuracy. \emph{International Journal of Forecasting}, 22, 679--688.
 #' @references Thorson, J.T. and Kristensen, K. (2016) Implementing a generic method for bias correction in statistical models using random effects, with spatial and population dynamics examples. \emph{Fisheries Research}, 175, 66--74.
 #' @return This function returns either three, four, or five objects depending on the values of `DHARMaPlot` and `testZI`: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If `DHARMaPlot = TRUE`, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from `simulateResiduals()`. If `testZI = TRUE` and `DHARMaPlot = TRUE`, a fifth object `dharmaZI` is also returned containing the result of `testZeroInflation()`. In the histogram, a blue dotted vertical line indicates the mean across replicates.
@@ -60,23 +60,26 @@
 #' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`:
 #'
 #' bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+#' @param verbose Logical. If `TRUE` (the default), prints a diagnostic message when substantial negative RBIAS is detected in a `glmmTMB` model with `bias_adjust = "none"`, suggesting the user consider applying a bias correction. Set to `FALSE` to suppress this message, which is useful when calling `bias_precision()` repeatedly in simulation or sweep contexts.
+#' @param in_sample_conditional Logical. If `TRUE` and the model is a `glmmTMB` fit with random effects, in-sample predictions are made conditionally on the estimated random effects (`re.form = NULL`) rather than marginally (`re.form = ~0`). This produces in-sample performance metrics that reflect how well the model fits the training data using all available information, including group-level random effect estimates. Out-of-sample predictions always use marginal predictions (`re.form = ~0`) regardless of this setting, since random effect estimates are not available for held-out observations in a strict generalization context. Note that setting `in_sample_conditional = TRUE` means in-sample and out-of-sample metrics are no longer directly comparable on the same scale, as they reflect different prediction strategies; the gap between them will therefore reflect both overfitting and the marginal vs conditional prediction distinction. The default is `FALSE`, which uses marginal predictions for both in-sample and out-of-sample performance and ensures direct comparability. This argument is silently ignored for non-`glmmTMB` models.
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_vline facet_grid theme_bw theme element_blank element_line element_text labs unit scale_y_continuous
 #' @importFrom DHARMa simulateResiduals testZeroInflation
 #' @importFrom glmmTMB ranef glmmTMB
+#' @importFrom nlme VarCorr
 #' @importFrom lme4 glmer lmer glmer.nb
-#' @param verbose Logical. If `TRUE` (the default), prints a diagnostic message when substantial negative RBIAS is detected in a `glmmTMB` model with `bias_adjust = "none"`, suggesting the user consider applying a bias correction. Set to `FALSE` to suppress this message, which is useful when calling `bias_precision()` repeatedly in simulation or sweep contexts.
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
-#' @importFrom stats complete.cases formula
+#' @importFrom stats complete.cases formula predict
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
                            seed = NULL, method = c("holdout", "bootstrap"),
                            bias_adjust = c("none", "manual", "tmb"),
-                           verbose = TRUE) {
+                           verbose = TRUE,
+                           in_sample_conditional = FALSE) {
 
   # --- specify bootstrapping method and bias adjustment
   method      <- match.arg(method)
@@ -183,24 +186,20 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     })
   }
 
-  # --- Predict helper ---
-  get_preds <- function(m, newdata) {
+  # --- Predict helpers ---
+  # get_preds_test: always marginal (re.form = ~0) since RE estimates are unavailable
+  # for held-out observations in a strict generalization context
+  get_preds_test <- function(m, newdata) {
     if (is_glmmTMB) {
       if (bias_adjust == "manual") {
-        # Marginal predictions multiplied by analytical lognormal correction exp(sigma^2/2),
-        # anchored to the full-data testModel's RE variance for stability across resamples
         predict(m, type = "response", newdata = newdata,
                 re.form = ~0, allow.new.levels = TRUE) * correction_factor
       } else if (bias_adjust == "tmb") {
-        # TMB's built-in bias correction via automatic differentiation;
-        # requires re.form = NULL (conditional predictions) to access RE variance
         preds <- predict(m, type = "response", newdata = newdata,
                          re.form = NULL, allow.new.levels = TRUE,
                          do.bias.correct = TRUE)
-        # do.bias.correct = TRUE returns a matrix; extract bias-corrected point estimate
         preds[, "Est. (bias.correct)"]
       } else {
-        # "none": standard marginal predictions, RE zeroed out
         predict(m, type = "response", newdata = newdata,
                 re.form = ~0, allow.new.levels = TRUE)
       }
@@ -218,6 +217,18 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
               allow.new.levels = TRUE, newdata = newdata)
     } else {
       predict(m, type = "response", newdata = newdata)
+    }
+  }
+
+  # get_preds_train: optionally conditional on REs for glmmTMB when
+  # in_sample_conditional = TRUE, reflecting true in-sample fit using all
+  # available information. Falls back to marginal for all other backends.
+  get_preds_train <- function(m, newdata) {
+    if (is_glmmTMB && in_sample_conditional) {
+      predict(m, type = "response", newdata = newdata,
+              re.form = NULL, allow.new.levels = TRUE)
+    } else {
+      get_preds_test(m, newdata)
     }
   }
 
@@ -240,8 +251,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
 
     y_train    <- train[[resp_var]]
     y_test     <- test[[resp_var]]
-    yhat_train <- get_preds(m_train, train)
-    yhat_test  <- get_preds(m_train, test)
+    yhat_train <- get_preds_train(m_train, train)
+    yhat_test  <- get_preds_test(m_train, test)
 
     results[[j]] <- data.frame(
       train_RRMSE  = fit_cost_rrmse( y_train, yhat_train),

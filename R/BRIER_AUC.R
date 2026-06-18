@@ -55,10 +55,11 @@
 #' @importFrom DHARMa simulateResiduals
 #' @importFrom rms val.prob
 #' @importFrom glmmTMB glmmTMB
+#' @importFrom nlme VarCorr
 #' @importFrom lme4 glmer
 #' @importFrom mgcv gam predict.gam
 #' @importFrom rlang .data
-#' @importFrom stats complete.cases formula
+#' @importFrom stats complete.cases formula predict
 #' @export
 brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
                       propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,

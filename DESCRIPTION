@@ -24,6 +24,7 @@ Imports:
     ,mgcViz
     ,mgcv
     ,rlang
+    ,nlme
 Depends: 
     ggplot2,
     R (>= 3.5)
