@@ -14,7 +14,8 @@ bias_precision(
   DHARMaReps = 1000,
   seed = NULL,
   method = c("holdout", "bootstrap"),
-  bias_adjust = c("none", "manual", "tmb")
+  bias_adjust = c("none", "manual", "tmb"),
+  verbose = TRUE
 )
 }
 \arguments{
@@ -37,6 +38,8 @@ bias_precision(
 \item{method}{The resampling method to use. The default, \code{holdout}, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas \code{bootstrap} samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8\% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.}
 
 \item{bias_adjust}{Character string specifying the bias adjustment method for marginal predictions in \code{glmmTMB} models. One of \code{"none"} (the default), \code{"manual"}, or \code{"tmb"}. \code{"none"} uses standard population-level predictions (\code{re.form = ~0}) with no correction, preserving the full RBIAS signal driven by Jensen's inequality and allowing it to be used diagnostically. \code{"manual"} applies an analytical lognormal correction to marginal predictions: population-level predictions (\code{re.form = ~0}) are multiplied by \code{exp(sigma^2 / 2)}, where \code{sigma^2} is the total random effect variance summed across all RE terms extracted from \code{VarCorr()}. \code{"tmb"} uses TMB's built-in bias correction (\code{do.bias.correct = TRUE}) applied to conditional predictions (\code{re.form = NULL}), which uses automatic differentiation to compute the corrected expected value accounting for RE uncertainty; note that this switches from marginal to conditional predictions. For most diagnostic purposes \code{"none"} is recommended; for calibrated response-scale predictions \code{"manual"} and \code{"tmb"} should give similar results and can be compared as a consistency check. This argument is silently ignored for non-\code{glmmTMB} models. See the note below and Thorson & Kristensen (2016) for details.}
+
+\item{verbose}{Logical. If \code{TRUE} (the default), prints a diagnostic message when substantial negative RBIAS is detected in a \code{glmmTMB} model with \code{bias_adjust = "none"}, suggesting the user consider applying a bias correction. Set to \code{FALSE} to suppress this message, which is useful when calling \code{bias_precision()} repeatedly in simulation or sweep contexts.}
 }
 \value{
 This function returns either three, four, or five objects depending on the values of \code{DHARMaPlot} and \code{testZI}: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If \code{DHARMaPlot = TRUE}, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from \code{simulateResiduals()}. If \code{testZI = TRUE} and \code{DHARMaPlot = TRUE}, a fifth object \code{dharmaZI} is also returned containing the result of \code{testZeroInflation()}. In the histogram, a blue dotted vertical line indicates the mean across replicates.

@@ -20,7 +20,7 @@
 #' @param DHARMaReps If DHARMaPlot is TRUE, you can also specify DHARMaReps if you want something other than the default of 1000 simulation replicates.
 #' @param seed Optional integer seed for reproducibility. If `NULL` (the default), no seed is set and results will differ across runs.
 #' @param method The resampling method to use. The default, `holdout`, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas `bootstrap` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
-#' @param bias_adjust Character string specifying the bias adjustment method for marginal predictions in `glmmTMB` models. One of `"none"` (the default), `"manual"`, or `"tmb"`. `"none"` uses standard population-level predictions (`re.form = ~0`) with no correction. `"manual"` applies an analytical correction to marginal predictions by multiplying by `exp(sigma^2 / 2)`, where `sigma^2` is the total random effect variance summed across all RE terms from `VarCorr()`. `"tmb"` uses TMB's built-in bias correction (`do.bias.correct = TRUE`) on conditional predictions (`re.form = NULL`). This argument is silently ignored for non-`glmmTMB` models. See the note below and Thorson & Kristensen (2016) for details.
+#' @param bias_adjust Character string specifying the bias adjustment method for marginal predictions in `glmmTMB` models. One of `"none"` (the default), `"manual"`, or `"tmb"`. `"none"` uses standard population-level predictions (`re.form = ~0`) with no correction. `"manual"` is not supported for binomial models and will throw an informative error — the analytical lognormal correction `exp(sigma^2/2)` is only valid for log-link models; use `bias_adjust = "tmb"` instead. `"tmb"` uses TMB's built-in bias correction (`do.bias.correct = TRUE`) on conditional predictions (`re.form = NULL`), which applies automatic differentiation to compute the corrected expected probability accounting for RE uncertainty. This argument is silently ignored for non-`glmmTMB` models. See the note below and Thorson & Kristensen (2016) for details.
 #' @note This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
 #'
 #' **Random effects and Jensen's inequality:** All predictions are population-level (i.e., random effects are set to zero via `re.form = ~0`). For models with random effects and a nonlinear link function such as the logit, backtransforming the linear predictor to the probability scale introduces a systematic bias in the predicted mean probability. This occurs because Jensen's inequality implies that `E[plogis(eta)] != plogis(E[eta])` for any random variable `eta`. The direction and magnitude of this bias depend on the curvature of the inverse-logit function at the linear predictor value, and grow with random effect variance. Consistent negative patterns in Brier score or log loss relative to the null model baseline may partly reflect this structural property of the GLMM. To obtain bias-corrected marginal predictions for `glmmTMB` models, set `bias_adjust = TRUE`, which applies the generic bias correction of Thorson & Kristensen (2016) via TMB's automatic differentiation. Note that this correction is not available for `lme4` or `mgcv` models.
@@ -129,6 +129,18 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
     }
   }
 
+  # --- Validate bias_adjust for binomial models ---
+  # The lognormal correction exp(sigma^2/2) is only valid for log-link models.
+  # For logit-link models there is no closed-form marginal mean correction;
+  # use bias_adjust = "tmb" instead, which uses TMB's AD-based correction.
+  if (bias_adjust == "manual")
+    stop("bias_adjust = 'manual' is not supported for binomial models. ",
+         "The analytical lognormal correction exp(sigma^2/2) is only valid for ",
+         "log-link models (e.g. Poisson, negative binomial). For logit-link models ",
+         "there is no equivalent closed-form correction. Use bias_adjust = 'tmb' instead, ",
+         "which applies TMB's automatic differentiation-based bias correction. ",
+         "See ?brier_auc for details.")
+
   # --- Fit helper: dispatch on model class, return NULL on failure ---
   fit_model <- function(train) {
     tryCatch({
@@ -158,17 +170,13 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   # lme4:    re.form = ~0 suppresses all random effects
   get_preds <- function(m, newdata) {
     if (is_glmmTMB) {
-      if (bias_adjust == "manual") {
-        re_vars    <- sapply(VarCorr(m)$cond, function(vc) vc[1, 1])
-        correction <- exp(sum(re_vars) / 2)
-        predict(m, type = "response", newdata = newdata,
-                re.form = ~0, allow.new.levels = TRUE) * correction
-      } else if (bias_adjust == "tmb") {
+      if (bias_adjust == "tmb") {
         preds <- predict(m, type = "response", newdata = newdata,
                          re.form = NULL, allow.new.levels = TRUE,
                          do.bias.correct = TRUE)
         preds[, "Est. (bias.correct)"]
       } else {
+        # "none": standard marginal predictions, RE zeroed out
         predict(m, type = "response", newdata = newdata,
                 re.form = ~0, allow.new.levels = TRUE)
       }

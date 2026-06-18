@@ -63,6 +63,7 @@
 #' @importFrom DHARMa simulateResiduals testZeroInflation
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom lme4 glmer lmer glmer.nb
+#' @param verbose Logical. If `TRUE` (the default), prints a diagnostic message when substantial negative RBIAS is detected in a `glmmTMB` model with `bias_adjust = "none"`, suggesting the user consider applying a bias correction. Set to `FALSE` to suppress this message, which is useful when calling `bias_precision()` repeatedly in simulation or sweep contexts.
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
 #' @importFrom stats complete.cases formula
@@ -70,7 +71,8 @@
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
                            seed = NULL, method = c("holdout", "bootstrap"),
-                           bias_adjust = c("none", "manual", "tmb")) {
+                           bias_adjust = c("none", "manual", "tmb"),
+                           verbose = TRUE) {
 
   # --- specify bootstrapping method and bias adjustment
   method      <- match.arg(method)
@@ -135,6 +137,17 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     }
   }
 
+  # --- Pre-compute manual bias correction factor from full-data model (once, outside loop) ---
+  # Using testModel's VarCorr rather than each resample's refitted model avoids
+  # unstable correction factors at high RE variance where training subsets
+  # produce noisy sigma^2 estimates that inflate exp(sigma^2/2) dramatically.
+  correction_factor <- if (bias_adjust == "manual" && is_glmmTMB) {
+    re_vars <- sapply(VarCorr(testModel)$cond, function(vc) vc[1, 1])
+    exp(sum(re_vars) / 2)
+  } else {
+    1
+  }
+
   # --- Fit helper: dispatch on model class, return NULL on failure ---
   fit_model <- function(train) {
     tryCatch({
@@ -171,11 +184,9 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     if (is_glmmTMB) {
       if (bias_adjust == "manual") {
         # Marginal predictions multiplied by analytical lognormal correction exp(sigma^2/2),
-        # where sigma^2 is summed across all RE terms from VarCorr()
-        re_vars     <- sapply(VarCorr(m)$cond, function(vc) vc[1, 1])
-        correction  <- exp(sum(re_vars) / 2)
+        # anchored to the full-data testModel's RE variance for stability across resamples
         predict(m, type = "response", newdata = newdata,
-                re.form = ~0, allow.new.levels = TRUE) * correction
+                re.form = ~0, allow.new.levels = TRUE) * correction_factor
       } else if (bias_adjust == "tmb") {
         # TMB's built-in bias correction via automatic differentiation;
         # requires re.form = NULL (conditional predictions) to access RE variance
@@ -276,9 +287,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # --- Jensen's inequality diagnostic message ---
   # Triggered when both in- and out-of-sample RBIAS are consistently negative,
   # which is the signature of marginal prediction bias from strong random effects
-  # on a nonlinear link scale. Only fires when bias_adjust = FALSE to avoid
-  # misleading the user when the correction has already been applied.
-  if (bias_adjust == "none" && is_glmmTMB) {
+  # on a nonlinear link scale. Only fires when bias_adjust = "none" and verbose = TRUE.
+  if (verbose && bias_adjust == "none" && is_glmmTMB) {
     rbias_summary <- results_summary[results_summary$Metric == "RBIAS", ]
     both_negative <- all(rbias_summary$mn < -10)
     if (both_negative) {
