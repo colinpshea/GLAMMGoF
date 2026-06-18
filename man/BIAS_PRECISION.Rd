@@ -13,7 +13,8 @@ bias_precision(
   testZI = TRUE,
   DHARMaReps = 1000,
   seed = NULL,
-  method = c("holdout", "bootstrap")
+  method = c("holdout", "bootstrap"),
+  bias_adjust = FALSE
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ bias_precision(
 \item{seed}{Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.}
 
 \item{method}{The resampling method to use. The default, \code{holdout}, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas \code{bootstrap} samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8\% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.}
+
+\item{bias_adjust}{Logical. If \code{TRUE} and the model is a \code{glmmTMB} fit, applies a bias correction to marginal predictions on the response scale via \code{do.bias.correct = TRUE} in \code{predict.glmmTMB}. This corrects for the systematic underestimation of the arithmetic mean that arises when backtransforming population-level predictions through a nonlinear link function in the presence of random effects (Jensen's inequality). The default is \code{FALSE}, which preserves the uncorrected marginal prediction behavior and allows \code{RBIAS} to reflect the full magnitude of RE-driven prediction bias. This argument is silently ignored for non-\code{glmmTMB} models. See the note below and Thorson & Kristensen (2016) for details.}
 }
 \value{
 This function returns either three, four, or five objects depending on the values of \code{DHARMaPlot} and \code{testZI}: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If \code{DHARMaPlot = TRUE}, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from \code{simulateResiduals()}. If \code{testZI = TRUE} and \code{DHARMaPlot = TRUE}, a fifth object \code{dharmaZI} is also returned containing the result of \code{testZeroInflation()}. In the histogram, a blue dotted vertical line indicates the mean across replicates.
@@ -81,7 +84,11 @@ Taken together, these three statistics tell a more complete story than any one a
 }
 \note{
 This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use brier_auc(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
+
+\strong{Random effects and Jensen's inequality:} All predictions are population-level (i.e., random effects are set to zero via \code{re.form = ~0}). For models with a nonlinear link function (e.g., log, logit) and random effects, backtransforming the linear predictor to the response scale introduces a systematic negative bias in the predicted arithmetic mean. This occurs because Jensen's inequality implies that \code{E[exp(eta)] > exp(E[eta])} for any random variable \code{eta}, so \code{exp(beta_0)} underestimates the true mean by a factor of approximately \code{exp(sigma^2 / 2)}, where \code{sigma^2} is the total random effect variance (summed across all RE terms). The magnitude of this bias grows rapidly with RE variance: a model with two random effects of modest size (e.g., SD = 0.3 and 0.4) can produce marginal predictions that underestimate observed values by 10\% or more. Consistent negative \code{RBIAS} in the output of this function -- particularly when both in-sample and out-of-sample values are negative -- may therefore reflect this structural property of the model rather than misspecification. To obtain bias-corrected marginal predictions for \code{glmmTMB} models, set \code{bias_adjust = TRUE}. Note that this correction is not available for \code{lme4} or \code{mgcv} models; however, \code{lme4} and \code{mgcv} GAMMs already use marginal predictions that exclude random effects, and the Jensen bias is present in those models regardless.
 }
 \references{
 Hyndman, R.J. and Koehler, A.B. (2006) Another look at measures of forecast accuracy. \emph{International Journal of Forecasting}, 22, 679--688.
+
+Thorson, J.T. and Kristensen, K. (2016) Implementing a generic method for bias correction in statistical models using random effects, with spatial and population dynamics examples. \emph{Fisheries Research}, 175, 66--74.
 }

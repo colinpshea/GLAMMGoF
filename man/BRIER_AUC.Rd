@@ -12,7 +12,8 @@ brier_auc(
   DHARMaPlot = TRUE,
   DHARMaReps = 1000,
   seed = NULL,
-  method = c("holdout", "bootstrap")
+  method = c("holdout", "bootstrap"),
+  bias_adjust = FALSE
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ brier_auc(
 \item{seed}{Optional integer seed for reproducibility. If \code{NULL} (the default), no seed is set and results will differ across runs.}
 
 \item{method}{The resampling method to use. The default, \code{holdout}, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas \code{bootstrap} samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8\% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.}
+
+\item{bias_adjust}{Logical. If \code{TRUE} and the model is a \code{glmmTMB} fit, applies a bias correction to marginal predictions on the response scale via \code{do.bias.correct = TRUE} in \code{predict.glmmTMB}. This corrects for systematic underestimation of predicted probabilities that arises when backtransforming population-level predictions through the logit link in the presence of random effects (Jensen's inequality). The default is \code{FALSE}. This argument is silently ignored for non-\code{glmmTMB} models. See the note below and Thorson & Kristensen (2016) for details.}
 }
 \value{
 This function returns four objects: a data frame with all of the bootstrapping or Monte Carlo resampling results (i.e., all \code{nReps} values for each performance statistic), a data frame with a summary (mean and 95\% confidence intervals) of all replicates for each performance statistic, a histogram of values for each performance statistic, and a goodness-of-fit plot based on scaled residuals from the simulateResiduals() function of the DHARMa package. If DHARMaPlot = FALSE, then simulateResiduals() is not used to assess the model residuals and only three of the four objects are returned. This function also returns the null model (i.e., intercept-only) log loss, Brier score, and AUC statistic for reference (i.e., the best predictive performance achievable without any predictors), which allows for comparison to the summarized log loss, Brier, and AUC metrics. The null log loss is computed as \code{-(p_bar * log(p_bar) + (1 - p_bar) * log(1 - p_bar))}, where \code{p_bar} is the observed event rate. The null Brier score is computed as \code{p_bar * (1 - p_bar)}. The null AUC is 0.5, the expected value for a model with no discriminatory ability, equivalent to random classification. The null log loss and Brier score are based on the arithmetic mean of the response, which approximates but is not identical to \code{plogis(intercept)} from a fitted intercept-only logistic model; the difference is negligible in practice and avoids the overhead of model fitting. In the histogram, a blue dotted vertical line indicates the mean of each metric across replicates, and a red dashed vertical line indicates the null model baseline for each metric: null log loss, null Brier score, and AUC = 0.5.
@@ -68,4 +71,9 @@ Reporting all three together is recommended: AUC reflects whether the model corr
 }
 \note{
 This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
+
+\strong{Random effects and Jensen's inequality:} All predictions are population-level (i.e., random effects are set to zero via \code{re.form = ~0}). For models with random effects and a nonlinear link function such as the logit, backtransforming the linear predictor to the probability scale introduces a systematic bias in the predicted mean probability. This occurs because Jensen's inequality implies that \code{E[plogis(eta)] != plogis(E[eta])} for any random variable \code{eta}. The direction and magnitude of this bias depend on the curvature of the inverse-logit function at the linear predictor value, and grow with random effect variance. Consistent negative patterns in Brier score or log loss relative to the null model baseline may partly reflect this structural property of the GLMM. To obtain bias-corrected marginal predictions for \code{glmmTMB} models, set \code{bias_adjust = TRUE}, which applies the generic bias correction of Thorson & Kristensen (2016) via TMB's automatic differentiation. Note that this correction is not available for \code{lme4} or \code{mgcv} models.
+}
+\references{
+Thorson, J.T. and Kristensen, K. (2016) Implementing a generic method for bias correction in statistical models using random effects, with spatial and population dynamics examples. \emph{Fisheries Research}, 175, 66--74.
 }

@@ -31,8 +31,12 @@
 #' @param testZI Logical. If `TRUE` and `DHARMaPlot = TRUE`, runs `testZeroInflation` on the simulated residuals. Most relevant for count models (Poisson, negative binomial, ZIP, hurdle). Default is `TRUE`.
 #' @param seed Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.
 #' @param method The resampling method to use. The default, `holdout`, repeatedly splits the data into random training and testing data sets (Monte Carlo cross-validation), whereas `bootstrap` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For well-behaved models and reasonably sized datasets, both methods should produce similar results; differences are most likely to emerge with small datasets, highly overdispersed data, or poorly specified models.
+#' @param bias_adjust Logical. If `TRUE` and the model is a `glmmTMB` fit, applies a bias correction to marginal predictions on the response scale via `do.bias.correct = TRUE` in `predict.glmmTMB`. This corrects for the systematic underestimation of the arithmetic mean that arises when backtransforming population-level predictions through a nonlinear link function in the presence of random effects (Jensen's inequality). The default is `FALSE`, which preserves the uncorrected marginal prediction behavior and allows `RBIAS` to reflect the full magnitude of RE-driven prediction bias. This argument is silently ignored for non-`glmmTMB` models. See the note below and Thorson & Kristensen (2016) for details.
 #' @note This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use brier_auc(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
+#'
+#' **Random effects and Jensen's inequality:** All predictions are population-level (i.e., random effects are set to zero via `re.form = ~0`). For models with a nonlinear link function (e.g., log, logit) and random effects, backtransforming the linear predictor to the response scale introduces a systematic negative bias in the predicted arithmetic mean. This occurs because Jensen's inequality implies that `E[exp(eta)] > exp(E[eta])` for any random variable `eta`, so `exp(beta_0)` underestimates the true mean by a factor of approximately `exp(sigma^2 / 2)`, where `sigma^2` is the total random effect variance (summed across all RE terms). The magnitude of this bias grows rapidly with RE variance: a model with two random effects of modest size (e.g., SD = 0.3 and 0.4) can produce marginal predictions that underestimate observed values by 10% or more. Consistent negative `RBIAS` in the output of this function -- particularly when both in-sample and out-of-sample values are negative -- may therefore reflect this structural property of the model rather than misspecification. To obtain bias-corrected marginal predictions for `glmmTMB` models, set `bias_adjust = TRUE`. Note that this correction is not available for `lme4` or `mgcv` models; however, `lme4` and `mgcv` GAMMs already use marginal predictions that exclude random effects, and the Jensen bias is present in those models regardless.
 #' @references Hyndman, R.J. and Koehler, A.B. (2006) Another look at measures of forecast accuracy. \emph{International Journal of Forecasting}, 22, 679--688.
+#' @references Thorson, J.T. and Kristensen, K. (2016) Implementing a generic method for bias correction in statistical models using random effects, with spatial and population dynamics examples. \emph{Fisheries Research}, 175, 66--74.
 #' @return This function returns either three, four, or five objects depending on the values of `DHARMaPlot` and `testZI`: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If `DHARMaPlot = TRUE`, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from `simulateResiduals()`. If `testZI = TRUE` and `DHARMaPlot = TRUE`, a fifth object `dharmaZI` is also returned containing the result of `testZeroInflation()`. In the histogram, a blue dotted vertical line indicates the mean across replicates.
 #'
 #' This package contains an example data set for fitting a negative binomial or Poisson regression called countData. Six example negative binomial regression model objects are also included: countModel_GLM is a GLM with no random effects; countModel_GLMM is a GLMM with one random effect; countModel_GLMM2 is a GLMM with two random effects; countModel_GAM is a GAM with no random effects; countModel_GAMM is a GAMM with one random effect; and countModel_GAMM2 is a GAMM with two random effects. GLMs and GLMMs were fitted using glmmTMB, whereas GAMs and GAMMs were fitted using mgcv:
@@ -65,7 +69,8 @@
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
-                           seed = NULL, method = c("holdout", "bootstrap")) {
+                           seed = NULL, method = c("holdout", "bootstrap"),
+                           bias_adjust = FALSE) {
 
   # --- specify bootstrapping method
   method = match.arg(method)
@@ -164,7 +169,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   get_preds <- function(m, newdata) {
     if (is_glmmTMB) {
       predict(m, type = "response", newdata = newdata, re.form = ~0,
-              allow.new.levels = TRUE)
+              allow.new.levels = TRUE, do.bias.correct = bias_adjust)
     } else if (is_gam) {
       if (!is.null(gam_re_labels)) {
         predict(m, type = "response",
@@ -248,6 +253,26 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
               lwr95 = quantile(value, 0.025),
               upr95 = quantile(value, 0.975),
               .groups = "drop")
+
+  # --- Jensen's inequality diagnostic message ---
+  # Triggered when both in- and out-of-sample RBIAS are consistently negative,
+  # which is the signature of marginal prediction bias from strong random effects
+  # on a nonlinear link scale. Only fires when bias_adjust = FALSE to avoid
+  # misleading the user when the correction has already been applied.
+  if (!bias_adjust && is_glmmTMB) {
+    rbias_summary <- results_summary[results_summary$Metric == "RBIAS", ]
+    both_negative <- all(rbias_summary$mn < -10)
+    if (both_negative) {
+      message(
+        "Note: Both in-sample and out-of-sample RBIAS are consistently negative (< -10%). ",
+        "This may indicate that strong random effects are causing marginal predictions to ",
+        "underestimate the arithmetic mean on the response scale (Jensen's inequality): ",
+        "exp(beta) underestimates the true mean when random effect variance is large. ",
+        "Consider re-running with bias_adjust = TRUE to apply a lognormal bias correction. ",
+        "See ?bias_precision for details."
+      )
+    }
+  }
 
   results_plot <- ggplot(results_df, aes(x = value)) +
     geom_histogram(color = "black", fill = "grey") +
