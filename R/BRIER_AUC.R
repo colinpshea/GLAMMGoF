@@ -47,7 +47,40 @@
 #'
 #' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method `holdout` or `bootstrap`, the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use DHARMa residual diagnostics (the default is TRUE), the number of DHARMa simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
 #'
-#' brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+#' \dontrun{
+#' # --- Standard usage ---
+#' brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData,
+#'           propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
+#'           seed = 123, method = "holdout")
+#'
+#' # --- Diagnose Jensen's inequality bias in a binomial GLMM ---
+#' # Step 1: run with no correction and inspect Brier score and log loss
+#' chk_none <- brier_auc(nReps = 100, testModel = logitModel_GLMM,
+#'                       testData = logitData, method = "holdout",
+#'                       DHARMaPlot = FALSE, bias_adjust = "none", seed = 123)
+#' chk_none$brier_auc_summary
+#'
+#' # Step 2: apply TMB bias correction
+#' # Note: "manual" is not supported for binomial models -- use "tmb" instead.
+#' # This is considerably slower than "none" due to conditional predictions
+#' # and TMB's automatic differentiation machinery.
+#' chk_tmb <- brier_auc(nReps = 100, testModel = logitModel_GLMM,
+#'                      testData = logitData, method = "holdout",
+#'                      DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123)
+#' chk_tmb$brier_auc_summary
+#'
+#' # --- Applying TMB bias correction to new predictions outside GLAMMGoF ---
+#' # Once Jensen's inequality has been diagnosed, apply the TMB correction
+#' # directly to predictions for new data:
+#'
+#' nd <- logitData[1:10, ]  # example new data
+#'
+#' # TMB bias correction for binomial glmmTMB models
+#' # (manual lognormal correction is not valid for logit-link models)
+#' preds_tmb <- predict(logitModel_GLMM, newdata = nd, type = "response",
+#'                      re.form = ~0, do.bias.correct = TRUE)
+#' }
+#'
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows filter
 #' @importFrom tidyr pivot_longer separate

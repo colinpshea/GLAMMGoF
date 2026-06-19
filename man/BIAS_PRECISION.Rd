@@ -63,7 +63,61 @@ countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs =
 
 Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use \code{DHARMa} residual diagnostics (the default is \code{TRUE}), whether to use \code{DHARMa} to test for zero-inflation (the default is \code{TRUE}), the number of \code{DHARMa} simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method \code{holdout} or \code{bootstrap}:
 
-bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+\dontrun{
+# --- Standard usage ---
+bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData,
+               propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE,
+               DHARMaReps = 1000, seed = 123, method = "holdout")
+
+# --- Diagnose Jensen's inequality bias ---
+# Step 1: run with no correction and check RBIAS
+chk_none <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                           testData = countData, method = "holdout",
+                           DHARMaPlot = FALSE, bias_adjust = "none", seed = 123)
+chk_none$bias_precision_summary
+
+# Step 2: apply manual correction -- if RBIAS moves toward zero, Jensen's
+# inequality is the source of the negative bias, not model misspecification
+chk_manual <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                             testData = countData, method = "holdout",
+                             DHARMaPlot = FALSE, bias_adjust = "manual", seed = 123)
+chk_manual$bias_precision_summary
+
+# Step 3 (optional): validate manual correction against TMB's AD-based correction
+# Note: considerably slower than "manual", especially for models with spatial REs
+chk_tmb <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                          testData = countData, method = "holdout",
+                          DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123)
+chk_tmb$bias_precision_summary
+
+# --- Separate goodness-of-fit from generalization ---
+# in_sample_conditional = TRUE uses conditional (BLUP-based) predictions for
+# in-sample performance and marginal predictions for out-of-sample performance.
+# Combined with bias_adjust = "manual", the Jensen correction is applied to
+# out-of-sample predictions only -- if both in- and out-of-sample RBIAS are
+# near zero, the model fits well AND generalizes well once Jensen bias is corrected.
+chk_cond <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                           testData = countData, method = "holdout",
+                           DHARMaPlot = FALSE, bias_adjust = "manual",
+                           in_sample_conditional = TRUE, seed = 123)
+chk_cond$bias_precision_summary
+
+# --- Applying bias correction to new predictions outside GLAMMGoF ---
+# Once Jensen's inequality has been diagnosed as the source of negative RBIAS,
+# apply the correction directly to predictions for new data:
+
+nd <- countData[1:10, ]  # example new data
+
+# Option 1: manual lognormal correction (fast, reliable for random intercept models)
+vc         <- VarCorr(countModel_GLMM)$cond
+correction <- exp(sum(sapply(vc, function(x) x[1, 1])) / 2)
+preds_adjusted <- predict(countModel_GLMM, newdata = nd,
+                          type = "response", re.form = ~0) * correction
+
+# Option 2: TMB bias correction (handles random slopes and complex RE structures)
+preds_tmb <- predict(countModel_GLMM, newdata = nd, type = "response",
+                     re.form = ~0, do.bias.correct = TRUE)
+}
 }
 \description{
 Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with continuous or integer response variables and with or without random effects and zero-inflation, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Four performance statistics are reported: relative root mean squared error (RRMSE), relative Mean Absolute Error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS). Note that all performance measures are based on population-level predictions (i.e., random effects are ignored). For models with a zero-inflation component, predictions account for zero-inflation (e.g., for glmmTMB, the predicted value represents the product of the mean_count and (1 - prob_zero)).
