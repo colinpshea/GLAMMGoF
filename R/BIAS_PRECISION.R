@@ -57,63 +57,7 @@
 #'
 #' countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
 #'
-#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`:
-#'
-#' \dontrun{
-#' # --- Standard usage ---
-#' bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData,
-#'                propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE,
-#'                DHARMaReps = 1000, seed = 123, method = "holdout")
-#'
-#' # --- Diagnose Jensen's inequality bias ---
-#' # Step 1: run with no correction and check RBIAS
-#' chk_none <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-#'                            testData = countData, method = "holdout",
-#'                            DHARMaPlot = FALSE, bias_adjust = "none", seed = 123)
-#' chk_none$bias_precision_summary
-#'
-#' # Step 2: apply manual correction -- if RBIAS moves toward zero, Jensen's
-#' # inequality is the source of the negative bias, not model misspecification
-#' chk_manual <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-#'                              testData = countData, method = "holdout",
-#'                              DHARMaPlot = FALSE, bias_adjust = "manual", seed = 123)
-#' chk_manual$bias_precision_summary
-#'
-#' # Step 3 (optional): validate manual correction against TMB's AD-based correction
-#' # Note: considerably slower than "manual", especially for models with spatial REs
-#' chk_tmb <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-#'                           testData = countData, method = "holdout",
-#'                           DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123)
-#' chk_tmb$bias_precision_summary
-#'
-#' # --- Separate goodness-of-fit from generalization ---
-#' # in_sample_conditional = TRUE uses conditional (BLUP-based) predictions for
-#' # in-sample performance and marginal predictions for out-of-sample performance.
-#' # Combined with bias_adjust = "manual", the Jensen correction is applied to
-#' # out-of-sample predictions only -- if both in- and out-of-sample RBIAS are
-#' # near zero, the model fits well AND generalizes well once Jensen bias is corrected.
-#' chk_cond <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-#'                            testData = countData, method = "holdout",
-#'                            DHARMaPlot = FALSE, bias_adjust = "manual",
-#'                            in_sample_conditional = TRUE, seed = 123)
-#' chk_cond$bias_precision_summary
-#'
-#' # --- Applying bias correction to new predictions outside GLAMMGoF ---
-#' # Once Jensen's inequality has been diagnosed as the source of negative RBIAS,
-#' # apply the correction directly to predictions for new data:
-#'
-#' nd <- countData[1:10, ]  # example new data
-#'
-#' # Option 1: manual lognormal correction (fast, reliable for random intercept models)
-#' vc         <- VarCorr(countModel_GLMM)$cond
-#' correction <- exp(sum(sapply(vc, function(x) x[1, 1])) / 2)
-#' preds_adjusted <- predict(countModel_GLMM, newdata = nd,
-#'                           type = "response", re.form = ~0) * correction
-#'
-#' # Option 2: TMB bias correction (handles random slopes and complex RE structures)
-#' preds_tmb <- predict(countModel_GLMM, newdata = nd, type = "response",
-#'                      re.form = ~0, do.bias.correct = TRUE)
-#' }
+#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`. Standard usage: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"). To diagnose Jensen's inequality bias, first run with bias_adjust = "none" and inspect RBIAS, then re-run with bias_adjust = "manual" -- if RBIAS moves toward zero, Jensen's inequality is the source of the negative bias rather than model misspecification: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "manual", seed = 123). To validate the manual correction against TMB's AD-based method (slower): bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123). To separate goodness-of-fit from generalization, use in_sample_conditional = TRUE combined with bias_adjust = "manual" -- in-sample predictions use estimated random effects while out-of-sample predictions use bias-corrected marginal predictions; if both RBIAS values are near zero the model fits well and generalizes well once Jensen bias is corrected: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "manual", in_sample_conditional = TRUE, seed = 123). To apply the bias correction to new predictions outside of GLAMMGoF after diagnosing Jensen's inequality, extract the total RE variance from VarCorr(), compute the correction factor as exp(total_variance / 2), and multiply marginal predictions by this factor (for random intercept models); or use predict() with do.bias.correct = TRUE for models with random slopes or complex RE structures. See the package vignette for worked examples.
 #'
 #' @param verbose Logical. If `TRUE` (the default), prints a diagnostic message when substantial negative RBIAS is detected in a `glmmTMB` model with `bias_adjust = "none"`, suggesting the user consider applying a bias correction. Set to `FALSE` to suppress this message, which is useful when calling `bias_precision()` repeatedly in simulation or sweep contexts.
 #' @param in_sample_conditional Logical. If `TRUE` and the model is a `glmmTMB` fit with random effects, in-sample predictions are made conditionally on the estimated random effects (`re.form = NULL`) rather than marginally (`re.form = ~0`). This produces in-sample performance metrics that reflect how well the model fits the training data using all available information, including group-level random effect estimates. Out-of-sample predictions always use marginal predictions (`re.form = ~0`) regardless of this setting, since random effect estimates are not available for held-out observations in a strict generalization context. Note that setting `in_sample_conditional = TRUE` means in-sample and out-of-sample metrics are no longer directly comparable on the same scale, as they reflect different prediction strategies; the gap between them will therefore reflect both overfitting and the marginal vs conditional prediction distinction. The default is `FALSE`, which uses marginal predictions for both in-sample and out-of-sample performance and ensures direct comparability. This argument is silently ignored for non-`glmmTMB` models.

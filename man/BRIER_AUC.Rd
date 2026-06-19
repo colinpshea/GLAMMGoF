@@ -52,41 +52,7 @@ logitModel_GAMM <- gam(y ~ Season + s(Temp) + s(Site, bs = "re"), family = binom
 
 logitModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = binomial, data = logitData)
 
-Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method \code{holdout} or \code{bootstrap}, the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use DHARMa residual diagnostics (the default is TRUE), the number of DHARMa simulation replicates (the default is 1000), and an optional integer seed for reproducibility:
-
-\dontrun{
-# --- Standard usage ---
-brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData,
-          propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
-          seed = 123, method = "holdout")
-
-# --- Diagnose Jensen's inequality bias in a binomial GLMM ---
-# Step 1: run with no correction and inspect Brier score and log loss
-chk_none <- brier_auc(nReps = 100, testModel = logitModel_GLMM,
-                      testData = logitData, method = "holdout",
-                      DHARMaPlot = FALSE, bias_adjust = "none", seed = 123)
-chk_none$brier_auc_summary
-
-# Step 2: apply TMB bias correction
-# Note: "manual" is not supported for binomial models -- use "tmb" instead.
-# This is considerably slower than "none" due to conditional predictions
-# and TMB's automatic differentiation machinery.
-chk_tmb <- brier_auc(nReps = 100, testModel = logitModel_GLMM,
-                     testData = logitData, method = "holdout",
-                     DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123)
-chk_tmb$brier_auc_summary
-
-# --- Applying TMB bias correction to new predictions outside GLAMMGoF ---
-# Once Jensen's inequality has been diagnosed, apply the TMB correction
-# directly to predictions for new data:
-
-nd <- logitData[1:10, ]  # example new data
-
-# TMB bias correction for binomial glmmTMB models
-# (manual lognormal correction is not valid for logit-link models)
-preds_tmb <- predict(logitModel_GLMM, newdata = nd, type = "response",
-                     re.form = ~0, do.bias.correct = TRUE)
-}
+Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice), the resampling method \code{holdout} or \code{bootstrap}, the proportion of data used for training when \code{method = "holdout"} (the default is 0.8), whether to use DHARMa residual diagnostics (the default is TRUE), the number of DHARMa simulation replicates (the default is 1000), and an optional integer seed for reproducibility. Standard usage: brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"). To diagnose Jensen's inequality bias in a binomial GLMM, first run with bias_adjust = "none" and inspect Brier score and log loss relative to the null model baseline: brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "none", seed = 123). Note that bias_adjust = "manual" is not supported for binomial models since the analytical lognormal correction exp(sigma^2/2) is only valid for log-link models; use bias_adjust = "tmb" instead (note: considerably slower than "none" due to conditional predictions and TMB's automatic differentiation machinery): brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123). To apply the TMB bias correction to new predictions outside of GLAMMGoF after diagnosing Jensen's inequality: preds_tmb <- predict(logitModel_GLMM, newdata = nd, type = "response", re.form = ~0, do.bias.correct = TRUE). Note that the manual lognormal correction is not valid for logit-link models and should not be applied to binomial GLMM predictions.
 }
 \description{
 Assess in- and out-of-sample predictive performance of generalized linear and generalized additive models with binary response variables and with or without random effects, using either repeated random holdout (Monte Carlo cross-validation) or bootstrap resampling with out-of-bag evaluation. Three performance statistics are reported: Brier scores (see the \code{rms} package documentation for details), which range from 0 to 1 with values closer to 0 indicating a better-predicting model and where sqrt(Brier score) is the average difference between the predicted probability and the observed value (0 or 1); AUC, an aggregated metric that evaluates how well a model classifies positive and negative outcomes at all possible probability cutoffs, ranging from 0 to 1 with values closer to 1 indicating a better classifier and where an AUC of 0.5 suggests performance no better than random guessing; and log loss (cross-entropy), which penalizes confident wrong predictions logarithmically and is particularly sensitive to miscalibration at the extremes of the predicted probability distribution, with lower values indicating better performance and no upper bound. Note that all performance measures are based on population-level predictions (i.e., random effects are ignored when present).
