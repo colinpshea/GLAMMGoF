@@ -38,7 +38,19 @@
 #'
 #' **Random slopes:** `bias_adjust = "manual"` assumes a random intercept-only structure. For models with random slopes, the variance of the linear predictor varies by observation as a function of the covariate associated with the random slope, so a single scalar correction `exp(sigma^2 / 2)` is not appropriate. In this case, use `bias_adjust = "tmb"`, which applies TMB's automatic differentiation over the full random effect covariance structure and correctly accounts for random slope variance. Applying `bias_adjust = "manual"` to a random slopes model will produce incorrect corrections and is not recommended.
 #'
-#' **In-sample conditional predictions:** By default, in-sample and out-of-sample predictions are both made marginally (`re.form = ~0`) to ensure direct comparability. However, for `glmmTMB` models, setting `in_sample_conditional = TRUE` switches in-sample predictions to condition on the estimated random effects (`re.form = NULL`), which more accurately reflects how well the model fits the training data using all available information. This will generally produce lower in-sample error metrics and near-zero in-sample RBIAS regardless of RE variance, since the model has access to group-level estimates for all training observations. Users should be aware that in-sample and out-of-sample metrics are no longer directly comparable when `in_sample_conditional = TRUE`, as the gap between them reflects both predictive generalization and the marginal vs conditional prediction distinction., the correction factor `exp(sigma^2 / 2)` is computed once from the full-data `testModel` via `VarCorr()` and applied uniformly across all resampling replicates, rather than being recomputed from each refitted training model. This introduces a minor form of information leakage into out-of-sample performance metrics, since the correction factor incorporates variance information from the full dataset including held-out observations. However, this approach is intentional: recomputing the correction from each training resample produces highly unstable correction factors at high RE variance, where small-sample RE variance estimates are noisy and `exp(sigma^2/2)` is sensitive to overestimation. The stability of the bias-corrected metrics is considered a greater practical benefit than strict out-of-sample purity of the correction factor, particularly given that the primary purpose of `bias_adjust = "manual"` is diagnostic confirmation that Jensen's inequality is the source of observed negative RBIAS rather than model misspecification. While `bias_adjust = "manual"` is an approximation rather than an exact correction -- unlike `bias_adjust = "tmb"` which uses TMB's automatic differentiation over the full RE covariance structure -- it is a close and reliable approximation for models with random intercepts, and is recommended as a fast and interpretable diagnostic tool: if switching from `bias_adjust = "none"` to `bias_adjust = "manual"` moves RBIAS toward zero, this is strong evidence that the observed negative bias is attributable to RE variance and Jensen's inequality rather than model misspecification or poor predictive generalization.
+#' **Conditional predictions:** By default, both in-sample and out-of-sample predictions are made marginally (`re.form = ~0`) to assess population-level generalization. Setting `conditional_predictions = TRUE` switches both to conditional predictions (`re.form = NULL`, `allow.new.levels = TRUE`), which use the random effect estimates from the refitted training model for all predictions. Since GLAMMGoF's holdout CV splits rows within groups rather than groups themselves, the training model has RE estimates for all groups represented in the test set, making conditional out-of-sample predictions well-defined and directly comparable to conditional in-sample predictions. The gap between in-sample and out-of-sample metrics then reflects genuine row-level overfitting rather than any marginal vs conditional distinction. This is most appropriate when the study design involves repeated measurements within observed groups (sites, years, individuals) and the primary interest is within-group predictive accuracy rather than generalization to new groups.
+#'
+#' **Correction factor and out-of-sample leakage:** For `bias_adjust = "manual"`, the correction factor `exp(sigma^2 / 2)` is computed once from the full-data `testModel` via `VarCorr()` and applied uniformly across all resampling replicates, rather than being recomputed from each refitted training model. This introduces a minor form of information leakage into out-of-sample performance metrics, since the correction factor incorporates variance information from the full dataset including held-out observations. However, this approach is intentional: recomputing the correction from each training resample produces highly unstable correction factors at high RE variance, where small-sample RE variance estimates are noisy and `exp(sigma^2/2)` is sensitive to overestimation. The stability of the bias-corrected metrics is considered a greater practical benefit than strict out-of-sample purity of the correction factor, particularly given that the primary purpose of `bias_adjust = "manual"` is diagnostic confirmation that Jensen's inequality is the source of observed negative RBIAS rather than model misspecification. While `bias_adjust = "manual"` is an approximation rather than an exact correction -- unlike `bias_adjust = "tmb"` which uses TMB's automatic differentiation over the full RE covariance structure -- it is a close and reliable approximation for models with random intercepts, and is recommended as a fast and interpretable diagnostic tool: if switching from `bias_adjust = "none"` to `bias_adjust = "manual"` moves RBIAS toward zero, this is strong evidence that the observed negative bias is attributable to RE variance and Jensen's inequality rather than model misspecification or poor predictive generalization.
+#' **Recommended workflow:** The following stepwise workflow is recommended for assessing predictive performance of a glmmTMB GLMM with a log link. See the package vignette for a fully worked example.
+#'
+#' Step 1 -- Run with defaults (`bias_adjust = "none"`, `conditional_predictions = FALSE`): assess population-level predictive generalization. Inspect RBIAS for both in-sample and out-of-sample performance. A runtime message will fire if both are consistently negative (< -10%), suggesting Jensen's inequality may be contributing.
+#'
+#' Step 2 -- If negative RBIAS is detected, re-run with `bias_adjust = "manual"`: if RBIAS moves toward zero, Jensen's inequality is confirmed as the source of the negative bias rather than model misspecification or poor generalization. The analytical correction `exp(sigma^2/2)` should then be applied to any response-scale predictions used for management or reporting purposes.
+#'
+#' Step 3 (optional) -- Re-run with `bias_adjust = "tmb"` to validate the manual correction using TMB's automatic differentiation. If manual and TMB agree closely, the analytical correction is reliable for your RE structure. Note that this step is considerably slower than Step 2, particularly for models with spatial random effects.
+#'
+#' Step 4 (optional) -- Re-run with `conditional_predictions = TRUE` to assess within-group predictive accuracy using estimated random effects. This measures how well the model interpolates within observed groups rather than generalizing to new ones. The in-sample vs out-of-sample gap now reflects genuine row-level overfitting rather than any marginal vs conditional distinction.
+#'
 #' @references Hyndman, R.J. and Koehler, A.B. (2006) Another look at measures of forecast accuracy. \emph{International Journal of Forecasting}, 22, 679--688.
 #' @references Thorson, J.T. and Kristensen, K. (2016) Implementing a generic method for bias correction in statistical models using random effects, with spatial and population dynamics examples. \emph{Fisheries Research}, 175, 66--74.
 #' @return This function returns either three, four, or five objects depending on the values of `DHARMaPlot` and `testZI`: a data frame with all bootstrapping or Monte Carlo resampling results (i.e., all `nReps` values for each performance statistic), a data frame with a summary (mean and 95% confidence intervals) of all replicates for each performance statistic, and a histogram of values for each performance statistic. If `DHARMaPlot = TRUE`, a fourth object is also returned: a goodness-of-fit plot based on scaled residuals from `simulateResiduals()`. If `testZI = TRUE` and `DHARMaPlot = TRUE`, a fifth object `dharmaZI` is also returned containing the result of `testZeroInflation()`. In the histogram, a blue dotted vertical line indicates the mean across replicates.
@@ -57,10 +69,10 @@
 #'
 #' countModel_GAMM2 <- gam(y ~ Season + s(Temp) + s(Site, bs = "re") + s(Year, bs = "re"), family = nb, data = countData)
 #'
-#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`. Standard usage: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"). To diagnose Jensen's inequality bias, first run with bias_adjust = "none" and inspect RBIAS, then re-run with bias_adjust = "manual" -- if RBIAS moves toward zero, Jensen's inequality is the source of the negative bias rather than model misspecification: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "manual", seed = 123). To validate the manual correction against TMB's AD-based method (slower): bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123). To separate goodness-of-fit from generalization, use in_sample_conditional = TRUE combined with bias_adjust = "manual" -- in-sample predictions use estimated random effects while out-of-sample predictions use bias-corrected marginal predictions; if both RBIAS values are near zero the model fits well and generalizes well once Jensen bias is corrected: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "manual", in_sample_conditional = TRUE, seed = 123). To apply the bias correction to new predictions outside of GLAMMGoF after diagnosing Jensen's inequality, extract the total RE variance from VarCorr(), compute the correction factor as exp(total_variance / 2), and multiply marginal predictions by this factor (for random intercept models); or use predict() with do.bias.correct = TRUE for models with random slopes or complex RE structures. See the package vignette for worked examples.
+#' Bootstrapping or Monte Carlo resampling of the performance statistics requires specifying the data and model being tested, the desired number of replicates (the default is 100 but should be at least 1000 in practice),  the proportion of data used for training when `method = "holdout"` (the default is 0.8), whether to use `DHARMa` residual diagnostics (the default is `TRUE`), whether to use `DHARMa` to test for zero-inflation (the default is `TRUE`), the number of `DHARMa` simulation replicates (the default is 1000), and an optional integer seed for reproducibility, and the resampling method `holdout` or `bootstrap`. Standard usage: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"). To diagnose Jensen's inequality bias, first run with bias_adjust = "none" and inspect RBIAS, then re-run with bias_adjust = "manual" -- if RBIAS moves toward zero, Jensen's inequality is the source of the negative bias rather than model misspecification: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "manual", seed = 123). To validate the manual correction against TMB's AD-based method (slower): bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123). To use conditional predictions for both in-sample and out-of-sample performance -- appropriate when repeated measurements within observed groups are present and within-group predictive accuracy is the primary interest -- both in-sample and out-of-sample RBIAS will reflect how well the model predicts held-out observations from groups it has already seen, and the in/out gap reflects genuine row-level overfitting: bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, method = "holdout", DHARMaPlot = FALSE, conditional_predictions = TRUE, seed = 123). To apply the bias correction to new predictions outside of GLAMMGoF after diagnosing Jensen's inequality, extract the total RE variance from VarCorr(), compute the correction factor as exp(total_variance / 2), and multiply marginal predictions by this factor (for random intercept models); or use predict() with do.bias.correct = TRUE for models with random slopes or complex RE structures. See the package vignette for worked examples.
 #'
 #' @param verbose Logical. If `TRUE` (the default), prints a diagnostic message when substantial negative RBIAS is detected in a `glmmTMB` model with `bias_adjust = "none"`, suggesting the user consider applying a bias correction. Set to `FALSE` to suppress this message, which is useful when calling `bias_precision()` repeatedly in simulation or sweep contexts.
-#' @param in_sample_conditional Logical. If `TRUE` and the model is a `glmmTMB` fit with random effects, in-sample predictions are made conditionally on the estimated random effects (`re.form = NULL`) rather than marginally (`re.form = ~0`). This produces in-sample performance metrics that reflect how well the model fits the training data using all available information, including group-level random effect estimates. Out-of-sample predictions always use marginal predictions (`re.form = ~0`) regardless of this setting, since random effect estimates are not available for held-out observations in a strict generalization context. Note that setting `in_sample_conditional = TRUE` means in-sample and out-of-sample metrics are no longer directly comparable on the same scale, as they reflect different prediction strategies; the gap between them will therefore reflect both overfitting and the marginal vs conditional prediction distinction. The default is `FALSE`, which uses marginal predictions for both in-sample and out-of-sample performance and ensures direct comparability. This argument is silently ignored for non-`glmmTMB` models.
+#' @param conditional_predictions Logical. If `TRUE` and the model is a `glmmTMB` fit with random effects, both in-sample and out-of-sample predictions are made conditionally on the estimated random effects (`re.form = NULL`, `allow.new.levels = TRUE`) rather than marginally (`re.form = ~0`). Since GLAMMGoF's holdout CV splits rows within groups rather than groups themselves, random effect estimates from the training model are valid for held-out observations from the same groups, making conditional out-of-sample predictions well-defined and meaningful. This produces performance metrics that reflect within-group predictive accuracy -- how well the model predicts held-out observations from groups it has already seen -- which is the most relevant question when the study design involves repeated measurements within sites, years, or individuals. In-sample and out-of-sample metrics remain directly comparable since both use the same conditional prediction strategy; the gap between them reflects genuine overfitting to training rows rather than any marginal vs conditional distinction. The default is `FALSE`, which uses marginal predictions for both in-sample and out-of-sample performance, assessing population-level generalization rather than within-group interpolation. This argument is silently ignored for non-`glmmTMB` models.
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
@@ -78,7 +90,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            seed = NULL, method = c("holdout", "bootstrap"),
                            bias_adjust = c("none", "manual", "tmb"),
                            verbose = TRUE,
-                           in_sample_conditional = FALSE) {
+                           conditional_predictions = FALSE) {
 
   # --- specify bootstrapping method and bias adjustment
   method      <- match.arg(method)
@@ -131,6 +143,19 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   is_negbin  <- "negbin"   %in% mc
   is_glm     <- "glm"      %in% mc && !is_gam
   is_lm      <- "lm"       %in% mc && !is_gam && !is_glm
+
+  # --- conditional_predictions message (after is_glmmTMB is defined) ---
+  if (conditional_predictions && is_glmmTMB) {
+    message(
+      "Note: conditional_predictions = TRUE assesses within-group predictive ",
+      "accuracy using estimated random effects (re.form = NULL) for both ",
+      "in-sample and out-of-sample predictions. This is appropriate when ",
+      "repeated measurements within observed groups are present and within-group ",
+      "interpolation is the primary interest. For population-level generalization ",
+      "assessment -- including detection of Jensen's inequality bias -- use the ",
+      "default conditional_predictions = FALSE."
+    )
+  }
 
   # --- Pre-compute GAM RE metadata (once, outside loop) ---
   gam_re_labels <- NULL
@@ -186,11 +211,22 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   }
 
   # --- Predict helpers ---
-  # get_preds_test: always marginal (re.form = ~0) since RE estimates are unavailable
-  # for held-out observations in a strict generalization context
-  get_preds_test <- function(m, newdata) {
+  # Both train and test use the same prediction strategy via get_preds_base.
+  # When conditional_predictions = TRUE, both use re.form = NULL since
+  # GLAMMGoF's holdout CV splits rows within groups rather than groups
+  # themselves -- RE estimates from the training model are valid for
+  # held-out observations from the same groups, making conditional
+  # out-of-sample predictions well-defined and directly comparable to
+  # conditional in-sample predictions.
+  # When conditional_predictions = FALSE (default), both use marginal
+  # predictions for population-level generalization assessment.
+
+  get_preds_base <- function(m, newdata) {
     if (is_glmmTMB) {
-      if (bias_adjust == "manual") {
+      if (conditional_predictions) {
+        predict(m, type = "response", newdata = newdata,
+                re.form = NULL, allow.new.levels = TRUE)
+      } else if (bias_adjust == "manual") {
         predict(m, type = "response", newdata = newdata,
                 re.form = ~0, allow.new.levels = TRUE) * correction_factor
       } else if (bias_adjust == "tmb") {
@@ -219,17 +255,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     }
   }
 
-  # get_preds_train: optionally conditional on REs for glmmTMB when
-  # in_sample_conditional = TRUE, reflecting true in-sample fit using all
-  # available information. Falls back to marginal for all other backends.
-  get_preds_train <- function(m, newdata) {
-    if (is_glmmTMB && in_sample_conditional) {
-      predict(m, type = "response", newdata = newdata,
-              re.form = NULL, allow.new.levels = TRUE)
-    } else {
-      get_preds_test(m, newdata)
-    }
-  }
+  get_preds_train <- get_preds_base
+  get_preds_test  <- get_preds_base
 
   # --- Bootstrap loop ---
   results <- vector("list", nReps)
