@@ -30,7 +30,7 @@ knitr::opts_chunk$set(
 
 -   `brier_auc()` is intended for models with binary response variables (i.e., logistic regression) and returns AUC, Brier score, and log loss.
 
-Both functions accept models with or without random effects, but predictive performance is based on population-level predictions, meaning random effects are excluded during prediction.
+Both functions accept models with or without random effects. By default, predictive performance is based on population-level (marginal) predictions, meaning random effects are excluded during prediction (`re.form = ~0`). This behavior can be changed via the `conditional_predictions` argument (see the Jensen's inequality section below for details).
 
 Two resampling methods are available via the method argument: repeated random holdout (method = "holdout", the default), which repeatedly partitions the data into training and testing subsets and is intuitive and widely used; and bootstrap resampling with out-of-bag evaluation (method = "bootstrap"), which samples with replacement and tends to make more efficient use of the available data, particularly for smaller datasets.
 
@@ -264,6 +264,102 @@ And now look at a plot of the summaries
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 br_auc$brier_auc_hist
 ```
+
+#### Jensen's inequality, random effects, and marginal predictions
+
+When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), backtransforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because of Jensen's inequality: for a convex function $f$ and a random variable $u$, $E[f(u)] > f(E[u])$. For a log-link model with random effects, this means:
+
+$$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
+
+where $\sigma^2$ is the total random effect variance. In other words, $\exp(\beta_0)$ — the typical marginal prediction — underestimates the true arithmetic mean by a factor of $\exp(\sigma^2/2)$. This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and does not affect fixed-effect inference or contrasts, but can substantially affect response-scale predictions used for management.
+
+For models with multiple random effects, the variances are additive on the log scale:
+
+$$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
+
+**This is not a model deficiency** — it is a structural property of GLMMs that reflects real, irreducible group-level heterogeneity. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+
+##### Diagnosing and correcting Jensen's inequality bias
+
+`bias_precision()` provides a `bias_adjust` argument with three options for diagnosing and correcting Jensen's inequality bias in `glmmTMB` models. A runtime message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
+
+**Step 1** — Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+# Step 1: default marginal predictions, Jensen signal visible
+chk_none <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                           testData = countData, method = "holdout",
+                           DHARMaPlot = FALSE, bias_adjust = "none", seed = 123)
+chk_none$bias_precision_summary
+```
+
+**Step 2** — Re-run with `bias_adjust = "manual"`. If RBIAS moves toward zero, Jensen's inequality is confirmed as the source of the negative bias rather than model misspecification or poor generalization. The analytical correction $\exp(\sigma^2/2)$ is applied to marginal predictions using the total random effect variance from `VarCorr()`.
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+# Step 2: analytical lognormal correction
+chk_manual <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                             testData = countData, method = "holdout",
+                             DHARMaPlot = FALSE, bias_adjust = "manual", seed = 123)
+chk_manual$bias_precision_summary
+```
+
+**Step 3 (optional)** — Re-run with `bias_adjust = "tmb"` to validate the manual correction using TMB's automatic differentiation. If manual and TMB agree closely, the analytical correction is reliable for your RE structure. Note that this step is considerably slower than Step 2.
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+# Step 3 (optional): TMB validation
+chk_tmb <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                          testData = countData, method = "holdout",
+                          DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123)
+chk_tmb$bias_precision_summary
+```
+
+Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF:
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+# Manual lognormal correction (fast, reliable for random intercept models)
+vc         <- VarCorr(countModel_GLMM)$cond
+correction <- exp(sum(sapply(vc, function(x) x[1, 1])) / 2)
+preds_adjusted <- predict(countModel_GLMM, newdata = countData,
+                          type = "response", re.form = ~0) * correction
+
+# TMB correction (handles random slopes and complex RE structures)
+preds_tmb <- predict(countModel_GLMM, newdata = countData,
+                     type = "response", re.form = ~0, do.bias.correct = TRUE)
+```
+
+Note that `bias_adjust = "manual"` is not supported for binomial models in `brier_auc()` since the analytical lognormal correction is only valid for log-link models. Use `bias_adjust = "tmb"` instead for binomial GLMMs.
+
+##### Marginal vs conditional predictions: the `conditional_predictions` argument
+
+By default, `bias_precision()` and `brier_auc()` use population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable — the most relevant question when predicting to new sites, new years, or new individuals.
+
+Setting `conditional_predictions = TRUE` switches both in-sample and out-of-sample predictions to condition on estimated random effects (`re.form = NULL`). Since GLAMMGoF's holdout CV splits rows within groups rather than groups themselves, random effect estimates from the training model are valid for held-out observations from the same groups. In-sample and out-of-sample metrics remain directly comparable since both use the same prediction strategy; the gap between them reflects genuine row-level overfitting rather than any marginal vs conditional distinction.
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+# Conditional predictions for within-group accuracy assessment
+chk_cond <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                           testData = countData, method = "holdout",
+                           DHARMaPlot = FALSE, conditional_predictions = TRUE,
+                           seed = 123)
+chk_cond$bias_precision_summary
+```
+
+##### Summary of `bias_adjust` and `conditional_predictions` combinations
+
+The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. All five valid combinations are appropriate in different contexts; the combination marked ❌ is blocked with an informative error.
+
+| `bias_adjust` | `conditional_predictions` | Prediction type | What it measures |
+|:---|:---|:---|:---|
+| `"none"` | `FALSE` (default) | Marginal | Population-level generalization; Jensen signal visible in RBIAS |
+| `"manual"` | `FALSE` | Marginal + corrected | Population-level generalization with analytical Jensen correction |
+| `"tmb"` | `FALSE` | Conditional + TMB corrected | Population-level generalization with TMB Jensen correction |
+| `"none"` | `TRUE` | Conditional | Within-group accuracy; Jensen bias absorbed by REs |
+| `"tmb"` | `TRUE` | Conditional + TMB corrected | Within-group accuracy with additional TMB correction |
+| `"manual"` | `TRUE` | ❌ Error | Double-correction — not permitted |
+
+For `brier_auc()`, the same logic applies with the exception that `bias_adjust = "manual"` is not available for binomial models regardless of `conditional_predictions`.
+
+The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the stepwise diagnostic workflow described above.
 
 #### Error messages when using `bias_precision()`
 
