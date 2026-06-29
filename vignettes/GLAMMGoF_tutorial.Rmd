@@ -267,7 +267,7 @@ br_auc$brier_auc_hist
 
 #### Jensen's inequality, random effects, and marginal predictions
 
-When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), backtransforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because of Jensen's inequality: for a convex function $f$ and a random variable $u$, $E[f(u)] > f(E[u])$. For a log-link model with random effects, this means:
+When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), backtransforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because of Jensen's inequality: for a convex (e.g., bowl-shaped like exponential) function $f$ and a random variable $u$, $E[f(u)] > f(E[u])$. For a log-link model with random effects, this means:
 
 $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
@@ -277,11 +277,11 @@ For models with multiple random effects, the variances are additive on the log s
 
 $$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
 
-**This is not a model deficiency** — it is a structural property of GLMMs that reflects real, irreducible group-level heterogeneity. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+**This is not a model deficiency:** it is a structural property of GLMMs that reflects real, irreducible group-level heterogeneity. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
 
 ##### Diagnosing and correcting Jensen's inequality bias
 
-`bias_precision()` provides a `bias_adjust` argument with three options for diagnosing and correcting Jensen's inequality bias in `glmmTMB` models. A runtime message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
+`bias_precision()` provides a `bias_adjust` argument with three options for diagnosing and correcting Jensen's inequality bias in `glmmTMB` models. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
 
 **Step 1** — Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
 
@@ -349,7 +349,7 @@ chk_cond$bias_precision_summary
 The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. All five valid combinations are appropriate in different contexts; the combination marked ❌ is blocked with an informative error.
 
 | `bias_adjust` | `conditional_predictions` | Prediction type | What it measures |
-|:---|:---|:---|:---|
+|:-----------------|:-----------------|:-----------------|:-----------------|
 | `"none"` | `FALSE` (default) | Marginal | Population-level generalization; Jensen signal visible in RBIAS |
 | `"manual"` | `FALSE` | Marginal + corrected | Population-level generalization with analytical Jensen correction |
 | `"tmb"` | `FALSE` | Conditional + TMB corrected | Population-level generalization with TMB Jensen correction |
