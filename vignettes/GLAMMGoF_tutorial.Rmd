@@ -267,7 +267,7 @@ br_auc$brier_auc_hist
 
 #### Jensen's inequality, random effects, and marginal predictions
 
-When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), backtransforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because of Jensen's inequality: for a convex (e.g., bowl-shaped like exponential) function $f$ and a random variable $u$, $E[f(u)] > f(E[u])$. For a log-link model with random effects, this means:
+When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), backtransforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward -- averaging on the log scale and then backtransforming always gives a smaller value than backtransforming individual predictions and then averaging (e.g., a bowl-shaped or exponential growth curve). This property is known as Jensen's inequality. For a log-link model with random effects, this means:
 
 $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
@@ -277,7 +277,7 @@ For models with multiple random effects, the variances are additive on the log s
 
 $$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
 
-**This is not a model deficiency:** it is a structural property of GLMMs that reflects real, irreducible group-level heterogeneity. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction might need to be applied.
+**This is not a model deficiency** — it is a structural property of GLMMs that reflects real, irreducible group-level heterogeneity. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
 
 ##### When does Jensen bias matter? Substantive vs nuisance random effects
 
