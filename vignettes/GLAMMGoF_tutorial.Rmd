@@ -299,7 +299,7 @@ Whether Jensen bias is consequential for a given analysis depends critically on 
 
 The general principle is: **if the random effect represents variation you would want to condition on in a prediction, the Jensen bias matters. If it represents study-specific noise that should not carry forward, marginalizing over it is correct and the Jensen bias is a non-issue.** Whether to apply the bias correction is therefore a scientific judgment call that depends on the nature of the random effects, the purpose of the predictions, and the magnitude of the bias given the estimated RE variance. `bias_precision()` surfaces the bias and provides tools to quantify and correct it; the decision of whether to act on it rests with the user.
 
-The following decision tree summarises the workflow:
+The following decision tree summarizes the workflow:
 
 ```{r, echo=FALSE, out.width="100%", fig.cap="Decision tree for whether to apply the Jensen's inequality bias correction to GLMM marginal predictions."}
 knitr::include_graphics("figures/jensen_decision_tree.svg")
