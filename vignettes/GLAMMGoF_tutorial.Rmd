@@ -285,13 +285,13 @@ This bias is directly analogous to the well-known log-normal back-transformation
 
 In the log-normal case, the log-scale variance is the residual variance and the correction is widely known. In the log-link GLMM case, the log-scale variance is the random effect variance and the same correction applies; however, this connection seems to be rarely made explicit in ecological statistics training. A fixed-effects GLM with a log link has no random component on the linear predictor and therefore no Jensen bias; $\exp(\beta_0)$ is exactly the arithmetic mean.
 
-This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and does not affect fixed-effect inference or contrasts, but can substantially affect response-scale predictions used for management.
+This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
 
 For models with multiple random effects, the variances are additive on the log scale:
 
 $$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
 
-**This is not a model deficiency:** it is a structural property of GLMMs that reflects real, irreducible group-level heterogeneity. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+**This is not a model deficiency:** it is a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
 
 #### When does Jensen bias matter? Substantive vs nuisance random effects
 
@@ -401,7 +401,7 @@ The table below summarizes the behavior of each combination of `bias_adjust` and
 
 | `bias_adjust` | `conditional_predictions` | Prediction type | What it measures |
 |:-----------------|:-----------------|:-----------------|:-----------------|
-| `"none"` | `FALSE` (default) | Marginal | Population-level (i.e., ignore REs) generalization; Jensen signal visible in RBIAS |
+| `"none"` (default) | `FALSE` (default) | Marginal | Population-level (i.e., ignore REs) generalization; Jensen signal visible in RBIAS |
 | `"manual"` | `FALSE` | Marginal + corrected | Population-level (i.e., ignore REs) generalization with analytical Jensen correction |
 | `"tmb"` | `FALSE` or `TRUE` | Conditional + TMB corrected | Within-group (i.e., predict to known RE groupings) accuracy with TMB correction (conditional predictions are used regardless of `conditional_predictions`) |
 | `"none"` | `TRUE` | Conditional | Within-group (i.e., predict to known RE groupings) accuracy; Jensen bias absorbed by REs |
