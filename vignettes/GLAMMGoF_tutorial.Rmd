@@ -347,7 +347,7 @@ chk_tmb <- bias_precision(nReps = 100, testModel = countModel_GLMM,
 chk_tmb$bias_precision_summary
 ```
 
-Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF:
+Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF. Note that although the calculations are explicitly written out below, GLAMMGoF has a `jensen_correct()` which provides a convenient wrapper for this calculation, accepting predictions, standard errors, and confidence interval bounds on the link or response scale (see ?jensen_correct for details):
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 # Manual lognormal correction (fast, reliable for random intercept models)
@@ -380,7 +380,7 @@ preds_se_corrected <- preds_tmb[, "Std. (bias.correct)"]
 
 Note that `bias_adjust = "manual"` is not supported for binomial models in `brier_auc()` since the analytical log-normal correction is only valid for log-link models. Use `bias_adjust = "tmb"` instead for binomial GLMMs.
 
-##### Marginal vs conditional predictions: the `conditional_predictions` argument
+#### Marginal vs conditional predictions: the `conditional_predictions` argument
 
 By default, `bias_precision()` and `brier_auc()` use population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable — the most relevant question when predicting to new sites, new years, or new individuals.
 

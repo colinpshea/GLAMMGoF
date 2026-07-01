@@ -1,0 +1,184 @@
+#' Lognormal bias correction factor for log-link GLMM marginal predictions
+#'
+#' Computes the lognormal bias correction factor \eqn{\exp(\sum \sigma^2 / 2)}
+#' for marginal predictions from a \code{glmmTMB} model with a log link and
+#' random effects, and optionally applies it to a vector of predictions, their
+#' standard errors, or confidence interval bounds. This corrects for the
+#' systematic underestimation of the arithmetic mean that arises from Jensen's
+#' inequality when backtransforming population-level (marginal) predictions to
+#' the response scale.
+#'
+#' When a GLMM includes random effects and a log link function,
+#' \eqn{\exp(\mathbf{X}\boldsymbol{\beta})} is the geometric mean of the
+#' marginal distribution, not the arithmetic mean. The arithmetic mean requires
+#' a multiplicative correction of \eqn{\exp(\sum \sigma^2_k / 2)}, where
+#' \eqn{\sigma^2_k} is the variance of the \eqn{k}-th random effect term,
+#' summed across all random effects in the conditional model. This is directly
+#' analogous to the well-known lognormal backtransformation correction and
+#' applies to any log-link GLMM regardless of response distribution (Poisson,
+#' negative binomial, Tweedie, gamma, etc.).
+#'
+#' When \code{scale = "response"} (the default), predictions and associated
+#' quantities are assumed to already be on the response scale (i.e.,
+#' backtransformed via \code{exp()}). The correction factor is applied as a
+#' simple multiplication: \eqn{\hat{\mu}_{adj} = \hat{\mu} \times c}, where
+#' \eqn{c = \exp(\sum \sigma^2 / 2)}. Standard errors and confidence interval
+#' bounds scale linearly by the same factor.
+#'
+#' When \code{scale = "link"}, predictions are assumed to be on the log scale
+#' (i.e., the linear predictor \eqn{\mathbf{X}\boldsymbol{\beta}}). The
+#' function backtransforms them to the response scale and applies the
+#' correction in one step: \eqn{\hat{\mu}_{adj} = \exp(\hat{\eta}) \times c}.
+#' Standard errors on the link scale are propagated to the response scale via
+#' the delta method before applying the correction:
+#' \eqn{SE_{adj} = \exp(\hat{\eta}) \times SE_{\eta} \times c}.
+#' Confidence intervals on the link scale are backtransformed symmetrically:
+#' \eqn{[exp(\hat{\eta} - 1.96 \times SE_{\eta}), exp(\hat{\eta} + 1.96 \times SE_{\eta})]}
+#' and then multiplied by \eqn{c}. If \code{lwr} and \code{upr} are supplied
+#' directly on the link scale they are backtransformed and corrected directly.
+#'
+#' @param model A fitted \code{glmmTMB} model object with a log link function
+#'   and at least one random effect in the conditional model.
+#' @param predictions An optional numeric vector of predictions to correct.
+#'   Interpreted as response-scale predictions when \code{scale = "response"}
+#'   (default), or as log-scale linear predictor values when
+#'   \code{scale = "link"}. If \code{NULL} (default), only the scalar
+#'   correction factor is returned.
+#' @param se An optional numeric vector of standard errors. Interpreted on the
+#'   same scale as \code{predictions}. When \code{scale = "link"}, delta-method
+#'   propagation is used to convert to the response scale before applying the
+#'   correction.
+#' @param lwr An optional numeric vector of lower confidence interval bounds,
+#'   on the same scale as \code{predictions}.
+#' @param upr An optional numeric vector of upper confidence interval bounds,
+#'   on the same scale as \code{predictions}.
+#' @param scale Character string, either \code{"response"} (default) or
+#'   \code{"link"}. Specifies the scale of the supplied \code{predictions},
+#'   \code{se}, \code{lwr}, and \code{upr} values. All returned adjusted
+#'   quantities are always on the response scale.
+#'
+#' @return If \code{predictions = NULL}, returns the scalar correction factor
+#'   \eqn{\exp(\sum \sigma^2 / 2)} as a single numeric value. If
+#'   \code{predictions} is supplied, returns a named list with elements:
+#'   \describe{
+#'     \item{\code{correction}}{The scalar correction factor.}
+#'     \item{\code{predictions_adjusted}}{Bias-corrected predictions on the
+#'       response scale.}
+#'     \item{\code{se_adjusted}}{Bias-corrected standard errors on the response
+#'       scale (only if \code{se} was supplied).}
+#'     \item{\code{lwr_adjusted}}{Bias-corrected lower CI bounds on the
+#'       response scale (only if \code{lwr} was supplied).}
+#'     \item{\code{upr_adjusted}}{Bias-corrected upper CI bounds on the
+#'       response scale (only if \code{upr} was supplied).}
+#'   }
+#'
+#' @note This function is intended for use with \code{glmmTMB} models with a
+#'   log link and random intercepts. For models with random slopes or complex
+#'   covariance structures (e.g., spatial random effects), the analytical
+#'   correction \eqn{\exp(\sum \sigma^2 / 2)} based on diagonal variance
+#'   components from \code{VarCorr()} is an approximation. In such cases,
+#'   \code{predict(model, do.bias.correct = TRUE)} provides a more exact
+#'   correction via TMB's automatic differentiation. The correction is not
+#'   appropriate for models with an identity link (e.g., Gaussian GLMMs) since
+#'   no backtransformation bias exists, nor for logit-link models where the
+#'   direction and magnitude of Jensen's inequality bias varies with the linear
+#'   predictor value.
+#'
+#'   Whether to apply the bias correction depends on the nature of the random
+#'   effects and the purpose of the predictions. Random effects that represent
+#'   real, persistent features of the system (site effects, spatial fields,
+#'   individual heterogeneity) warrant correction when making response-scale
+#'   predictions. Random effects that represent study-specific nuisance
+#'   variation (year effects within a study window, observer effects) may not
+#'   require correction when the goal is population-level generalization. See
+#'   the package vignette for a decision framework.
+#'
+#' @references Thorson, J.T. and Kristensen, K. (2016) Implementing a generic
+#'   method for bias correction in statistical models using random effects, with
+#'   spatial and population dynamics examples. \emph{Fisheries Research}, 175,
+#'   66--74.
+#'
+#' @examples
+#' \dontrun{
+#' # Fit a glmmTMB model
+#' m <- glmmTMB(y ~ x + (1 | site), data = dat, family = nbinom2)
+#'
+#' # Get the correction factor only
+#' jensen_correct(m)
+#'
+#' # Response-scale workflow
+#' preds <- predict(m, newdata = dat, type = "response", re.form = ~0)
+#' se    <- predict(m, newdata = dat, type = "response",
+#'                  re.form = ~0, se.fit = TRUE)$se.fit
+#' lwr   <- preds - 1.96 * se
+#' upr   <- preds + 1.96 * se
+#'
+#' result <- jensen_correct(m, predictions = preds, se = se,
+#'                          lwr = lwr, upr = upr, scale = "response")
+#'
+#' # Link-scale workflow (backtransformation + correction in one step)
+#' preds_link <- predict(m, newdata = dat, type = "link", re.form = ~0)
+#' se_link    <- predict(m, newdata = dat, type = "link",
+#'                       re.form = ~0, se.fit = TRUE)$se.fit
+#'
+#' result_link <- jensen_correct(m, predictions = preds_link, se = se_link,
+#'                               scale = "link")
+#' }
+#'
+#' @importFrom nlme VarCorr
+#' @export
+jensen_correct <- function(model, predictions = NULL,
+                           se = NULL, lwr = NULL, upr = NULL,
+                           scale = c("response", "link")) {
+
+  scale <- match.arg(scale)
+
+  # --- Validate model class ---
+  if (!inherits(model, "glmmTMB"))
+    stop("jensen_correct() currently only supports glmmTMB model objects. ",
+         "For lme4 models, extract RE variances manually via VarCorr() and ",
+         "compute exp(sum(sapply(VarCorr(model), function(x) attr(x, 'stddev')^2)) / 2).")
+
+  # --- Check for random effects ---
+  vc <- VarCorr(model)$cond
+  if (length(vc) == 0)
+    warning("No random effects found in the conditional model. ",
+            "The correction factor is 1 (no adjustment). ",
+            "Jensen's inequality bias only arises when random effects are present.")
+
+  # --- Compute correction factor ---
+  re_vars    <- if (length(vc) > 0) sapply(vc, function(x) x[1, 1]) else 0
+  correction <- exp(sum(re_vars) / 2)
+
+  # --- Return scalar if no predictions supplied ---
+  if (is.null(predictions)) return(correction)
+
+  # --- Apply correction based on scale ---
+  if (scale == "response") {
+
+    # All inputs already on response scale -- multiply by correction
+    out <- list(correction           = correction,
+                predictions_adjusted = predictions * correction)
+    if (!is.null(se))  out$se_adjusted  <- se  * correction
+    if (!is.null(lwr)) out$lwr_adjusted <- lwr * correction
+    if (!is.null(upr)) out$upr_adjusted <- upr * correction
+
+  } else {
+
+    # Link scale -- backtransform then apply correction
+    preds_resp <- exp(predictions) * correction
+
+    out <- list(correction           = correction,
+                predictions_adjusted = preds_resp)
+
+    if (!is.null(se)) {
+      # Delta method: SE_response = exp(eta) * SE_link, then multiply by c
+      out$se_adjusted <- exp(predictions) * se * correction
+    }
+
+    if (!is.null(lwr)) out$lwr_adjusted <- exp(lwr) * correction
+    if (!is.null(upr)) out$upr_adjusted <- exp(upr) * correction
+  }
+
+  out
+}

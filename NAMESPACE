@@ -2,6 +2,7 @@
 
 export(bias_precision)
 export(brier_auc)
+export(jensen_correct)
 importFrom(DHARMa,simulateResiduals)
 importFrom(DHARMa,testZeroInflation)
 importFrom(MASS,glm.nb)
