@@ -317,7 +317,7 @@ The general principle is: **if the random effect represents variation you would 
 
 `bias_precision()` provides a `bias_adjust` argument with three options for diagnosing and correcting Jensen's inequality bias in `glmmTMB` models. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
 
-**Step 1** — Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
+**Step 1** - Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 # Step 1: default marginal predictions, Jensen signal visible
@@ -327,7 +327,7 @@ chk_none <- bias_precision(nReps = 100, testModel = countModel_GLMM,
 chk_none$bias_precision_summary
 ```
 
-**Step 2** — Re-run with `bias_adjust = "manual"`. If RBIAS moves toward zero, Jensen's inequality is confirmed as the source of the negative bias rather than model misspecification or poor generalization. The analytical correction $\exp(\sigma^2/2)$ is applied to marginal predictions using the total random effect variance from `VarCorr()`.
+**Step 2** - Re-run with `bias_adjust = "manual"`. If RBIAS moves toward zero, Jensen's inequality is confirmed as the source of the negative bias rather than model misspecification or poor generalization. The analytical correction $\exp(\sigma^2/2)$ is applied to marginal predictions using the total random effect variance from `VarCorr()`.
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 # Step 2: analytical lognormal correction
@@ -337,7 +337,7 @@ chk_manual <- bias_precision(nReps = 100, testModel = countModel_GLMM,
 chk_manual$bias_precision_summary
 ```
 
-**Step 3 (optional)** — Re-run with `bias_adjust = "tmb"` to validate the manual correction using TMB's automatic differentiation. If manual and TMB agree closely, the analytical correction is reliable for your RE structure. Note that this step is considerably slower than Step 2.
+**Step 3 (optional)** - Re-run with `bias_adjust = "tmb"` to validate the manual correction using TMB's automatic differentiation. If manual and TMB agree closely, the analytical correction is reliable for your RE structure. Note that this step is considerably slower than Step 2.
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 # Step 3 (optional): TMB validation
@@ -382,7 +382,7 @@ Note that `bias_adjust = "manual"` is not supported for binomial models in `brie
 
 #### Marginal vs conditional predictions: the `conditional_predictions` argument
 
-By default, `bias_precision()` and `brier_auc()` use population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable — the most relevant question when predicting to new sites, new years, or new individuals.
+By default, `bias_precision()` and `brier_auc()` use population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable - the most relevant question when predicting to new sites, new years, or new individuals.
 
 Setting `conditional_predictions = TRUE` switches both in-sample and out-of-sample predictions to condition on estimated random effects (`re.form = NULL`). Since GLAMMGoF's holdout CV splits rows within groups rather than groups themselves, random effect estimates from the training model are valid for held-out observations from the same groups. In-sample and out-of-sample metrics remain directly comparable since both use the same prediction strategy; the gap between them reflects genuine row-level over-fitting rather than any marginal vs conditional distinction.
 
@@ -397,19 +397,23 @@ chk_cond$bias_precision_summary
 
 #### Summary of `bias_adjust` and `conditional_predictions` combinations
 
-The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. Note that `bias_adjust = "tmb"` always uses conditional predictions (`re.form = NULL`) internally, since TMB's automatic differentiation bias correction requires random effects to be present in the linear predictor (`do.bias.correct` has no effect when REs are set to zero). This means `conditional_predictions` has no additional effect when `bias_adjust = "tmb"`; both settings produce the same TMB-corrected behavior. There are five distinct behaviors in total; the combination marked ❌ is blocked with an informative error.
+The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. Note that `bias_adjust = "tmb"` uses `re.form = NULL` as a computational necessity so that TMB's automatic differentiation can access the RE variance structure; this is not a choice to make group-specific conditional predictions, and the output is still a corrected population-level marginal mean. This means `conditional_predictions` has no additional effect when `bias_adjust = "tmb"`; both settings produce the same TMB-corrected behavior. There are five distinct behaviors in total; the combination marked ❌ is blocked with an informative error.
 
 | `bias_adjust` | `conditional_predictions` | Prediction type | What it measures |
 |:-----------------|:-----------------|:-----------------|:-----------------|
 | `"none"` (default) | `FALSE` (default) | Marginal | Population-level (i.e., ignore REs) generalization; Jensen signal visible in RBIAS |
 | `"manual"` | `FALSE` | Marginal + corrected | Population-level (i.e., ignore REs) generalization with analytical Jensen correction |
-| `"tmb"` | `FALSE` or `TRUE` | Conditional + TMB corrected | Within-group (i.e., predict to known RE groupings) accuracy with TMB correction (conditional predictions are used regardless of `conditional_predictions`) |
+| `"tmb"` | `FALSE` or `TRUE` | Corrected population-level | Corrected population-level marginal mean via TMB's AD; uses `re.form = NULL` internally as a computational requirement, not to obtain group-specific predictions |
 | `"none"` | `TRUE` | Conditional | Within-group (i.e., predict to known RE groupings) accuracy; Jensen bias absorbed by REs |
-| `"manual"` | `TRUE` | ❌ Error | Double-correction — not permitted |
+| `"manual"` | `TRUE` | ❌ Error | Double-correction - not permitted |
 
 For `brier_auc()`, the same logic applies with the exception that `bias_adjust = "manual"` is not available for binomial models regardless of `conditional_predictions`.
 
 The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above. Note that there is currently no option to obtain truly marginal, TMB-corrected predictions, since the TMB correction is mathematically tied to conditional prediction.
+
+#### Recommended workflow for inference and predictions
+
+Based on the foregoing, we recommend the following general workflow for log-link GLMMs with random effects. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the lognormal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
 
 #### Error messages when using `bias_precision()`
 

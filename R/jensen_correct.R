@@ -134,20 +134,29 @@ jensen_correct <- function(model, predictions = NULL,
   scale <- match.arg(scale)
 
   # --- Validate model class ---
-  if (!inherits(model, "glmmTMB"))
-    stop("jensen_correct() currently only supports glmmTMB model objects. ",
-         "For lme4 models, extract RE variances manually via VarCorr() and ",
-         "compute exp(sum(sapply(VarCorr(model), function(x) attr(x, 'stddev')^2)) / 2).")
+  if (!inherits(model, c("glmmTMB", "merMod")))
+    stop("jensen_correct() currently only supports glmmTMB and lme4 model objects. ",
+         "For other model types, extract RE variances manually and ",
+         "compute exp(sum(re_variances) / 2).")
 
-  # --- Check for random effects ---
-  vc <- VarCorr(model)$cond
-  if (length(vc) == 0)
-    warning("No random effects found in the conditional model. ",
-            "The correction factor is 1 (no adjustment). ",
-            "Jensen's inequality bias only arises when random effects are present.")
+  # --- Check for random effects and compute correction factor ---
+  if (inherits(model, "glmmTMB")) {
+    vc <- VarCorr(model)$cond
+    if (length(vc) == 0)
+      warning("No random effects found in the conditional model. ",
+              "The correction factor is 1 (no adjustment). ",
+              "Jensen's inequality bias only arises when random effects are present.")
+    re_vars <- if (length(vc) > 0) sapply(vc, function(x) x[1, 1]) else 0
+  } else {
+    # lme4 merMod objects (glmerMod, lmerMod)
+    vc <- VarCorr(model)
+    if (length(vc) == 0)
+      warning("No random effects found in the model. ",
+              "The correction factor is 1 (no adjustment). ",
+              "Jensen's inequality bias only arises when random effects are present.")
+    re_vars <- if (length(vc) > 0) sapply(vc, function(x) attr(x, "stddev")^2) else 0
+  }
 
-  # --- Compute correction factor ---
-  re_vars    <- if (length(vc) > 0) sapply(vc, function(x) x[1, 1]) else 0
   correction <- exp(sum(re_vars) / 2)
 
   # --- Return scalar if no predictions supplied ---
