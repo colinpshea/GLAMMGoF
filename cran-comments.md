@@ -9,6 +9,11 @@
 * "unable to verify current time" — this is a network issue on the check 
   machine and not related to the package itself.
 
+## Test environments
+* Local Windows 11, R 4.5.x
+* win-builder (devel)
+* win-builder (release)
+
 ## Downstream dependencies
 This is a new submission. There are no downstream dependencies.
 
@@ -40,3 +45,23 @@ misspellings:
 * glmmTMB (R package name)
 * lme (as in lme4, an R package name)
 * mgcv (R package name)
+
+## Notes to CRAN reviewers
+
+This is the first submission of GLAMMGoF to CRAN. The package is currently
+distributed via R-universe (https://cshea15.r-universe.dev/GLAMMGoF) and has
+been in active use by ecological researchers prior to this submission.
+
+The package provides resampling-based predictive validation for generalized
+linear and additive models, with particular support for detecting and correcting
+Jensen's inequality bias in log-link GLMMs with random effects. Supported model
+backends include glmmTMB, lme4, mgcv, MASS, and stats.
+
+All examples in the documentation are wrapped in \dontrun{} to avoid long
+runtimes during checking, as the core functions involve repeated model refitting
+via Monte Carlo cross-validation or bootstrap resampling. A vignette
+demonstrating full package functionality is included.
+
+The package imports DHARMa for optional residual diagnostics. DHARMa is listed
+in Imports rather than Suggests because its simulateResiduals() function is
+called within the main exported functions when DHARMaPlot = TRUE (the default).
