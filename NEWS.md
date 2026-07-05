@@ -1,15 +1,10 @@
 # GLAMMGoF 1.1.2
 
-* Updated `@param`, `@note`, and vignette documentation to reflect `lme4` support for `bias_adjust = "manual"` and `conditional_predictions`
-
-# GLAMMGoF 1.1.1
-
 * Added `bias_adjust = "manual"` support for `lme4` model objects (`glmerMod`, `lmerMod`) using `attr(VarCorr(model), "stddev")^2` for RE variance extraction
 * Added `conditional_predictions = TRUE` support for `lme4` model objects
 * Added informative `stop()` for `bias_adjust = "tmb"` with `lme4` models, pointing users to `"manual"` or refitting in `glmmTMB`
 * Added `jensen_correct()` as an exported utility function for standalone lognormal bias correction of predictions, standard errors, and confidence intervals on either the response or link scale; supports both `glmmTMB` and `lme4` model objects
 * Updated `@param`, `@note`, and vignette documentation to reflect `lme4` support for `bias_adjust = "manual"` and `conditional_predictions`
-
 
 # GLAMMGoF 1.1.0
 

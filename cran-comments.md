@@ -1,13 +1,9 @@
 ## R CMD check results
-0 errors | 1 warning | 1 note
+0 errors | 1 warning | 0 notes
 
 ### Warning
 * "package 'ggplot2' was built under R version 4.5.3" — this is a local 
   machine issue and not related to the package itself.
-
-### Note
-* "unable to verify current time" — this is a network issue on the check 
-  machine and not related to the package itself.
 
 ## Test environments
 * Local Windows 11, R 4.5.x
