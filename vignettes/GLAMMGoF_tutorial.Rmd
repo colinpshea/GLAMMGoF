@@ -413,7 +413,7 @@ The default combination (`bias_adjust = "none"`, `conditional_predictions = FALS
 
 #### Recommended workflow for inference and predictions
 
-Based on the foregoing, we recommend the following general workflow for log-link GLMMs with random effects. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the lognormal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
+The following general workflow is recommended for log-link GLMMs with random effects. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
 
 #### Error messages when using `bias_precision()`
 
