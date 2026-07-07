@@ -61,3 +61,10 @@ demonstrating full package functionality is included.
 The package imports DHARMa for optional residual diagnostics. DHARMa is listed
 in Imports rather than Suggests because its simulateResiduals() function is
 called within the main exported functions when DHARMaPlot = TRUE (the default).
+
+The following flagged words in DESCRIPTION are intentional technical terms 
+and not misspellings:
+- RRMSE, RMAE, RMedAE, RBIAS: relative performance metrics defined in the package
+- Brier: Brier score, a standard binary prediction metric (named after Glenn Brier)
+- TMB, glmmTMB: Template Model Builder and its R interface
+- mgcv, lme: established R package names
