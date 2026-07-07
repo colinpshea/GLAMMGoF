@@ -1,7 +1,8 @@
 # GLAMMGoF 1.1.3
 
 * Bumped to 1.1.3
-* Added checks for `testModel` and `testData` that throw informative warnings when data and model objects are swapped or the wrong format 
+* Added `correction_factor` argument to `bias_precision()` allowing users to supply a known correction factor directly when `bias_adjust = "manual"`, bypassing internal VarCorr() computation. Primarily useful in simulation contexts where the true random effect variance is known and RE variance estimates from training subsets may be unstable at high sigma values. 
+* Added argument validation checks for swapped testModel/testData arguments in bias_precision() and brier_auc().
 
 # GLAMMGoF 1.1.2
 

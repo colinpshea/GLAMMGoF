@@ -85,6 +85,7 @@
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_vline facet_grid theme_bw theme element_blank element_line element_text labs unit scale_y_continuous
+#' @param correction_factor Optional numeric scalar. If supplied and `bias_adjust = "manual"`, this value is used directly as the lognormal bias correction factor instead of computing it from `VarCorr(testModel)`. This is primarily useful in simulation contexts where the true random effect variance is known, allowing the correction to be anchored to the true `sigma^2` rather than the potentially noisy estimated variance from the fitted model. For example, in a simulation sweeping over sigma values, pass `exp(sigma^2 / 2)` directly to avoid instability at high sigma where `VarCorr()` estimates from training subsets are unreliable. In applied use with real data, leave this as `NULL` (the default) so the correction is computed from the full-data `testModel` via `VarCorr()`. Ignored when `bias_adjust` is not `"manual"`.
 #' @importFrom DHARMa simulateResiduals testZeroInflation
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom nlme VarCorr
@@ -98,7 +99,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            seed = NULL, method = c("holdout", "bootstrap"),
                            bias_adjust = c("none", "manual", "tmb"),
                            verbose = TRUE,
-                           conditional_predictions = FALSE) {
+                           conditional_predictions = FALSE,
+                           correction_factor = NULL) {
 
   # --- specify bootstrapping method and bias adjustment
   method      <- match.arg(method)
@@ -204,11 +206,15 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   }
 
   # --- Pre-compute manual bias correction factor from full-data model (once, outside loop) ---
+  # If correction_factor is supplied by the user (e.g. in simulation contexts where the
+  # true sigma^2 is known), use it directly. Otherwise compute from VarCorr(testModel).
   # Using testModel's VarCorr rather than each resample's refitted model avoids
   # unstable correction factors at high RE variance where training subsets
   # produce noisy sigma^2 estimates that inflate exp(sigma^2/2) dramatically.
   # lme4 VarCorr returns a named list where stddev is stored as an attribute.
-  correction_factor <- if (bias_adjust == "manual" && is_glmmTMB) {
+  correction_factor <- if (!is.null(correction_factor) && bias_adjust == "manual") {
+    correction_factor   # use supplied value directly
+  } else if (bias_adjust == "manual" && is_glmmTMB) {
     re_vars <- sapply(VarCorr(testModel)$cond, function(vc) vc[1, 1])
     exp(sum(re_vars) / 2)
   } else if (bias_adjust == "manual" && (is_glmer || is_lmer)) {
