@@ -1,3 +1,8 @@
+# GLAMMGoF 1.1.3
+
+* Bumped to 1.1.3
+* Added checks for `testModel` and `testData` that throw informative warnings when data and model objects are swapped or the wrong format 
+
 # GLAMMGoF 1.1.2
 
 * Added `bias_adjust = "manual"` support for `lme4` model objects (`glmerMod`, `lmerMod`) using `attr(VarCorr(model), "stddev")^2` for RE variance extraction

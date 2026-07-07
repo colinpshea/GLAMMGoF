@@ -84,6 +84,18 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   # --- Optional seed ---
   if (!is.null(seed)) set.seed(seed)
 
+  # --- Validate argument types ---
+  if (inherits(testModel, "data.frame"))
+    stop("testModel appears to be a data frame rather than a fitted model object. ",
+         "Did you accidentally swap the testModel and testData arguments? ",
+         "testModel should be a fitted model object (e.g., from glmmTMB, lme4, or mgcv) ",
+         "and testData should be the data frame used to fit the model.")
+
+  if (!inherits(testData, "data.frame"))
+    stop("testData should be a data frame but received an object of class '",
+         paste(class(testData), collapse = ", "), "'. ",
+         "Did you accidentally swap the testModel and testData arguments?")
+
   # --- Validate inputs ---
   stopifnot("testModel cannot be NULL" = !is.null(testModel))
   stopifnot("testData cannot be NULL"  = !is.null(testData))
