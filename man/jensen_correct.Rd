@@ -2,7 +2,7 @@
 % Please edit documentation in R/jensen_correct.R
 \name{jensen_correct}
 \alias{jensen_correct}
-\title{Lognormal bias correction factor for log-link GLMM marginal predictions}
+\title{Log-normal bias correction factor for log-link GLMM marginal predictions}
 \usage{
 jensen_correct(
   model,
@@ -14,7 +14,7 @@ jensen_correct(
 )
 }
 \arguments{
-\item{model}{A fitted \code{glmmTMB} model object with a log link function
+\item{model}{A fitted \code{glmmTMB} or \code{lme4} model object with a log link function
 and at least one random effect in the conditional model.}
 
 \item{predictions}{An optional numeric vector of predictions to correct.
@@ -56,12 +56,12 @@ response scale (only if \code{upr} was supplied).}
 }
 }
 \description{
-Computes the lognormal bias correction factor \eqn{\exp(\sum \sigma^2 / 2)}
-for marginal predictions from a \code{glmmTMB} model with a log link and
+Computes the log-normal bias correction factor \eqn{\exp(\sum \sigma^2 / 2)}
+for marginal predictions from a \code{glmmTMB} or \code{lme4} model with a log link and
 random effects, and optionally applies it to a vector of predictions, their
 standard errors, or confidence interval bounds. This corrects for the
 systematic underestimation of the arithmetic mean that arises from Jensen's
-inequality when backtransforming population-level (marginal) predictions to
+inequality when back-transforming population-level (marginal) predictions to
 the response scale.
 }
 \details{
@@ -71,28 +71,28 @@ marginal distribution, not the arithmetic mean. The arithmetic mean requires
 a multiplicative correction of \eqn{\exp(\sum \sigma^2_k / 2)}, where
 \eqn{\sigma^2_k} is the variance of the \eqn{k}-th random effect term,
 summed across all random effects in the conditional model. This is directly
-analogous to the well-known lognormal backtransformation correction and
+analogous to the well-known log-normal back-transformation correction and
 applies to any log-link GLMM regardless of response distribution (Poisson,
 negative binomial, Tweedie, gamma, etc.).
 
 When \code{scale = "response"} (the default), predictions and associated
 quantities are assumed to already be on the response scale (i.e.,
-backtransformed via \code{exp()}). The correction factor is applied as a
+back-transformed via \code{exp()}). The correction factor is applied as a
 simple multiplication: \eqn{\hat{\mu}_{adj} = \hat{\mu} \times c}, where
 \eqn{c = \exp(\sum \sigma^2 / 2)}. Standard errors and confidence interval
 bounds scale linearly by the same factor.
 
 When \code{scale = "link"}, predictions are assumed to be on the log scale
 (i.e., the linear predictor \eqn{\mathbf{X}\boldsymbol{\beta}}). The
-function backtransforms them to the response scale and applies the
+function back-transforms them to the response scale and applies the
 correction in one step: \eqn{\hat{\mu}_{adj} = \exp(\hat{\eta}) \times c}.
 Standard errors on the link scale are propagated to the response scale via
 the delta method before applying the correction:
 \eqn{SE_{adj} = \exp(\hat{\eta}) \times SE_{\eta} \times c}.
-Confidence intervals on the link scale are backtransformed symmetrically:
+Confidence intervals on the link scale are back-transformed symmetrically:
 \eqn{[exp(\hat{\eta} - 1.96 \times SE_{\eta}), exp(\hat{\eta} + 1.96 \times SE_{\eta})]}
 and then multiplied by \eqn{c}. If \code{lwr} and \code{upr} are supplied
-directly on the link scale they are backtransformed and corrected directly.
+directly on the link scale they are back-transformed and corrected directly.
 }
 \note{
 This function is intended for use with \code{glmmTMB} models with a
@@ -103,7 +103,7 @@ components from \code{VarCorr()} is an approximation. In such cases,
 \code{predict(model, do.bias.correct = TRUE)} provides a more exact
 correction via TMB's automatic differentiation. The correction is not
 appropriate for models with an identity link (e.g., Gaussian GLMMs) since
-no backtransformation bias exists, nor for logit-link models where the
+no back-transformation bias exists, nor for logit-link models where the
 direction and magnitude of Jensen's inequality bias varies with the linear
 predictor value.
 
