@@ -186,7 +186,7 @@ test_that("brier_auc summary contains AUC, Brier, and LogLoss", {
                     testData = logitData, DHARMaPlot = FALSE, seed = 42)
   summ <- out[[grep("summary", names(out))]]
   metrics <- unique(as.character(summ$Metric))
-  expect_true(any(c("AUC", "Brier", "LogLoss") %in% metrics))
+  expect_true(any(c("AUC statistic", "Brier score", "Log loss") %in% metrics))
 })
 
 test_that("brier_auc errors for bias_adjust = 'manual'", {
