@@ -1,3 +1,7 @@
+# GLAMMGoF 1.1.4
+
+* Bumped to 1.1.4
+
 # GLAMMGoF 1.1.3
 
 * Bumped to 1.1.3
