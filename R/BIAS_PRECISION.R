@@ -212,7 +212,18 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # unstable correction factors at high RE variance where training subsets
   # produce noisy sigma^2 estimates that inflate exp(sigma^2/2) dramatically.
   # lme4 VarCorr returns a named list where stddev is stored as an attribute.
-  correction_factor <- if (!is.null(correction_factor) && bias_adjust == "manual") {
+# cf_internal <- if (!is.null(correction_factor) && bias_adjust == "manual") {
+#   correction_factor   # use supplied value directly
+# } else if (bias_adjust == "manual" && is_glmmTMB) {
+#   re_vars <- sapply(VarCorr(testModel)$cond, function(vc) vc[1, 1])
+#   exp(sum(re_vars) / 2)
+# } else if (bias_adjust == "manual" && (is_glmer || is_lmer)) {
+#   re_vars <- sapply(VarCorr(testModel), function(vc) attr(vc, "stddev")^2)
+#   exp(sum(re_vars) / 2)
+# } else {
+#   1
+# }
+  cf_internal <- if (!is.null(correction_factor) && bias_adjust == "manual") {
     correction_factor   # use supplied value directly
   } else if (bias_adjust == "manual" && is_glmmTMB) {
     re_vars <- sapply(VarCorr(testModel)$cond, function(vc) vc[1, 1])
@@ -273,7 +284,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                 re.form = NULL, allow.new.levels = TRUE)
       } else if (bias_adjust == "manual") {
         predict(m, type = "response", newdata = newdata,
-                re.form = ~0, allow.new.levels = TRUE) * correction_factor
+                re.form = ~0, allow.new.levels = TRUE) * cf_internal
       } else if (bias_adjust == "tmb") {
         preds <- predict(m, type = "response", newdata = newdata,
                          re.form = NULL, allow.new.levels = TRUE,
@@ -298,7 +309,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                 allow.new.levels = TRUE, newdata = newdata)
       } else if (bias_adjust == "manual") {
         predict(m, type = "response", re.form = ~0,
-                allow.new.levels = TRUE, newdata = newdata) * correction_factor
+                allow.new.levels = TRUE, newdata = newdata) * cf_internal
       } else {
         predict(m, type = "response", re.form = ~0,
                 allow.new.levels = TRUE, newdata = newdata)
