@@ -267,7 +267,7 @@ br_auc$brier_auc_hist
 
 #### Jensen's inequality, random effects, and marginal predictions
 
-When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward -- averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging (e.g., a bowl-shaped or exponential growth curve). This property is known as Jensen's inequality. For a log-link model with random effects, this means:
+When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward, and averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging (e.g., a bowl-shaped or exponential growth curve). This property is known as Jensen's inequality. For a log-link model with random effects, this means:
 
 $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
@@ -277,13 +277,13 @@ This bias is directly analogous to the well-known log-normal back-transformation
 
 |   | Log-normal model | Log-link GLMM |
 |:-----------------------|:-----------------------|:-----------------------|
-| Model structure | $\log(Y) \sim \text{Normal}(\mu, \sigma^2)$ | $\log(\mu_{ij}) = X\beta + u_j$, $u_j \sim \text{Normal}(0, \sigma^2)$ |
+| Model structure | $\log(Y) \sim \text{Normal}(X\beta, \sigma^2)$ | $\log(\mu_{ij}) = X\beta + u_j$, $u_j \sim \text{Normal}(0, \sigma^2)$ |
 | Log-scale variance | Residual $\sigma^2$ | Random effect variance $\sigma^2$ |
-| Naive back-transform | $\exp(\mu)$ | $\exp(X\beta)$ |
-| True arithmetic mean | $\exp(\mu + \sigma^2/2)$ | $\exp(X\beta + \sigma^2/2)$ |
+| Naive back-transform | $\exp(X\beta)$ | $\exp(X\beta)$ |
+| True arithmetic mean | $\exp(X\beta + \sigma^2/2)$ | $\exp(X\beta + \sigma^2/2)$ |
 | Correction factor | $\exp(\sigma^2/2)$ | $\exp(\sigma^2/2)$ |
 
-In the log-normal case, the log-scale variance is the residual variance and the correction is widely known. In the log-link GLMM case, the log-scale variance is the random effect variance and the same correction applies; however, this connection seems to be rarely made explicit in ecological statistics training. A fixed-effects GLM with a log link has no random component on the linear predictor and therefore no Jensen bias; $\exp(\beta_0)$ is exactly the arithmetic mean.
+In the log-normal case, the log-scale variance is the residual variance and the correction is widely known. In the log-link GLMM case, the log-scale variance is the random effect variance and the same correction applies; however, this connection seems to be rarely made explicit in ecological statistics training. It follows that log-normal models with random effects are subject to both sources of bias simultaneously (residual variance and random effect variance), requiring a combined correction of `exp((sigma^2_residual + sigma^2_random_effect) / 2)`, where both variance components are additive on the natural log scale. A fixed-effects GLM with a log link has no random component on the linear predictor and therefore no Jensen bias; $\exp(\beta_0)$ is exactly the arithmetic mean.
 
 This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
 
@@ -291,7 +291,7 @@ For models with multiple random effects, the variances are additive on the log s
 
 $$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
 
-**This is not a model deficiency:** it is a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+**This is not a model deficiency:** Rather, it is a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
 
 #### When does Jensen bias matter? Substantive vs nuisance random effects
 
@@ -306,7 +306,7 @@ Whether Jensen bias is consequential for a given analysis depends critically on 
 
 **Nuisance random effects** capture study-specific variation that is not relevant to forward predictions or generalization. For these, marginalizing over the RE is conceptually correct and the Jensen bias is largely irrelevant:
 
--   Year random effects capturing inte-rannual variation during a study period: not meaningful when predicting to future years or simulating counts under specified covariate conditions
+-   Year random effects capturing inter-annual variation during a study period: not meaningful when predicting to future years or simulating counts under specified covariate conditions
 -   Observer random effects capturing individual variation in detection: not relevant when predicting to new observers
 -   Overdispersion random effects (OLREs): capture residual heterogeneity not attributable to any substantive grouping factor
 -   Batch or run random effects in laboratory studies: study-specific, not generalizable
