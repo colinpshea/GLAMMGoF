@@ -92,7 +92,7 @@
 #' @importFrom lme4 glmer lmer glmer.nb
 #' @importFrom MASS glm.nb
 #' @importFrom mgcv gam predict.gam
-#' @importFrom stats complete.cases formula predict
+#' @importFrom stats complete.cases formula predict sigma
 #' @export
 bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000,
@@ -166,6 +166,21 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   is_glm     <- "glm"      %in% mc && !is_gam
   is_lm      <- "lm"       %in% mc && !is_gam && !is_glm
 
+  # --- Detect a natural-log-transformed response (lognormal models) ---
+  # A lognormal model (log(y) ~ .) is Gaussian on the log scale, so predict()
+  # returns the mean on the LOG scale: predictions must be exponentiated before
+  # comparison with the original-scale response, and the correction adds the
+  # residual variance to the RE variance. Detection keys on the formula LHS,
+  # never on family/link, so gaussian(link = "log") (bare LHS, untransformed
+  # response) is NOT treated as lognormal and correctly receives no residual term.
+  logresp      <- .detect_log_response(testModel)
+  is_lognormal <- isTRUE(logresp$natural)
+  if (logresp$logged && !is_lognormal)
+    stop("bias_precision() supports natural-log response transforms only; the ",
+         "formula uses '", logresp$base, "'. The back-transformation and its ",
+         "variance scaling differ for other bases - refit on the natural-log ",
+         "scale (log(y) ~ .).")
+
   # --- conditional_predictions message (after model class flags defined) ---
   if (conditional_predictions && (is_glmmTMB || is_glmer || is_lmer)) {
     if (bias_adjust == "manual")
@@ -194,6 +209,14 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
          "Use bias_adjust = 'manual' instead, or refit your model in glmmTMB to ",
          "access the TMB correction. See ?bias_precision for details.")
 
+  # --- Validate bias_adjust = "tmb" for lognormal models ---
+  if (bias_adjust == "tmb" && is_lognormal)
+    stop("bias_adjust = 'tmb' does not apply to lognormal (log-transformed ",
+         "response) models: TMB's bias correction integrates over the random ",
+         "effects but does not include the residual retransformation term, so it ",
+         "would under-correct. Use bias_adjust = 'manual', which applies ",
+         "exp((sigma^2_resid + sum(sigma^2_RE)) / 2).")
+
   # --- Pre-compute GAM RE metadata (once, outside loop) ---
   gam_re_labels <- NULL
   gam_re_terms  <- NULL
@@ -207,30 +230,27 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   # --- Pre-compute manual bias correction factor from full-data model (once, outside loop) ---
   # If correction_factor is supplied by the user (e.g. in simulation contexts where the
-  # true sigma^2 is known), use it directly. Otherwise compute from VarCorr(testModel).
-  # Using testModel's VarCorr rather than each resample's refitted model avoids
-  # unstable correction factors at high RE variance where training subsets
-  # produce noisy sigma^2 estimates that inflate exp(sigma^2/2) dramatically.
-  # lme4 VarCorr returns a named list where stddev is stored as an attribute.
-# cf_internal <- if (!is.null(correction_factor) && bias_adjust == "manual") {
-#   correction_factor   # use supplied value directly
-# } else if (bias_adjust == "manual" && is_glmmTMB) {
-#   re_vars <- sapply(VarCorr(testModel)$cond, function(vc) vc[1, 1])
-#   exp(sum(re_vars) / 2)
-# } else if (bias_adjust == "manual" && (is_glmer || is_lmer)) {
-#   re_vars <- sapply(VarCorr(testModel), function(vc) attr(vc, "stddev")^2)
-#   exp(sum(re_vars) / 2)
-# } else {
-#   1
-# }
+  # true sigma^2 is known), use it directly. Otherwise compute it once from testModel
+  # via the shared .re_variance_sum() helper (and sigma() for the lognormal residual).
+  # Using testModel rather than each resample's refitted model avoids unstable
+  # correction factors at high RE variance where training subsets produce noisy
+  # variance estimates that inflate exp(V/2) dramatically.
+  #
+  # V = sum of RE intercept variances (all RE models) + residual variance (lognormal
+  # only). The residual term is what makes a log(y) ~ . model doubly biased; it is
+  # omitted for log-link models, where the residual sits outside exp(). This branch
+  # also covers no-RE lognormal fits (lm / glm), for which re_var = 0 and the
+  # correction reduces to exp(sigma^2_resid / 2).
   cf_internal <- if (!is.null(correction_factor) && bias_adjust == "manual") {
     correction_factor   # use supplied value directly
-  } else if (bias_adjust == "manual" && is_glmmTMB) {
-    re_vars <- sapply(VarCorr(testModel)$cond, function(vc) vc[1, 1])
-    exp(sum(re_vars) / 2)
-  } else if (bias_adjust == "manual" && (is_glmer || is_lmer)) {
-    re_vars <- sapply(VarCorr(testModel), function(vc) attr(vc, "stddev")^2)
-    exp(sum(re_vars) / 2)
+  } else if (bias_adjust == "manual") {
+    rev_full <- .re_variance_sum(testModel)
+    if (rev_full$slopes)
+      warning("Random slopes detected; bias_adjust = 'manual' uses intercept ",
+              "variances only and is approximate. For random-slope models use ",
+              "bias_adjust = 'tmb' (glmmTMB). See ?bias_precision.")
+    resid_var <- if (is_lognormal) sigma(testModel)^2 else 0
+    exp((rev_full$re_var + resid_var) / 2)
   } else {
     1
   }
@@ -278,6 +298,28 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # predictions for population-level generalization assessment.
 
   get_preds_base <- function(m, newdata) {
+    # --- Lognormal (log(y) ~ .): predict() returns the mean on the LOG scale ---
+    # The response is Gaussian on the log scale (identity link), so predict()
+    # gives the log-scale mean regardless of backend. Back-transform with exp()
+    # to the original response scale, then apply the correction factor
+    # (residual + RE variance via cf_internal when bias_adjust = "manual"; 1
+    # otherwise). This runs before the branches below so the log-scale-vs-
+    # original-scale mismatch is resolved for every lognormal backend, including
+    # no-RE lm / glm fits.
+    if (is_lognormal) {
+      reform <- if (conditional_predictions) NULL else ~0
+      if (is_glmmTMB) {
+        eta <- predict(m, type = "response", newdata = newdata,
+                       re.form = reform, allow.new.levels = TRUE)
+      } else if (is_glmer || is_lmer) {
+        eta <- predict(m, newdata = newdata, re.form = reform,
+                       allow.new.levels = TRUE)
+      } else {
+        eta <- predict(m, newdata = newdata)          # lm / glm (no random effects)
+      }
+      return(exp(eta) * cf_internal)
+    }
+
     if (is_glmmTMB) {
       if (conditional_predictions) {
         predict(m, type = "response", newdata = newdata,
@@ -393,7 +435,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # Triggered when both in- and out-of-sample RBIAS are consistently negative,
   # which is the signature of marginal prediction bias from strong random effects
   # on a nonlinear link scale. Only fires when bias_adjust = "none" and verbose = TRUE.
-  if (verbose && bias_adjust == "none" && is_glmmTMB) {
+  if (verbose && bias_adjust == "none" && (is_glmmTMB || is_lognormal)) {
     rbias_summary <- results_summary[results_summary$Metric == "RBIAS", ]
     both_negative <- all(rbias_summary$mn < -10)
     if (both_negative) {
