@@ -273,17 +273,148 @@ $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
 where $\sigma^2$ is the total random effect variance. In other words, $\exp(\beta_0)$ , the typical marginal prediction, underestimates the true arithmetic mean by a factor of $\exp(\sigma^2/2)$.
 
-This bias is directly analogous to the well-known log-normal back-transformation bias. The math is identical; the only difference is where the log-scale variance comes from:
+This bias is directly analogous to the well-known log-normal back-transformation
+bias. The math is identical; the only difference is which variance components sit
+on the log scale, *inside* the back-transformation:
 
-|   | Log-normal model | Log-link GLMM |
-|:-----------------------|:-----------------------|:-----------------------|
-| Model structure | $\log(Y) \sim \text{Normal}(X\beta, \sigma^2)$ | $\log(\mu_{ij}) = X\beta + u_j$, $u_j \sim \text{Normal}(0, \sigma^2)$ |
-| Log-scale variance | Residual $\sigma^2$ | Random effect variance $\sigma^2$ |
-| Naive back-transform | $\exp(X\beta)$ | $\exp(X\beta)$ |
-| True arithmetic mean | $\exp(X\beta + \sigma^2/2)$ | $\exp(X\beta + \sigma^2/2)$ |
-| Correction factor | $\exp(\sigma^2/2)$ | $\exp(\sigma^2/2)$ |
+|  | Log-normal LM | Log-link GLMM | Log-normal LMM |
+|:---|:---|:---|:---|
+| Model structure | $\log(Y_i) \sim \text{Normal}(X\beta, \sigma^2_\varepsilon)$ | $\log(\mu_{ij}) = X\beta + u_j$, $u_j \sim \text{Normal}(0, \sigma^2_u)$ | $\log(Y_{ij}) \sim \text{Normal}(X\beta + u_j, \sigma^2_\varepsilon)$ |
+| Log-scale variance | Residual $\sigma^2_\varepsilon$ | Random effect $\sigma^2_u$ | **Both:** $\sigma^2_\varepsilon + \sigma^2_u$ |
+| Naive back-transform | $\exp(X\beta)$ | $\exp(X\beta)$ | $\exp(X\beta)$ |
+| True arithmetic mean | $\exp(X\beta + \sigma^2_\varepsilon/2)$ | $\exp(X\beta + \sigma^2_u/2)$ | $\exp(X\beta + (\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
+| Correction factor | $\exp(\sigma^2_\varepsilon/2)$ | $\exp(\sigma^2_u/2)$ | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
 
-In the log-normal case, the log-scale variance is the residual variance and the correction is widely known. In the log-link GLMM case, the log-scale variance is the random effect variance and the same correction applies; however, this connection seems to be rarely made explicit in ecological statistics training. It follows that log-normal models with random effects are subject to both sources of bias simultaneously (residual variance and random effect variance), requiring a combined correction of $\exp((\sigma^2_{residual} + sigma^2_{random effect}) / 2)$, where both variance components are additive on the natural log scale. A fixed-effects GLM with a log link has no random component on the linear predictor and therefore no Jensen bias; $\exp(\beta_0)$ is exactly the arithmetic mean.
+In the log-normal LM case, the log-scale variance is the residual variance and the
+correction is widely known. In the log-link GLMM case, the log-scale variance is
+the random effect variance and the same correction applies; however, this
+connection seems to be rarely made explicit in ecological statistics training.
+
+The third column is where the two meet. A log-normal model *with* random effects
+is subject to both sources of bias simultaneously, because both the residual error
+and the random effects are additive on the log scale and therefore both sit inside
+the exponential. The correction is
+$\exp((\sigma^2_{\varepsilon} + \sigma^2_{u}) / 2)$, and omitting the residual
+term is a common and consequential mistake: residual variance is typically the
+*larger* of the two components, so a correction built from `VarCorr()` alone can
+recover only a fraction of the bias while appearing to have addressed it. A
+fixed-effects GLM with a log link has no random component on the linear predictor
+and therefore no Jensen bias at all; $\exp(\beta_0)$ is exactly the arithmetic
+mean.
+
+#### Which correction applies? Log *link* vs log *response*
+
+The single most important distinction is whether the log appears as a **link
+function** or as a **transformation of the response**, because this determines
+whether the residual variance sits inside or outside the back-transformation. The
+family alone does not tell you: a Gaussian model can appear on either side of this
+line.
+
+| Model | Formula | Residual is additive on... | Correction |
+|:---|:---|:---|:---|
+| Log-link GLM | `y ~ x, family = poisson` | (no log-scale random component) | none needed |
+| Log-link GLMM | `y ~ x + (1\|site), family = nbinom2` | response scale | $\exp(\sigma^2_u/2)$ |
+| Gaussian log **link** | `y ~ x + (1\|site), family = gaussian("log")` | response scale | $\exp(\sigma^2_u/2)$ |
+| Log-normal LM | `log(y) ~ x` | **log scale** | $\exp(\sigma^2_\varepsilon/2)$ |
+| Log-normal LMM | `log(y) ~ x + (1\|site)` | **log scale** | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
+
+The fourth row is the trap. `gaussian(link = "log")` and `log(y) ~ x` are easy to
+conflate - both involve a Gaussian likelihood and an exponential - but they are
+different models. With a log link the response is untransformed and the residual
+error is additive on the *response* scale, outside $\exp()$, so it contributes
+nothing to the retransformation bias. With a log-transformed response the residual
+error is additive on the *log* scale, inside $\exp()$, so it contributes fully.
+
+`GLAMMGoF` resolves this automatically by inspecting the left-hand side of the
+model formula rather than the family or link, so both cases are handled correctly
+without user intervention. Only a natural log is supported; `log10()`, `log2()`,
+and `log1p()` responses are rejected with an informative error, since each implies
+a different back-transformation.
+
+One case cannot be resolved automatically: a response that was log-transformed
+*before* fitting and stored as its own column (e.g. `logy ~ x`). The formula gives
+no indication that a transformation occurred, so `jensen_correct()` stops with an
+error rather than guessing. Pass `type = "lognormal"` explicitly in that situation:
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+countData$log_y <- log(countData$y)
+m_precomputed   <- lm(log_y ~ Temp, data = countData)
+
+jensen_correct(m_precomputed)                      # error: transformation not visible
+jensen_correct(m_precomputed, type = "lognormal")  # correct: exp(sigma^2_resid / 2)
+```
+
+#### A worked example: the doubly-biased case
+
+The example below simulates data from a log-normal LMM with known variance
+components, then compares the naive back-transform against the correction built
+from the random effect variance alone and the full correction including the
+residual term.
+
+```{r, warning=FALSE, message=FALSE, comment=NA}
+library(glmmTMB)
+
+set.seed(42)
+n_site <- 40; n_per <- 25
+site   <- factor(rep(seq_len(n_site), each = n_per))
+u      <- rnorm(n_site, 0, 0.5)                      # RE sd      = 0.5
+x      <- rnorm(n_site * n_per)
+logy   <- 2 + 0.3 * x + u[as.integer(site)] +
+          rnorm(n_site * n_per, 0, 0.6)              # residual sd = 0.6
+lnDat  <- data.frame(y = exp(logy), x = x, site = site)
+
+m_ln <- glmmTMB(log(y) ~ x + (1 | site), family = gaussian, data = lnDat)
+
+s2_u   <- VarCorr(m_ln)$cond$site[1, 1]              # random effect variance
+s2_eps <- sigma(m_ln)^2                              # residual variance
+
+naive     <- exp(predict(m_ln, type = "link", re.form = ~0))
+re_only   <- naive * exp(s2_u / 2)                   # incomplete correction
+corrected <- naive * jensen_correct(m_ln)            # exp((s2_eps + s2_u) / 2)
+
+data.frame(
+  quantity = c("Observed mean of y", "Naive back-transform",
+               "Corrected: RE variance only", "Corrected: RE + residual"),
+  value    = round(c(mean(lnDat$y), mean(naive),
+                     mean(re_only), mean(corrected)), 2)
+)
+```
+
+The naive back-transform recovers the geometric mean and underestimates the
+arithmetic mean substantially. The RE-only correction closes part of the gap,
+which is what makes it dangerous: the result moves in the right direction and
+looks plausible, but a sizeable bias remains because the residual variance here is
+larger than the random effect variance. Only the full correction recovers the
+observed mean.
+
+`bias_precision()` applies the same correction internally when
+`bias_adjust = "manual"` is used with a log-transformed response, and reports
+predictive performance on the original response scale:
+
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+bp_ln_none <- bias_precision(nReps = 100, testModel = m_ln, testData = lnDat,
+                             method = "holdout", DHARMaPlot = FALSE,
+                             bias_adjust = "none", seed = 123)
+
+bp_ln_man  <- bias_precision(nReps = 100, testModel = m_ln, testData = lnDat,
+                             method = "holdout", DHARMaPlot = FALSE,
+                             bias_adjust = "manual", seed = 123)
+
+bp_ln_none$bias_precision_summary   # RBIAS strongly negative
+bp_ln_man$bias_precision_summary    # RBIAS pulled toward zero
+```
+
+Two limitations apply to log-normal models specifically. First,
+`bias_adjust = "tmb"` is not available: TMB's bias correction integrates over the
+random effects but does not include the residual retransformation term, so it
+would under-correct; `bias_adjust = "manual"` is the correct choice and an
+informative error is thrown otherwise. Second, `conditional_predictions = TRUE`
+remains incompatible with `bias_adjust = "manual"`. Note that the reasoning
+differs slightly from the log-link case: conditional predictions absorb the random
+effect contribution but *not* the residual contribution, since the residual is
+always marginalized. A conditional log-normal prediction therefore still requires
+a residual-only correction of $\exp(\sigma^2_\varepsilon/2)$, which is not
+currently implemented.
 
 This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
 
