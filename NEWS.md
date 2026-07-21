@@ -1,6 +1,7 @@
 # GLAMMGoF 1.1.4
 
 * Bumped to 1.1.4
+* Ehanced support for lognormal models (log transformed response with Gaussian distribution) and Gaussian models with a log link function. 
 
 # GLAMMGoF 1.1.3
 
