@@ -1,6 +1,6 @@
 Package: GLAMMGoF
 Title: Resampling-Based Predictive Validation for Generalized Linear and Generalized Additive Models
-Date: 2026-07-08
+Date: 2026-07-22
 URL: https://github.com/colinpshea/glammgof
 Version: 1.2.0
 Authors@R: 
