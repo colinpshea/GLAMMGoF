@@ -1,8 +1,8 @@
-# GLAMMGoF 1.1.5
+# GLAMMGoF 1.2.0
 
 ## New features
 
-* Bumped to 1.1.5
+* Bumped to 1.2.0
 
 * `jensen_correct()` now supports lognormal models (a natural-log-transformed
   response, `log(y) ~ .`), applying the combined correction

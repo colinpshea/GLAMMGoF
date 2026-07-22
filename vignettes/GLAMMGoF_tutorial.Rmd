@@ -549,7 +549,7 @@ The following general workflow is recommended for log-link GLMMs with random eff
 
 #### Error messages when using `bias_precision()`
 
-For obvious reasons, the code below will cause `bias_precision` quit and throw an error message:
+For obvious reasons, the code below will cause `bias_precision` to quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
@@ -561,7 +561,7 @@ try(bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitDat
 
 #### Error messages when using `brier_auc()`
 
-For equally obvious reasons, the code below will cause `brier_auc` quit and throw an error message:
+For equally obvious reasons, the code below will cause `brier_auc` to quit and throw an error message:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 brier_auc(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
