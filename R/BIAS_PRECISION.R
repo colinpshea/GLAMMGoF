@@ -258,7 +258,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     # RE-only factor, so warn rather than silently applying it. jensen_correct()
     # errors on the same ambiguity; here a warning is used because the run is
     # still informative and the user may have supplied correction_factor.
-    if (!is_lognormal && rev_full$re_var > 0) {
+    if (!is_lognormal) {
       fam_full <- tryCatch(family(testModel), error = function(e) NULL)
       if (!is.null(fam_full) &&
           identical(fam_full$link, "identity") &&
@@ -266,13 +266,16 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
         warning(
           "Identity link with an untransformed Gaussian response detected, but ",
           "bias_adjust = 'manual' was requested. It cannot be determined from ",
-          "the formula whether the response was log-transformed before fitting.\n",
-          "  * If this is an ordinary linear mixed model, no retransformation ",
-          "bias exists and the correction exp(sum(sigma^2_RE) / 2) is ",
-          "unwarranted - use bias_adjust = 'none'.\n",
-          "  * If the response is a pre-computed log column (e.g. 'logy'), a ",
-          "correction is warranted but the one applied here is incomplete: the ",
-          "residual variance is not included. Refit as log(y) ~ . so the ",
+          "the formula whether the response was log-transformed before ",
+          "fitting, so the correction applied here is exp(sum(sigma^2_RE) / 2), ",
+          "which excludes any residual term and equals 1 when the model has no ",
+          "random effects.\n",
+          " * If this is an ordinary linear or linear mixed model, no ",
+          "retransformation bias exists and no correction is warranted - use ",
+          "bias_adjust = 'none'.\n",
+          " * If the response is a pre-computed log column (e.g. 'logy'), the ",
+          "correction applied is incomplete or absent because the residual ",
+          "variance cannot be detected. Refit as log(y) ~ . so the ",
           "transformation is visible, or supply correction_factor = ",
           "exp((sigma^2_resid + sum(sigma^2_RE)) / 2) directly."
         )
