@@ -1,7 +1,96 @@
+# GLAMMGoF 1.1.5
+
+## New features
+
+* Bumped to 1.1.5
+
+* `jensen_correct()` now supports lognormal models (a natural-log-transformed
+  response, `log(y) ~ .`), applying the combined correction
+  `exp((sigma^2_residual + sum(sigma^2_RE)) / 2)`. Because both the residual
+  error and the random effects are additive on the log scale, lognormal mixed
+  models are subject to retransformation bias from both sources simultaneously;
+  a correction built from `VarCorr()` alone recovers only part of the bias.
+
+* `jensen_correct()` gains a `type` argument (`"auto"`, `"log_link"`,
+  `"lognormal"`). The default, `"auto"`, resolves the appropriate correction by
+  inspecting the response transformation in the model formula. Set
+  `type = "lognormal"` explicitly when the response was log-transformed before
+  fitting and stored as its own column (e.g. `logy ~ x`), where the
+  transformation is invisible to the formula parser.
+
+* `jensen_correct()` now accepts `lm` and `glm` objects in addition to `glmmTMB`
+  and `lme4` fits, supporting lognormal models without random effects
+  (correction `exp(sigma^2_residual / 2)`).
+
+* `bias_precision()` now supports lognormal models. Predictions are
+  back-transformed to the original response scale before metrics are computed,
+  and `bias_adjust = "manual"` applies the combined residual + random-effect
+  correction.
+
+* Detection of log-transformed responses keys on the left-hand side of the model
+  formula rather than the family or link, so `gaussian(link = "log")` (log link,
+  untransformed response, residual additive on the response scale) is correctly
+  distinguished from `log(y) ~ .` (log-transformed response, residual additive
+  on the log scale) and receives no residual term.
+
+## Behavior changes
+
+* **Results for lognormal models will change substantially.** Previously,
+  `bias_precision()` compared predictions from a `log(y) ~ .` model against the
+  untransformed response, so predictions on the log scale were evaluated against
+  observations on the original scale. The resulting RRMSE, RMAE, RMedAE, and
+  RBIAS values were not meaningful. Predictions are now correctly
+  back-transformed. Any previously reported metrics for log-transformed-response
+  models should be regarded as invalid and recomputed.
+
+* `jensen_correct()` now throws an informative error, rather than returning a
+  correction factor, when passed a model with an identity link and an
+  untransformed Gaussian response (e.g. `lmer(y ~ x + (1 | site))`). No
+  retransformation bias exists for such models and the previously returned
+  factor was not meaningful. This case cannot be distinguished automatically
+  from a pre-logged response column; pass `type = "lognormal"` if the response
+  is in fact on the log scale.
+
+* For `lme4` models with random slopes, `jensen_correct()` now uses the random
+  intercept variance only, and issues a warning. Previously all diagonal
+  standard deviations, including slope terms, were summed. Results are unchanged
+  for random-intercept models. The scalar correction is not valid for random
+  slopes in either case, since the variance of the linear predictor then depends
+  on the covariate; use `bias_adjust = "tmb"` or
+  `predict(., do.bias.correct = TRUE)`.
+
+* `bias_adjust = "manual"` in `bias_precision()` now warns when random slopes
+  are detected, consistent with `jensen_correct()`.
+
+* Responses transformed with a non-natural logarithm (`log10()`, `log2()`,
+  `log1p()`, or `log(x, base = )`) are now rejected with an informative error in
+  both functions, since each implies a different back-transformation.
+
+* `bias_adjust = "tmb"` now throws an error for lognormal models. TMB's bias
+  correction integrates over the random effects but does not include the
+  residual retransformation term, so it would under-correct. Use
+  `bias_adjust = "manual"`.
+
+## Documentation
+
+* The vignette gains a decision table distinguishing log-*link* models from
+  log-transformed *responses*, and a worked example demonstrating that a
+  correction built from random effect variance alone leaves substantial residual
+  bias in a lognormal mixed model.
+
+## Known limitations
+
+* `conditional_predictions = TRUE` remains incompatible with
+  `bias_adjust = "manual"`. For lognormal models the reasoning differs from the
+  log-link case: conditional predictions absorb the random effect contribution
+  but not the residual contribution, so a residual-only correction of
+  `exp(sigma^2_residual / 2)` would still be required. This is not yet
+  implemented.
+
+
 # GLAMMGoF 1.1.4
 
 * Bumped to 1.1.4
-* Ehanced support for lognormal models (log transformed response with Gaussian distribution) and Gaussian models with a log link function. 
 
 # GLAMMGoF 1.1.3
 

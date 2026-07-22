@@ -302,6 +302,14 @@ fixed-effects GLM with a log link has no random component on the linear predicto
 and therefore no Jensen bias at all; $\exp(\beta_0)$ is exactly the arithmetic
 mean.
 
+This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
+
+For models with multiple random effects, the variances are additive on the log scale:
+
+$$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
+
+**This is not a model deficiency:** Rather, it is a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+
 #### Which correction applies? Log *link* vs log *response*
 
 The single most important distinction is whether the log appears as a **link
@@ -330,19 +338,6 @@ model formula rather than the family or link, so both cases are handled correctl
 without user intervention. Only a natural log is supported; `log10()`, `log2()`,
 and `log1p()` responses are rejected with an informative error, since each implies
 a different back-transformation.
-
-One case cannot be resolved automatically: a response that was log-transformed
-*before* fitting and stored as its own column (e.g. `logy ~ x`). The formula gives
-no indication that a transformation occurred, so `jensen_correct()` stops with an
-error rather than guessing. Pass `type = "lognormal"` explicitly in that situation:
-
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-countData$log_y <- log(countData$y)
-m_precomputed   <- lm(log_y ~ Temp, data = countData)
-
-jensen_correct(m_precomputed)                      # error: transformation not visible
-jensen_correct(m_precomputed, type = "lognormal")  # correct: exp(sigma^2_resid / 2)
-```
 
 #### A worked example: the doubly-biased case
 
@@ -416,13 +411,19 @@ always marginalized. A conditional log-normal prediction therefore still require
 a residual-only correction of $\exp(\sigma^2_\varepsilon/2)$, which is not
 currently implemented.
 
-This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
+One case cannot be resolved automatically: a response that was log-transformed
+*before* fitting and stored as its own column. The formula then gives no
+indication that a transformation occurred, so `jensen_correct()` stops with an
+error rather than guessing. Pass `type = "lognormal"` explicitly in that
+situation:
 
-For models with multiple random effects, the variances are additive on the log scale:
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+lnDat$log_y   <- log(lnDat$y)
+m_precomputed <- lm(log_y ~ x, data = lnDat)
 
-$$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
-
-**This is not a model deficiency:** Rather, it is a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+jensen_correct(m_precomputed)                      # error: transformation not visible
+jensen_correct(m_precomputed, type = "lognormal")  # correct: exp(sigma^2_resid / 2)
+```
 
 #### When does Jensen bias matter? Substantive vs nuisance random effects
 
@@ -446,7 +447,7 @@ The general principle is: **if the random effect represents variation you would 
 
 #### Diagnosing and correcting Jensen's inequality bias
 
-`bias_precision()` provides a `bias_adjust` argument with three options for diagnosing and correcting Jensen's inequality bias in `glmmTMB` models. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
+`bias_precision()` provides a `bias_adjust` argument with three options for diagnosing and correcting Jensen's inequality bias. The `"manual"` correction is available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response; `"tmb"` is available for `glmmTMB` models only, and not for models fit to a log-transformed response. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
 
 **Step 1** - Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
 
@@ -458,7 +459,7 @@ chk_none <- bias_precision(nReps = 100, testModel = countModel_GLMM,
 chk_none$bias_precision_summary
 ```
 
-**Step 2** - Re-run with `bias_adjust = "manual"`. If RBIAS moves toward zero, Jensen's inequality is confirmed as the source of the negative bias rather than model misspecification or poor generalization. The analytical correction $\exp(\sigma^2/2)$ is applied to marginal predictions using the total random effect variance from `VarCorr()`.
+**Step 2** - Re-run with `bias_adjust = "manual"`. If RBIAS moves toward zero, Jensen's inequality is confirmed as the source of the negative bias rather than model misspecification or poor generalization. The analytical correction $\exp(V/2)$ is applied to marginal predictions, where $V$ is the sum of the variance components that are additive on the log scale. For a log-link model this is the total random effect variance from `VarCorr()`. For a model fit to a log-transformed response, the residual variance from `sigma()` is included as well, since it too sits inside the back-transformation.
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 # Step 2: analytical lognormal correction
@@ -478,7 +479,7 @@ chk_tmb <- bias_precision(nReps = 100, testModel = countModel_GLMM,
 chk_tmb$bias_precision_summary
 ```
 
-Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF. Note that although the calculations are explicitly written out below, GLAMMGoF has a `jensen_correct()` which provides a convenient wrapper for this calculation, accepting predictions, standard errors, and confidence interval bounds on the link or response scale (see ?jensen_correct for details):
+Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF. Note that although the calculations are explicitly written out below, GLAMMGoF has a `jensen_correct()` function which provides a convenient wrapper for this calculation, resolving the appropriate correction automatically from the model and accepting predictions, standard errors, and confidence interval bounds on the link or response scale (see ?jensen_correct for details):
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 # Manual lognormal correction (fast, reliable for random intercept models)
@@ -509,7 +510,7 @@ preds_corrected    <- preds_tmb[, "Est. (bias.correct)"]
 preds_se_corrected <- preds_tmb[, "Std. (bias.correct)"]
 ```
 
-Note that `bias_adjust = "manual"` is not supported for binomial models in `brier_auc()` since the analytical log-normal correction is only valid for log-link models. Use `bias_adjust = "tmb"` instead for binomial GLMMs.
+Note that `bias_adjust = "manual"` is not supported for binomial models in `brier_auc()`, since the analytical correction is only valid where predictions are back-transformed via the exponential - that is, for log-link and log-transformed-response models. Use `bias_adjust = "tmb"` instead for binomial GLMMs.
 
 #### Marginal vs conditional predictions: the `conditional_predictions` argument
 
@@ -534,17 +535,17 @@ The table below summarizes the behavior of each combination of `bias_adjust` and
 |:-----------------|:-----------------|:-----------------|:-----------------|
 | `"none"` (default) | `FALSE` (default) | Marginal | Population-level (i.e., ignore REs) generalization; Jensen signal visible in RBIAS |
 | `"manual"` | `FALSE` | Marginal + corrected | Population-level (i.e., ignore REs) generalization with analytical Jensen correction |
-| `"tmb"` | `FALSE` or `TRUE` | Corrected population-level | Corrected population-level marginal mean via TMB's AD; uses `re.form = NULL` internally as a computational requirement, not to obtain group-specific predictions |
+| `"tmb"` | `FALSE` or `TRUE` | Corrected population-level | Corrected population-level marginal mean via TMB's AD; uses `re.form = NULL` internally as a computational requirement, not to obtain group-specific predictions. Not available for models fit to a log-transformed response |
 | `"none"` | `TRUE` | Conditional | Within-group (i.e., predict to known RE groupings) accuracy; Jensen bias absorbed by REs |
 | `"manual"` | `TRUE` | ❌ Error | Double-correction - not permitted |
 
-For `brier_auc()`, the same logic applies with the exception that `bias_adjust = "manual"` is not available for binomial models regardless of `conditional_predictions`.
+For models fit to a log-transformed response (`log(y) ~ .`), `bias_adjust = "tmb"` throws an informative error: TMB's correction integrates over the random effects but omits the residual retransformation term, and would therefore under-correct. Use `bias_adjust = "manual"`, which includes both components. The `"manual"` + `conditional_predictions = TRUE` combination remains blocked for these models as well, though for a slightly different reason - conditional predictions absorb the random effect contribution but not the residual contribution, so a residual-only correction would still be required, and this is not currently implemented. For `brier_auc()`, the same logic applies with the exception that `bias_adjust = "manual"` is not available for binomial models regardless of `conditional_predictions`.
 
 The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above. Note that there is currently no option to obtain truly marginal, TMB-corrected predictions, since the TMB correction is mathematically tied to conditional prediction.
 
 #### Recommended workflow for inference and predictions
 
-The following general workflow is recommended for log-link GLMMs with random effects. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
+The following general workflow is recommended for log-link GLMMs with random effects, and applies equally to models fit to a log-transformed response. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
 
 #### Error messages when using `bias_precision()`
 
