@@ -249,6 +249,35 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
       warning("Random slopes detected; bias_adjust = 'manual' uses intercept ",
               "variances only and is approximate. For random-slope models use ",
               "bias_adjust = 'tmb' (glmmTMB). See ?bias_precision.")
+
+    # An identity-link Gaussian model with random effects is ambiguous: it is
+    # either an ordinary LMM (no retransformation, no bias, correction
+    # unwarranted) or a model fit to a pre-computed log column (correction
+    # warranted, but the residual term cannot be detected from the formula and
+    # is therefore missing). Neither case is correctly served by the default
+    # RE-only factor, so warn rather than silently applying it. jensen_correct()
+    # errors on the same ambiguity; here a warning is used because the run is
+    # still informative and the user may have supplied correction_factor.
+    if (!is_lognormal && rev_full$re_var > 0) {
+      fam_full <- tryCatch(family(testModel), error = function(e) NULL)
+      if (!is.null(fam_full) &&
+          identical(fam_full$link, "identity") &&
+          identical(fam_full$family, "gaussian"))
+        warning(
+          "Identity link with an untransformed Gaussian response detected, but ",
+          "bias_adjust = 'manual' was requested. It cannot be determined from ",
+          "the formula whether the response was log-transformed before fitting.\n",
+          "  * If this is an ordinary linear mixed model, no retransformation ",
+          "bias exists and the correction exp(sum(sigma^2_RE) / 2) is ",
+          "unwarranted - use bias_adjust = 'none'.\n",
+          "  * If the response is a pre-computed log column (e.g. 'logy'), a ",
+          "correction is warranted but the one applied here is incomplete: the ",
+          "residual variance is not included. Refit as log(y) ~ . so the ",
+          "transformation is visible, or supply correction_factor = ",
+          "exp((sigma^2_resid + sum(sigma^2_RE)) / 2) directly."
+        )
+    }
+
     resid_var <- if (is_lognormal) sigma(testModel)^2 else 0
     exp((rev_full$re_var + resid_var) / 2)
   } else {
@@ -435,7 +464,14 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # Triggered when both in- and out-of-sample RBIAS are consistently negative,
   # which is the signature of marginal prediction bias from strong random effects
   # on a nonlinear link scale. Only fires when bias_adjust = "none" and verbose = TRUE.
-  if (verbose && bias_adjust == "none" && (is_glmmTMB || is_lognormal)) {
+  jensen_plausible <- if (is_lognormal) {
+    TRUE
+  } else {
+    fam_diag <- tryCatch(family(testModel), error = function(e) NULL)
+    is_glmmTMB && !is.null(fam_diag) && !identical(fam_diag$link, "identity")
+  }
+
+  if (verbose && bias_adjust == "none" && jensen_plausible) {
     rbias_summary <- results_summary[results_summary$Metric == "RBIAS", ]
     both_negative <- all(rbias_summary$mn < -10)
     if (both_negative) {
