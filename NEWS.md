@@ -1,3 +1,9 @@
+# GLAMMGoF 1.2.1
+
+## New features
+
+* Bumped to 1.2.1
+
 # GLAMMGoF 1.2.0
 
 ## New features

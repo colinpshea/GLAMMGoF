@@ -325,10 +325,10 @@ line.
 | Model | Formula | Residual is additive on... | Correction |
 |:---|:---|:---|:---|
 | Log-link GLM | `y ~ x, family = poisson` | (no log-scale random component) | none needed |
-| Log-link GLMM | `y ~ x + (1\|site), family = nbinom2` | response scale | $\exp(\sigma^2_u/2)$ |
-| Gaussian log **link** | `y ~ x + (1\|site), family = gaussian("log")` | response scale | $\exp(\sigma^2_u/2)$ |
+| Log-link GLMM | `y ~ x + (1|site), family = nbinom2` | response scale | $\exp(\sigma^2_u/2)$ |
+| Gaussian log **link** | `y ~ x + (1|site), family = gaussian("log")` | response scale | $\exp(\sigma^2_u/2)$ |
 | Log-normal LM | `log(y) ~ x` | **log scale** | $\exp(\sigma^2_\varepsilon/2)$ |
-| Log-normal LMM | `log(y) ~ x + (1\|site)` | **log scale** | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
+| Log-normal LMM | `log(y) ~ x + (1|site)` | **log scale** | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
 
 The fourth row is the trap. `gaussian(link = "log")` and `log(y) ~ x` are easy to
 conflate - both involve a Gaussian likelihood and an exponential - but they are
