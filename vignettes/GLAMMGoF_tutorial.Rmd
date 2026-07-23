@@ -3,6 +3,10 @@ title: "GLAMMGoF Tutorial"
 output: 
   rmarkdown::html_document:
     toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 4  
     code_overflow: wrap
     number_sections: false
 vignette: >
@@ -22,7 +26,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-#### What does GLAMMGoF do?
+### What does GLAMMGoF do?
 
 `GLAMMGoF` is an R package for resampling-based predictive assessment of generalized linear and generalized additive models. The two main functions in the package, `bias_precision()` and `brier_auc()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to re-sampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `lmer()`, `glmer()`, and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics can also be performed using the `DHARMa` package.
 
@@ -38,7 +42,7 @@ Two resampling methods are available via the method argument: repeated random ho
 
 In general, `method = "holdout"` more closely reflects prediction to independent unseen observations and may be more intuitive for assessing generalization, whereas `method = "bootstrap"` makes more efficient use of the available data by evaluating performance on out-of-bag observations and may provide more stable estimates of predictive performance when sample sizes are small.
 
-#### Getting started
+### Getting started
 
 You've either downloaded and installed `GLAMMGoF` from R-universe, GitHub, DevOps, or a local zipped package file. Once installed, you can access the vignette by running `browseVignettes("GLAMMGoF")`. Note that `ggplot2` is a dependency, and functions from numerous other R packages are imported and used as well.
 
@@ -51,7 +55,7 @@ library(dplyr)
 library(tidyr)
 ```
 
-#### How is GLAMMGoF used?
+### How is GLAMMGoF used?
 
 There are only two functions in this package, and which one you use depends on the type of model being assessed:
 
@@ -265,7 +269,7 @@ And now look at a plot of the summaries
 br_auc$brier_auc_hist
 ```
 
-#### Jensen's inequality, random effects, and marginal predictions
+### Jensen's inequality, random effects, and marginal predictions
 
 When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward, and averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging (e.g., a bowl-shaped or exponential growth curve). This property is known as Jensen's inequality. For a log-link model with random effects, this means:
 
@@ -512,7 +516,7 @@ preds_se_corrected <- preds_tmb[, "Std. (bias.correct)"]
 
 Note that `bias_adjust = "manual"` is not supported for binomial models in `brier_auc()`, since the analytical correction is only valid where predictions are back-transformed via the exponential - that is, for log-link and log-transformed-response models. Use `bias_adjust = "tmb"` instead for binomial GLMMs.
 
-#### Marginal vs conditional predictions: the `conditional_predictions` argument
+### Marginal vs conditional predictions: the `conditional_predictions` argument
 
 By default, `bias_precision()` and `brier_auc()` use population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable - the most relevant question when predicting to new sites, new years, or new individuals.
 
@@ -543,11 +547,11 @@ For models fit to a log-transformed response (`log(y) ~ .`), `bias_adjust = "tmb
 
 The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above. Note that there is currently no option to obtain truly marginal, TMB-corrected predictions, since the TMB correction is mathematically tied to conditional prediction.
 
-#### Recommended workflow for inference and predictions
+### Recommended workflow for inference and predictions
 
 The following general workflow is recommended for log-link GLMMs with random effects, and applies equally to models fit to a log-transformed response. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
 
-#### Error messages when using `bias_precision()`
+### Error messages when using `bias_precision()`
 
 For obvious reasons, the code below will cause `bias_precision` to quit and throw an error message:
 
@@ -559,7 +563,7 @@ bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitData, p
 try(bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
 ```
 
-#### Error messages when using `brier_auc()`
+### Error messages when using `brier_auc()`
 
 For equally obvious reasons, the code below will cause `brier_auc` to quit and throw an error message:
 
