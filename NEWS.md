@@ -10,7 +10,7 @@
 
 * Bumped to 1.2.0
 
-* `jensen_correct()` now supports lognormal models (a natural-log-transformed
+* `jensen_correct()` now supports log-normal models (a natural-log-transformed
   response, `log(y) ~ .`), applying the combined correction
   `exp((sigma^2_residual + sum(sigma^2_RE)) / 2)`. Because both the residual
   error and the random effects are additive on the log scale, lognormal mixed
