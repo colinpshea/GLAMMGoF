@@ -8,8 +8,12 @@
 #   2. The residual term is added ONLY when the response is natural-log
 #      transformed - NOT for log-link models and NOT for gaussian(link = "log"),
 #      where the residual sits outside exp() (the "trap" regression tests).
-#   3. The new error paths fire (identity-link ambiguity, non-natural log base,
-#      tmb + lognormal).
+#   3. The new error paths fire (identity-link ambiguity, non-natural log base).
+#   4. bias_adjust = "tmb" is no longer a valid option (regression guard: the
+#      TMB path was removed in v1.3.0 after diagnostics showed that
+#      predict.glmmTMB(..., re.form = ~0, do.bias.correct = TRUE) does not
+#      apply a marginal-mean Jensen correction - glmmTMB itself warns that
+#      'bias.correct' does nothing without random effects on that call).
 #
 # Simulators are self-contained so the tests do not depend on the shipped
 # countData / countModel_* objects.
@@ -252,15 +256,20 @@ test_that("bias_adjust='manual' moves RBIAS toward zero for a lognormal model", 
   expect_lt(abs(out_rbias(man)), abs(out_rbias(none))) # correction pulls toward 0
 })
 
-test_that("bias_adjust='tmb' errors for lognormal models", {
+test_that("bias_adjust='tmb' is no longer a valid option (regression guard)", {
   skip_if_not_installed("glmmTMB")
 
+  # The TMB bias-correction path was removed in v1.3.0: diagnostics on the
+  # single-fit path showed predict.glmmTMB(..., re.form = ~0,
+  # do.bias.correct = TRUE) is a no-op ('bias.correct' does nothing without
+  # random effects), so the option no longer exists. match.arg() should
+  # reject "tmb" with a "should be one of" error.
   dat <- sim_lognormal(seed = 14, n_site = 30, n_per = 15)
   m   <- glmmTMB::glmmTMB(log(y) ~ x + (1 | site), family = gaussian, data = dat)
   expect_error(
     bias_precision(nReps = 5, testModel = m, testData = dat,
                    DHARMaPlot = FALSE, bias_adjust = "tmb", verbose = FALSE),
-    "lognormal")
+    "should be one of")
 })
 
 test_that("bias_precision rejects non-natural log responses", {

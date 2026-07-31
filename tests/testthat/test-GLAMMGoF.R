@@ -154,6 +154,17 @@ test_that("bias_precision works with bootstrap method", {
   )
 })
 
+test_that("bias_precision rejects bias_adjust = 'tmb' (regression guard)", {
+  # The TMB bias-correction path was removed in v1.3.0. match.arg() should
+  # reject "tmb" with a "should be one of" error.
+  expect_error(
+    bias_precision(nReps = 3, testModel = countModel_GLMM,
+                   testData = countData, DHARMaPlot = FALSE,
+                   bias_adjust = "tmb", verbose = FALSE, seed = 42),
+    "should be one of"
+  )
+})
+
 test_that("bias_precision manual correction moves RBIAS toward zero", {
   out_none <- bias_precision(nReps = 25, testModel = countModel_GLMM2,
                               testData = countData, DHARMaPlot = FALSE,
@@ -194,6 +205,17 @@ test_that("brier_auc errors for bias_adjust = 'manual'", {
     brier_auc(nReps = 3, testModel = logitModel_GLMM,
               testData = logitData, DHARMaPlot = FALSE,
               bias_adjust = "manual", seed = 42)
+  )
+})
+
+test_that("brier_auc rejects bias_adjust = 'tmb' (regression guard)", {
+  # The TMB bias-correction path was removed in v1.3.0. match.arg() should
+  # reject "tmb" with a "should be one of" error.
+  expect_error(
+    brier_auc(nReps = 3, testModel = logitModel_GLMM,
+              testData = logitData, DHARMaPlot = FALSE,
+              bias_adjust = "tmb", seed = 42),
+    "should be one of"
   )
 })
 

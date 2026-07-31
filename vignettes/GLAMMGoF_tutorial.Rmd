@@ -38,7 +38,7 @@ Both functions accept models with or without random effects. By default, predict
 
 Two resampling methods are available via the method argument: repeated random holdout (method = "holdout", the default), which repeatedly partitions the data into training and testing subsets and is intuitive and widely used; and bootstrap resampling with out-of-bag evaluation (method = "bootstrap"), which samples with replacement and tends to make more efficient use of the available data, particularly for smaller data sets.
 
-**Important note:** The functions in this package take an existing model fitted to the full data set and assess the predictive performance of that model structure through repeated resampling. In each replicate, the model is refit to a re-sampled training data set and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information available for inference, while resampling-based predictive assessment provides a practical way to evaluate generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited.
+**Important note:** The functions in this package take an existing model fitted to the full data set and assess the predictive performance of that model structure through repeated resampling. In each of `nReps` replicates, the model is refit to a re-sampled training data set and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information available for inference, while resampling-based predictive assessment provides a practical way to evaluate generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited.
 
 In general, `method = "holdout"` more closely reflects prediction to independent unseen observations and may be more intuitive for assessing generalization, whereas `method = "bootstrap"` makes more efficient use of the available data by evaluating performance on out-of-bag observations and may provide more stable estimates of predictive performance when sample sizes are small.
 
@@ -79,7 +79,7 @@ There are only two functions in this package, and which one you use depends on t
     fit_cost_rmedae  <- function(y, yhat) median(abs(yhat - y)) / mean(y) * 100
     ```
 
-    -   Taken together, these three statistics tell a more complete story than any one alone. If `RRMSE` is notably larger than `RMAE`, that signals a handful of high-leverage predictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
+-   Taken together, these three statistics tell a more complete story than any one alone. If `RRMSE` is notably larger than `RMAE`, that signals a handful of high-leverage predictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
 
 -   `RBIAS (Relative Bias)`: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic over-prediction and negative values indicate systematic under-prediction. `RBIAS` is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting `RBIAS` alongside `RRMSE` and `RMAE` therefore distinguishes random prediction noise from systematic directional error.
 
@@ -103,7 +103,7 @@ There are only two functions in this package, and which one you use depends on t
 
 -   Reporting all three together is recommended: `AUC` reflects whether the model correctly separates cases from non-cases; `Brier score` provides an overall summary of probability accuracy on a squared-error scale; and `log loss` highlights whether the model is making any dangerously overconfident errors that the `Brier score` might underweight.
 
-Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates. Results are stored across all replicates and reported as a summary table (mean and 95% confidence intervals) and a histogram of replicate values for each performance statistic, with a blue dotted vertical line indicating the mean across replicates. For `brier_auc()`, a red dashed vertical line is also displayed in the log loss panels, indicating the null (intercept-only) log loss baseline as a reference point for model comparison.
+Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates. Results are stored across all `nReps` replicates and reported as a summary table (mean and 95% confidence intervals) and a histogram of replicate values for each performance statistic, with a blue dotted vertical line indicating the mean across replicates. For `brier_auc()`, a red dashed vertical line is also displayed in the log loss panels, indicating the null (intercept-only) log loss baseline as a reference point for model comparison.
 
 Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets.
 
@@ -119,15 +119,13 @@ For zero-heavy count or continuous data, the choice of performance metric matter
 
 -   When combined with the `DHARMa` zero-inflation test (`testZI = TRUE`), these metrics provide a more complete assessment than any single measure alone. `RMedAE` or `RMAE` summarize predictive accuracy, while the ZI test evaluates whether the model correctly reproduces the observed frequency of zeros. A significant ZI test result with `ratioObsSim > 1` indicates that the model is underpredicting zeros, suggesting that a zero-inflated model family or additional sources of heterogeneity should be considered.
 
-This entire process is repeated `nReps` times, and the resulting sampling distributions of the performance metrics are summarized. Because `RRMSE`, `RMAE`, `RMedAE`, `RBIAS`, `AUC`, `Brier score`, and `log loss` quantify different aspects of predictive performance, they should be interpreted as complementary rather than interchangeable
-
 There are two example data sets, `countData` and `logitData`, with integer and binary response variables, respectively. Each data set also includes a variety of continuous and categorical predictor variables. Additionally, there are 12 example model objects (6 beginning with `count` and 6 beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible `R` packages
 
 #### Using the `bias_precision()` function
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer`, `glmer.nb`, and `lmer`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package).
+1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer`, `glmer.nb`, and `lmer`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package). The function will throw an informative error message if the wrong type of model is supplied. 
 
 2.  The only other choices you need to make are:
 
@@ -201,7 +199,7 @@ bp$bias_precision_hist
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is only a logistic regression with a binary response variable. Additionally, logistic regression models fit using the R packages `glmmTMB`, `lme4`, and `glm`/`lm` from the `stats` package are all supported.
+1.  Be sure you're using it with the correct model type, which in this case is only a logistic regression with a binary response variable. Additionally, logistic regression models fit using the R packages `glmmTMB`, `lme4`, and `glm`/`lm` from the `stats` package are all supported. The function will throw an informative error message if the wrong type of model is supplied. 
 
 2.  The only other choices you need to make are:
 
@@ -352,11 +350,11 @@ line.
 | Log-normal LM | `log(y) ~ x` | **log scale** | $\exp(\sigma^2_\varepsilon/2)$ |
 | Log-normal LMM | `log(y) ~ x + (1|site)` | **log scale** | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
 
-The fourth row is the trap. `gaussian(link = "log")` and `log(y) ~ x` are easy to
-conflate - both involve a Gaussian likelihood and an exponential - but they are
+`gaussian(link = "log")` and `log(y) ~ x` are easy to
+conflate, as both involve a Gaussian likelihood and an exponential, but they are
 different models. With a log link the response is untransformed and the residual
 error is additive on the *response* scale, outside $\exp()$, so it contributes
-nothing to the retransformation bias. With a log-transformed response the residual
+nothing to the re-transformation bias. With a log-transformed response the residual
 error is additive on the *log* scale, inside $\exp()$, so it contributes fully.
 
 `GLAMMGoF` resolves this automatically by inspecting the left-hand side of the
@@ -367,7 +365,7 @@ a different back-transformation.
 
 #### Diagnosing and correcting Jensen's inequality bias
 
-`bias_precision()` provides a `bias_adjust` argument with three options for diagnosing and correcting Jensen's inequality bias. The `"manual"` correction is available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response; `"tmb"` is available for `glmmTMB` models only, and not for models fit to a log-transformed response. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
+`bias_precision()` provides a `bias_adjust` argument with two options for diagnosing and correcting Jensen's inequality bias. The `"manual"` correction is available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
 
 **Step 1** - Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
 
@@ -389,16 +387,6 @@ chk_manual <- bias_precision(nReps = 100, testModel = countModel_GLMM,
 chk_manual$bias_precision_summary
 ```
 
-**Step 3 (optional)** - Re-run with `bias_adjust = "tmb"` to validate the manual correction using TMB's automatic differentiation. If manual and TMB agree closely, the analytical correction is reliable for your RE structure. Note that this step is considerably slower than Step 2.
-
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-# Step 3 (optional): TMB validation
-chk_tmb <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-                          testData = countData, method = "holdout",
-                          DHARMaPlot = FALSE, bias_adjust = "tmb", seed = 123)
-chk_tmb$bias_precision_summary
-```
-
 Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF. Note that although the calculations are explicitly written out below, GLAMMGoF has a `jensen_correct()` function which provides a convenient wrapper for this calculation, resolving the appropriate correction automatically from the model and accepting predictions, standard errors, and confidence interval bounds on the link or response scale (see ?jensen_correct for details):
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
@@ -414,25 +402,7 @@ preds_adjusted <- predict(countModel_GLMM, newdata = countData,
 preds_se   <- predict(countModel_GLMM, newdata = countData,
                       type = "response", re.form = ~0, se.fit = TRUE)$se.fit
 preds_se_adjusted <- preds_se * correction
-
-# TMB correction (handles random slopes and complex RE structures).
-# Unlike the manual correction, TMB automatically returns bias-corrected
-# standard errors alongside point estimates via automatic differentiation --
-# no additional scaling is needed.
-preds_tmb  <- predict(countModel_GLMM, newdata = countData,
-                      type = "response", re.form = ~0, do.bias.correct = TRUE)
-# preds_tmb is a matrix with columns:
-#   "Estimate"            -- uncorrected marginal prediction
-#   "Std. Error"          -- SE of uncorrected prediction
-#   "Est. (bias.correct)" -- bias-corrected prediction
-#   "Std. (bias.correct)" -- SE of bias-corrected prediction (use this one)
-preds_corrected    <- preds_tmb[, "Est. (bias.correct)"]
-preds_se_corrected <- preds_tmb[, "Std. (bias.correct)"]
 ```
-
-
-
-
 
 #### A worked example: the doubly-biased case
 
@@ -494,11 +464,7 @@ bp_ln_none$bias_precision_summary   # RBIAS strongly negative
 bp_ln_man$bias_precision_summary    # RBIAS pulled toward zero
 ```
 
-Two limitations apply to log-normal models specifically. First,
-`bias_adjust = "tmb"` is not available: TMB's bias correction integrates over the
-random effects but does not include the residual retransformation term, so it
-would under-correct; `bias_adjust = "manual"` is the correct choice and an
-informative error is thrown otherwise. Second, `conditional_predictions = TRUE`
+One limitation applies to log-normal models specifically: `conditional_predictions = TRUE`
 remains incompatible with `bias_adjust = "manual"`. Note that the reasoning
 differs slightly from the log-link case: conditional predictions absorb the random
 effect contribution but *not* the residual contribution, since the residual is
@@ -537,44 +503,19 @@ chk_cond$bias_precision_summary
 
 #### Summary of `bias_adjust` and `conditional_predictions` combinations
 
-The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. Note that `bias_adjust = "tmb"` uses `re.form = NULL` as a computational necessity so that TMB's automatic differentiation can access the RE variance structure; this is not a choice to make group-specific conditional predictions, and the output is still a corrected population-level marginal mean. This means `conditional_predictions` has no additional effect when `bias_adjust = "tmb"`; both settings produce the same TMB-corrected behavior. There are five distinct behaviors in total; the combination marked ❌ is blocked with an informative error.
+The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. There are four distinct behaviors in total; the combination marked ❌ is blocked with an informative error.
 
 | `bias_adjust` | `conditional_predictions` | Prediction type | What it measures |
 |:-----------------|:-----------------|:-----------------|:-----------------|
 | `"none"` (default) | `FALSE` (default) | Marginal | Population-level (i.e., ignore REs) generalization; Jensen signal visible in RBIAS |
 | `"manual"` | `FALSE` | Marginal + corrected | Population-level (i.e., ignore REs) generalization with analytical Jensen correction |
-| `"tmb"` | `FALSE` or `TRUE` | Corrected population-level | Corrected population-level marginal mean via TMB's AD; uses `re.form = NULL` internally as a computational requirement, not to obtain group-specific predictions. Not available for models fit to a log-transformed response |
 | `"none"` | `TRUE` | Conditional | Within-group (i.e., predict to known RE groupings) accuracy; Jensen bias absorbed by REs |
 | `"manual"` | `TRUE` | ❌ Error | Double-correction - not permitted |
 
-The `bias_adjust` and `conditional_predictions` restrictions for log-transformed-response models (no `"tmb"`; no `"manual"` with conditional predictions) are described in the worked example above. For `brier_auc()`, the same logic applies, except that `bias_adjust = "manual"` is not available for binomial models regardless of `conditional_predictions`: the analytical correction is only valid where predictions are back-transformed via the exponential (log-link and log-transformed-response models), so binomial GLMMs must use `bias_adjust = "tmb"`.
+The `bias_adjust` and `conditional_predictions` restrictions for log-transformed-response models (no `"manual"` with conditional predictions) are described in the worked example above. For `brier_auc()`, the same logic applies, except that `bias_adjust = "manual"` is not available for binomial models regardless of `conditional_predictions`: the analytical correction is only valid where predictions are back-transformed via the exponential (log-link and log-transformed-response models), and the logit link does not admit a closed-form scalar marginal-mean correction. No bias adjustment is currently supported for binomial GLMMs in `brier_auc()`; Brier score and log loss should be interpreted relative to the null model baseline that the function reports alongside the resampling summaries.
 
-The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above. Note that there is currently no option to obtain truly marginal, TMB-corrected predictions, since the TMB correction is mathematically tied to conditional prediction.
+The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above.
 
 ### Recommended workflow for inference and predictions
 
 The following general workflow is recommended for log-link GLMMs with random effects, and applies equally to models fit to a log-transformed response. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
-
-### Error messages when using `bias_precision()`
-
-For obvious reasons, the code below will cause `bias_precision` to quit and throw an error message:
-
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(bias_precision(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
-```
-
-### Error messages when using `brier_auc()`
-
-For equally obvious reasons, the code below will cause `brier_auc` to quit and throw an error message:
-
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-brier_auc(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
-try(brier_auc(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout"))
-```

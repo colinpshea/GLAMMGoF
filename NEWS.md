@@ -1,3 +1,36 @@
+# GLAMMGoF 1.3.0
+
+## Breaking changes
+
+* `bias_adjust = "tmb"` has been removed from `bias_precision()` and
+  `brier_auc()`. Diagnostics on the single-fit path revealed that
+  `predict.glmmTMB(..., re.form = ~0, do.bias.correct = TRUE)` does not
+  apply a marginal-mean Jensen correction: glmmTMB itself emits the
+  warning `'bias.correct' does nothing without random effects` on that
+  call, and the returned "bias-corrected" estimate is identical to the
+  raw marginal prediction. The option therefore ran expensive TMB
+  machinery for no effect. Users should use `bias_adjust = "manual"`
+  for log-link GLMMs and lognormal LMMs. For `brier_auc()`, no bias
+  correction is currently supported for binomial GLMMs: the logit link
+  does not admit a closed-form scalar marginal-mean correction.
+
+## Documentation
+
+* Random slopes note in `bias_precision()` rewritten to reflect that
+  `bias_adjust = "manual"` uses a scalar approximation for random-slope
+  models. The exact marginal correction under random slopes is
+  per-observation (`exp(x_i' Sigma x_i / 2)`) and is planned for a
+  future release. The scalar approximation is reasonable when slope
+  variance is small or covariates are centered near zero.
+
+* Recommended workflow, examples, and cross-references updated
+  throughout to remove the TMB path.
+
+## Tests
+
+* Regression guards added: `bias_adjust = "tmb"` now errors via
+  `match.arg()` in both `bias_precision()` and `brier_auc()`.
+
 # GLAMMGoF 1.2.1
 
 ## New features
