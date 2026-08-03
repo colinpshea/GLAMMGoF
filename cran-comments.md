@@ -45,8 +45,8 @@ misspellings:
 ## Notes to CRAN reviewers
 
 This is the first submission of GLAMMGoF to CRAN. The package is currently
-distributed via R-universe (https://cshea15.r-universe.dev/GLAMMGoF) and has
-been in active use by ecological researchers prior to this submission.
+distributed via R-universe (https://colinpshea.r-universe.dev/GLAMMGoF)
+and has been in active use by ecological researchers prior to this submission.
 
 The package provides resampling-based predictive validation for generalized
 linear and additive models, with particular support for detecting and correcting

@@ -30,7 +30,7 @@ knitr::opts_chunk$set(
 
 `GLAMMGoF` is an R package for resampling-based predictive assessment of generalized linear and generalized additive models. The two main functions in the package, `bias_precision()` and `brier_auc()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to re-sampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `lmer()`, `glmer()`, and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics can also be performed using the `DHARMa` package.
 
--   `bias_precision()` is intended for models with continuous or integer response variables (e.g., Gaussian, Poisson, negative binomial, Tweedie, or Gamma distributions) and returns relative root mean squared error (RRMSE), relative mean absolute error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS).
+-   `bias_precision()` is intended for models with continuous or integer response variables (e.g., gamma, Gaussian, negative binomial, Poisson, or Tweedie distributions) and returns relative root mean squared error (RRMSE), relative mean absolute error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS).
 
 -   `brier_auc()` is intended for models with binary response variables (i.e., logistic regression) and returns AUC, Brier score, and log loss.
 
@@ -38,9 +38,7 @@ Both functions accept models with or without random effects. By default, predict
 
 Two resampling methods are available via the method argument: repeated random holdout (method = "holdout", the default), which repeatedly partitions the data into training and testing subsets and is intuitive and widely used; and bootstrap resampling with out-of-bag evaluation (method = "bootstrap"), which samples with replacement and tends to make more efficient use of the available data, particularly for smaller data sets.
 
-**Important note:** The functions in this package take an existing model fitted to the full data set and assess the predictive performance of that model structure through repeated resampling. In each of `nReps` replicates, the model is refit to a re-sampled training data set and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information available for inference, while resampling-based predictive assessment provides a practical way to evaluate generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited.
-
-In general, `method = "holdout"` more closely reflects prediction to independent unseen observations and may be more intuitive for assessing generalization, whereas `method = "bootstrap"` makes more efficient use of the available data by evaluating performance on out-of-bag observations and may provide more stable estimates of predictive performance when sample sizes are small.
+**Important note:** The functions in this package take an existing model fitted to the full data set and assess the predictive performance of that model structure through repeated resampling. In each of `nReps` replicates, the model is refit to a re-sampled training data set and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information available for inference, while resampling-based predictive assessment provides a practical way to evaluate generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited. In general, `method = "holdout"` more closely reflects prediction to independent unseen observations and may be more intuitive for assessing generalization, whereas `method = "bootstrap"` makes more efficient use of the available data by evaluating performance on out-of-bag observations and may provide more stable estimates of predictive performance when sample sizes are small.
 
 ### Getting started
 
@@ -105,11 +103,7 @@ There are only two functions in this package, and which one you use depends on t
 
 Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates. Results are stored across all `nReps` replicates and reported as a summary table (mean and 95% confidence intervals) and a histogram of replicate values for each performance statistic, with a blue dotted vertical line indicating the mean across replicates. For `brier_auc()`, a red dashed vertical line is also displayed in the log loss panels, indicating the null (intercept-only) log loss baseline as a reference point for model comparison.
 
-Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets.
-
-Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training data set contains the same number of observations as the original data set, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller data sets, but is slightly less intuitive than the holdout approach.
-
-For well-behaved models and reasonably sized data sets, both methods should produce similar results. Differences are most likely to emerge with small data sets, highly overdispersed data, or poorly specified models.
+Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets. Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training data set contains the same number of observations as the original data set, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller data sets, but is slightly less intuitive than the holdout approach. For well-behaved models and reasonably sized data sets, both methods should produce similar results. Differences are most likely to emerge with small data sets, highly overdispersed data, or poorly specified models.
 
 #### A note about zero-inflated models
 
@@ -125,7 +119,7 @@ There are two example data sets, `countData` and `logitData`, with integer and b
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, Poisson, negative binomial, Tweedie, and gamma) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer`, `glmer.nb`, and `lmer`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package). The function will throw an informative error message if the wrong type of model is supplied. 
+1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, gamma, negative binomial, Poisson, or Tweedie) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer`, `glmer.nb`, and `lmer`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package). The function will throw an informative error message if the wrong type of model is supplied. 
 
 2.  The only other choices you need to make are:
 
@@ -165,7 +159,7 @@ knitr::kable(head(bp$bias_precision_summary, 8))
 
  
 
-And now look at a plot of the summaries
+And now look at a plot of the summaries...
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 bp$bias_precision_hist
@@ -189,7 +183,7 @@ bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate(across(c(mn, l
 knitr::kable(head(bp$bias_precision_summary, 8))
 ```
 
-And now look at a plot of the summaries
+And now look at a plot of the summaries...
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 bp$bias_precision_hist
@@ -239,7 +233,7 @@ knitr::kable(head(br_auc$brier_auc_summary, 9))
 
  
 
-And now look at a plot of the summaries
+And now look at a plot of the summaries...
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 br_auc$brier_auc_hist
@@ -263,7 +257,7 @@ br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr
 knitr::kable(head(br_auc$brier_auc_summary, 9))
 ```
 
-And now look at a plot of the summaries
+And now look at a plot of the summaries...
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 br_auc$brier_auc_hist
@@ -271,15 +265,13 @@ br_auc$brier_auc_hist
 
 ### Jensen's inequality, random effects, and marginal predictions
 
-When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward, and averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging (e.g., a bowl-shaped or exponential growth curve). This property is known as Jensen's inequality. For a log-link model with random effects, this means:
+When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward  (e.g., a bowl-shaped or exponential growth curve), and averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging. This property is known as Jensen's inequality. For a log-link model with random effects, this means:
 
 $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
 where $\sigma^2$ is the total random effect variance. In other words, $\exp(\beta_0)$ , the typical marginal prediction, underestimates the true arithmetic mean by a factor of $\exp(\sigma^2/2)$.
 
-This bias is directly analogous to the well-known log-normal back-transformation
-bias. The math is identical; the only difference is which variance components sit
-on the log scale, *inside* the back-transformation:
+This bias is directly analogous to the well-known log-normal back-transformation bias. The math is identical; the only difference is which variance components sit on the log scale, *inside* the back-transformation:
 
 |  | Log-normal LM | Log-link GLMM | Log-normal LMM |
 |:---|:---|:---|:---|
@@ -289,22 +281,9 @@ on the log scale, *inside* the back-transformation:
 | True arithmetic mean | $\exp(X\beta + \sigma^2_\varepsilon/2)$ | $\exp(X\beta + \sigma^2_u/2)$ | $\exp(X\beta + (\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
 | Correction factor | $\exp(\sigma^2_\varepsilon/2)$ | $\exp(\sigma^2_u/2)$ | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
 
-In the log-normal LM case, the log-scale variance is the residual variance and the
-correction is widely known. In the log-link GLMM case, the log-scale variance is
-the random effect variance and the same correction applies; however, this
-connection seems to be rarely made explicit in ecological statistics training.
+In the log-normal LM case, the log-scale variance is the residual variance and the correction is widely known. In the log-link GLMM case, the log-scale variance is the random effect variance and the same correction applies; however, this connection seems to be rarely made explicit in ecological statistics training.
 
-The third column is where the two meet. A log-normal model *with* random effects
-is subject to both sources of bias simultaneously, because both the residual error
-and the random effects are additive on the log scale and therefore both sit inside
-the exponential. The correction is
-$\exp((\sigma^2_{\varepsilon} + \sigma^2_{u}) / 2)$, and omitting the residual
-term is a common and consequential mistake: residual variance is typically the
-*larger* of the two components, so a correction built from `VarCorr()` alone can
-recover only a fraction of the bias while appearing to have addressed it. A
-fixed-effects GLM with a log link has no random component on the linear predictor
-and therefore no Jensen bias at all; $\exp(\beta_0)$ is exactly the arithmetic
-mean.
+The third column is where the two meet. A log-normal model *with* random effects is subject to both sources of bias simultaneously, because both the residual error and the random effects are additive on the log scale and therefore both sit inside the exponential. The correction is $\exp((\sigma^2_{\varepsilon} + \sigma^2_{u}) / 2)$, and omitting the residual term is a common and consequential mistake: residual variance is typically the *larger* of the two components, so a correction built from `VarCorr()` alone can recover only a fraction of the bias while appearing to have addressed it. A fixed-effects GLM with a log link has no random component on the linear predictor and therefore no Jensen bias at all; $\exp(\beta_0)$ is exactly the arithmetic mean.
 
 This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
 
@@ -312,7 +291,7 @@ For models with multiple random effects, the variances are additive on the log s
 
 $$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
 
-**This is not a model deficiency:** Rather, it is a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+**This is not a model deficiency** but rather a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
 
 #### When does Jensen bias matter? Substantive vs nuisance random effects
 
@@ -336,11 +315,8 @@ The general principle is: **if the random effect represents variation you would 
 
 #### Which correction applies? Log *link* vs log *response*
 
-The single most important distinction is whether the log appears as a **link
-function** or as a **transformation of the response**, because this determines
-whether the residual variance sits inside or outside the back-transformation. The
-family alone does not tell you: a Gaussian model can appear on either side of this
-line.
+The single most important distinction is whether the log appears as a **link function** or as a **transformation of the response**, because this determines
+whether the residual variance sits inside or outside the back-transformation. The family alone does not tell you: a Gaussian model can appear on either side of this line.
 
 | Model | Formula | Residual is additive on... | Correction |
 |:---|:---|:---|:---|
@@ -350,18 +326,9 @@ line.
 | Log-normal LM | `log(y) ~ x` | **log scale** | $\exp(\sigma^2_\varepsilon/2)$ |
 | Log-normal LMM | `log(y) ~ x + (1|site)` | **log scale** | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
 
-`gaussian(link = "log")` and `log(y) ~ x` are easy to
-conflate, as both involve a Gaussian likelihood and an exponential, but they are
-different models. With a log link the response is untransformed and the residual
-error is additive on the *response* scale, outside $\exp()$, so it contributes
-nothing to the re-transformation bias. With a log-transformed response the residual
-error is additive on the *log* scale, inside $\exp()$, so it contributes fully.
+`gaussian(link = "log")` and `log(y) ~ x` are easy to conflate, as both involve a Gaussian likelihood and an exponential, but they are different models. With a log link the response is untransformed and the residual error is additive on the *response* scale, outside $\exp()$, so it contributes nothing to the re-transformation bias. With a log-transformed response the residual error is additive on the *log* scale, inside $\exp()$, so it contributes fully.
 
-`GLAMMGoF` resolves this automatically by inspecting the left-hand side of the
-model formula rather than the family or link, so both cases are handled correctly
-without user intervention. Only a natural log is supported; `log10()`, `log2()`,
-and `log1p()` responses are rejected with an informative error, since each implies
-a different back-transformation.
+`GLAMMGoF` resolves this automatically by inspecting the left-hand side of the model formula rather than the family or link, so both cases are handled correctly without user intervention. Only a natural log is supported; `log10()` and `log2()` responses are rejected with an informative error, since each requires a different back-transformation.
 
 #### Diagnosing and correcting Jensen's inequality bias
 
@@ -440,12 +407,8 @@ data.frame(
 )
 ```
 
-The naive back-transform recovers the geometric mean and underestimates the
-arithmetic mean substantially. The RE-only correction closes part of the gap,
-which is what makes it dangerous: the result moves in the right direction and
-looks plausible, but a sizeable bias remains because the residual variance here is
-larger than the random effect variance. Only the full correction recovers the
-observed mean.
+The naive back-transform recovers the geometric mean and underestimates the arithmetic mean substantially. The RE-only correction closes part of the gap,
+which is what makes it dangerous: the result moves in the right direction and looks plausible, but a sizable bias remains because the residual variance here is larger than the random effect variance. Only the full correction recovers the observed mean.
 
 `bias_precision()` applies the same correction internally when
 `bias_adjust = "manual"` is used with a log-transformed response, and reports
@@ -464,19 +427,10 @@ bp_ln_none$bias_precision_summary   # RBIAS strongly negative
 bp_ln_man$bias_precision_summary    # RBIAS pulled toward zero
 ```
 
-One limitation applies to log-normal models specifically: `conditional_predictions = TRUE`
-remains incompatible with `bias_adjust = "manual"`. Note that the reasoning
-differs slightly from the log-link case: conditional predictions absorb the random
-effect contribution but *not* the residual contribution, since the residual is
-always marginalized. A conditional log-normal prediction therefore still requires
-a residual-only correction of $\exp(\sigma^2_\varepsilon/2)$, which is not
-currently implemented.
+One limitation applies to log-normal models specifically: `conditional_predictions = TRUE` remains incompatible with `bias_adjust = "manual"`. Note that the reasoning differs slightly from the log-link case: conditional predictions absorb the random effect contribution but *not* the residual contribution, since the residual is always marginalized. A conditional log-normal prediction therefore still requires a residual-only correction of $\exp(\sigma^2_\varepsilon/2)$, which is not currently implemented.
 
-One case cannot be resolved automatically: a response that was log-transformed
-*before* fitting and stored as its own column. The formula then gives no
-indication that a transformation occurred, so `jensen_correct()` stops with an
-error rather than guessing. Pass `type = "lognormal"` explicitly in that
-situation:
+One case cannot be resolved automatically: a response that was log-transformed *before* fitting and stored as its own column. The formula then gives no
+indication that a transformation occurred, so `jensen_correct()` stops with an error rather than guessing. Pass `type = "lognormal"` explicitly in that situation:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 lnDat$log_y   <- log(lnDat$y)
