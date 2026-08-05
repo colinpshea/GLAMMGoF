@@ -51,6 +51,7 @@ library(GLAMMGoF)
 ```{r, warning=FALSE, message = FALSE, comment=NA, echo=FALSE}
 library(dplyr)
 library(tidyr)
+library(patchwork)
 ```
 
 ### How is GLAMMGoF used?
@@ -373,19 +374,35 @@ preds_se_adjusted <- preds_se * correction
 
 #### A note about `holdout` vs `bootstrap` resampling methods when diagnosing and adjusting for Jensen's inequality bias
 
-Note on method choice for random-effect models: method = "holdout" is recommended over method = "bootstrap" when the model contains random effects with nontrivial variance components. Bootstrap resampling with replacement duplicates rows within re-sampled training sets. These duplicates appear to the model as within-group replicates, systematically inflating the estimated random-effect variance in refitted training models relative to the full-data fit. When bias_adjust = "manual" is used, the correction factor is computed once from the full-data model, so it under-corrects the inflated per-refit Jensen bias under bootstrap and leaves residual negative RBIAS in the output. This issue appears to be most pronounced in datasets with few observations per random-effect group, which is common in ecological sampling designs; it is particularly acute for balanced repeated-measures designs (e.g., a fixed number of sub-samples per site or subject), where case bootstrap with replacement generates duplicated rows that could not arise under the sampling design. In such cases, cluster bootstrap (resampling entire groups) or parametric bootstrap would be more appropriate resampling schemes; GLAMMGoF currently supports neither, so method = "holdout" is the recommended choice.
+Note on method choice for random-effect models: `method = "holdout"` is recommended over `method = "bootstrap"` when the design has few observations per random-effect group. Case bootstrap with replacement duplicates rows within re-sampled training sets, and these duplicates appear to the model as within-group replicates. When groups are sparse, each duplicated row has disproportionate leverage over that group's apparent within-group structure, systematically inflating the estimated random-effect variance in refitted training models relative to the full-data fit. When bias_adjust = "manual" is used, the correction factor is computed once from the full-data model and therefore under-corrects the inflated per-refit Jensen bias under bootstrap, leaving residual negative RBIAS in the output. The effect is largely independent of model specification; it appears in both correctly-specified and misspecified fits when groups are sparse, and diminishes substantially when groups have many observations regardless of specification. The issue is particularly acute for balanced repeated-measures designs (e.g., a fixed number of sub-samples per site or subject), where case bootstrap generates duplicated rows at rates and structures inconsistent with the sampling design. Cluster bootstrap (resampling entire groups) or parametric bootstrap would be more appropriate resampling schemes; `GLAMMGoF` currently supports neither, so `method = "holdout"` is the recommended choice.
 
+The figure below shows this pattern across a controlled simulation. Panel A shows out-of-sample RBIAS after Jensen correction; Panel B shows per-refit random-effect variance estimates. The bootstrap-vs-holdout divergence appears in both panels when groups are sparse (top row) and largely disappears when groups are dense (bottom row), across both correctly-specified and misspecified fits. 
 
-The implication for Jensen bias diagnostics in `bias_precision()` is direct: when bias_adjust = "manual", the analytical correction factor exp(V/2) is computed once from the full-data model and applied uniformly across resamples. Under `method = "holdout"`, this factor matches the per-refit random-effect variance closely, because holdout sub-sampling produces unbiased variance-component estimates. Under method = "bootstrap", the same static factor under-corrects the inflated per-refit Jensen bias, leaving residual negative RBIAS in the "manual" output. The "none" result is also more negative under bootstrap than holdout for the same reason; the true Jensen bias in each refit is larger.
+```{r bootstrap-figure, fig.width = 7, fig.height = 9, echo = FALSE}
 
-Holdout resampling therefore produces internally consistent behavior between `bias_adjust = "none"` and `bias_adjust = "manual"` and is the recommended method for the Jensen diagnostic workflow. Bootstrap resampling remains appropriate for GLMs and GAMs without random effects, for random-effect models with negligible variance components, and for applications where the primary interest is in overall predictive precision rather than in diagnosing marginal-mean bias. The choice between methods is orthogonal to bias_adjust and can be made on other grounds: "bootstrap" makes more efficient use of small datasets by evaluating on out-of-bag observations, while "holdout" more closely mirrors prediction to genuinely independent unseen data.
+# Simulation results generated by data-raw/sim_bootstrap_holdout.R
+# See metadata field for seed and session info.
+
+sim_data <- readRDS(system.file("extdata", "sim_bootstrap_holdout.rds",
+                                package = "GLAMMGoF"))
+
+# Panel A ggplot
+panelA <- sim_data$rbias_df |>
+  filter(Group == "Out-of-sample performance") |>
+  ggplot(aes(x = method, y = value, fill = method)) +
+  # ...
+
+# Panel B ggplot
+panelB <- sim_data$revar_df |>
+  ggplot(aes(x = method, y = refit_re_var, fill = method)) +
+  # ...
+
+panelA / panelB
+```
 
 #### A worked example: the doubly-biased case
 
-The example below simulates data from a log-normal LMM with known variance
-components, then compares the naive back-transform against the correction built
-from the random effect variance alone and the full correction including the
-residual term.
+The example below simulates data from a log-normal LMM with known variance components, then compares the naive back-transform against the correction built from the random effect variance alone and the full correction including the residual term.
 
 ```{r, warning=FALSE, message=FALSE, comment=NA}
 library(glmmTMB)
@@ -416,12 +433,9 @@ data.frame(
 )
 ```
 
-The naive back-transform recovers the geometric mean and underestimates the arithmetic mean substantially. The RE-only correction closes part of the gap,
-which is what makes it dangerous: the result moves in the right direction and looks plausible, but a sizable bias remains because the residual variance here is larger than the random effect variance. Only the full correction recovers the observed mean.
+The naive back-transform recovers the geometric mean and underestimates the arithmetic mean substantially. The RE-only correction closes part of the gap, which is what makes it dangerous: the result moves in the right direction and looks plausible, but a sizable bias remains because the residual variance here is larger than the random effect variance. Only the full correction recovers the observed mean.
 
-`bias_precision()` applies the same correction internally when
-`bias_adjust = "manual"` is used with a log-transformed response, and reports
-predictive performance on the original response scale:
+`bias_precision()` applies the same correction internally when `bias_adjust = "manual"` is used with a log-transformed response, and reports predictive performance on the original response scale:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 bp_ln_none <- bias_precision(nReps = 100, testModel = m_ln, testData = lnDat,
@@ -438,8 +452,7 @@ bp_ln_man$bias_precision_summary    # RBIAS pulled toward zero
 
 One limitation applies to log-normal models specifically: `conditional_predictions = TRUE` remains incompatible with `bias_adjust = "manual"`. Note that the reasoning differs slightly from the log-link case: conditional predictions absorb the random effect contribution but *not* the residual contribution, since the residual is always marginalized. A conditional log-normal prediction therefore still requires a residual-only correction of $\exp(\sigma^2_\varepsilon/2)$, which is not currently implemented.
 
-One case cannot be resolved automatically: a response that was log-transformed *before* fitting and stored as its own column. The formula then gives no
-indication that a transformation occurred, so `jensen_correct()` stops with an error rather than guessing. Pass `type = "lognormal"` explicitly in that situation:
+One case cannot be resolved automatically: a response that was log-transformed *before* fitting and stored as its own column. The formula then gives no indication that a transformation occurred, so `jensen_correct()` stops with an error rather than guessing. Pass `type = "lognormal"` explicitly in that situation:
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 lnDat$log_y   <- log(lnDat$y)
