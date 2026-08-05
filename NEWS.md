@@ -1,3 +1,38 @@
+# GLAMMGoF 1.3.1
+
+## New features
+
+* Added a simulation figure to the vignette illustrating the effect
+  of Jensen's inequality bias on out-of-sample RBIAS across a range
+  of random-effect standard deviations, and the effect of applying
+  the analytical correction via `bias_adjust = "manual"`. Panels
+  cover a GLM without random effects, a GLMM with one random effect,
+  and a GLMM with two crossed random effects.
+
+* Added a second simulation figure comparing holdout and case bootstrap
+  resampling under a 2x2 design (model specification x observations
+  per random-effect group). Demonstrates that case bootstrap
+  systematically inflates per-refit random-effect variance when
+  groups are sparse, causing `bias_adjust = "manual"` to under-correct;
+  the effect is largely independent of model specification.
+
+## Documentation
+
+* Vignette now recommends `method = "holdout"` for random-effect models
+  with sparse groups, with the underlying mechanism explained.
+  `@param method` in `bias_precision()` and `brier_auc()` updated to
+  match.
+
+* Random-slopes note in `bias_precision()` rewritten to reflect that
+  `bias_adjust = "manual"` uses a scalar approximation for random-slope
+  models; the exact marginal correction under random slopes is
+  per-observation.
+
+## Tests
+
+* Regression guards added: `bias_adjust = "tmb"` now errors via
+  `match.arg()` in `bias_precision()` and `brier_auc()`.
+
 # GLAMMGoF 1.3.0
 
 ## Breaking changes
