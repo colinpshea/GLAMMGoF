@@ -50,6 +50,7 @@ library(GLAMMGoF)
 
 ```{r, warning=FALSE, message = FALSE, comment=NA, echo=FALSE}
 library(dplyr)
+library(ggplot2)
 library(tidyr)
 library(patchwork)
 ```
@@ -104,7 +105,7 @@ There are only two functions in this package, and which one you use depends on t
 
 Both functions assess in- and out-of-sample predictive performance for generalized linear and generalized additive models, with or without random effects, by repeatedly resampling data and evaluating predictive performance across multiple replicates. Results are stored across all `nReps` replicates and reported as a summary table (mean and 95% confidence intervals) and a histogram of replicate values for each performance statistic, with a blue dotted vertical line indicating the mean across replicates. For `brier_auc()`, a red dashed vertical line is also displayed in the log loss panels, indicating the null (intercept-only) log loss baseline as a reference point for model comparison.
 
-Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets. Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training data set contains the same number of observations as the original data set, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller data sets, but is slightly less intuitive than the holdout approach. For well-behaved models and reasonably sized data sets, both methods should produce similar results. Differences are most likely to emerge with small data sets, highly overdispersed data, or poorly specified models.
+Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets. Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training data set contains the same number of observations as the original data set, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller data sets, but is slightly less intuitive than the holdout approach. For models without random effects and reasonably sized data sets, both methods should produce similar results. Differences can emerge for random-effect models, particularly when random-effect groups have few observations. See "A note about holdout vs bootstrap resampling methods when diagnosing and adjusting for Jensen's inequality bias" below for details. 
 
 #### A note about zero-inflated models
 
@@ -168,7 +169,7 @@ bp$bias_precision_hist
 
  
 
-Now let's compare to the `bootstrap` method for the same model, which generally should be very similar for well-behaved models and reasonably sized data sets.
+Now let's compare to the `bootstrap` method for the same model, which generally should be very similar for well-behaved models and reasonably sized data sets (but see "A note about holdout vs bootstrap resampling methods when diagnosing and adjusting for Jensen's inequality bias" below for details)
 
 ```{r, warning=FALSE, comment=NA}
 bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
@@ -242,7 +243,7 @@ br_auc$brier_auc_hist
 
  
 
-Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets.
+Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets (but see "A note about holdout vs bootstrap resampling methods when diagnosing and adjusting for Jensen's inequality bias" below for details).
 
 ```{r, warning=FALSE, comment=NA}
 br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
@@ -355,6 +356,39 @@ chk_manual <- bias_precision(nReps = 100, testModel = countModel_GLMM,
 chk_manual$bias_precision_summary
 ```
 
+The figure below shows the effect of applying the Jensen correction across a range of random-effect variances, based on a simulation of intercept-only Poisson GLMMs (100 independent datasets × 100 cross-validation replicates per σ value, N = 20,000). The "none" line traces the underlying Jensen bias as it grows with random-effect variance, reaching roughly −40% at σ = 1 for the two-RE case. The "manual" line shows the same simulations after applying the analytical correction: RBIAS is pulled to near zero across the full σ range whenever random effects are present. For a GLM without random effects (left panel) both options behave identically, since the correction factor is exp(0/2) = 1 and does nothing. 
+
+```{r jensen-figure, fig.width = 9, fig.height = 5, echo = FALSE, message = FALSE, warning = FALSE}
+# Simulation results generated by data-raw/sim_jensen_sigma_sweep.R
+
+sim_jensen <- readRDS(system.file("extdata", "sim_jensen_sigma_sweep.rds",
+                                  package = "GLAMMGoF"))
+
+pal <- c('No correction  ("none")' = "#D85A30",
+         'Analytical  ("manual")'  = "#185FA5")
+
+ggplot(sim_jensen$results_df,
+       aes(x = sigma_true, y = rbias_mean,
+           colour = bias_adjust, fill = bias_adjust)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey60") +
+  geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.15, colour = NA) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.8) +
+  scale_colour_manual(values = pal, name = NULL) +
+  scale_fill_manual(values = pal, name = NULL) +
+  scale_x_continuous(
+    name   = expression(paste("True random-effect ", sigma)),
+    breaks = round(sim_jensen$metadata$sigma_grid, 2)
+  ) +
+  labs(y = "Out-of-sample RBIAS (%)") +
+  facet_wrap(~ scenario) +
+  theme_bw(base_size = 11) +
+  theme(legend.position  = "bottom",
+        panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "grey95"),
+        strip.text       = element_text(size = 9))
+```
+
 Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF. Note that although the calculations are explicitly written out below, GLAMMGoF has a `jensen_correct()` function which provides a convenient wrapper for this calculation, resolving the appropriate correction automatically from the model and accepting predictions, standard errors, and confidence interval bounds on the link or response scale (see ?jensen_correct for details):
 
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
@@ -378,24 +412,38 @@ Note on method choice for random-effect models: `method = "holdout"` is recommen
 
 The figure below shows this pattern across a controlled simulation. Panel A shows out-of-sample RBIAS after Jensen correction; Panel B shows per-refit random-effect variance estimates. The bootstrap-vs-holdout divergence appears in both panels when groups are sparse (top row) and largely disappears when groups are dense (bottom row), across both correctly-specified and misspecified fits. 
 
-```{r bootstrap-figure, fig.width = 7, fig.height = 9, echo = FALSE}
-
+```{r bootstrap-figure, fig.width = 7, fig.height = 9, echo = FALSE, message = FALSE, warning = FALSE}
 # Simulation results generated by data-raw/sim_bootstrap_holdout.R
 # See metadata field for seed and session info.
 
 sim_data <- readRDS(system.file("extdata", "sim_bootstrap_holdout.rds",
                                 package = "GLAMMGoF"))
 
-# Panel A ggplot
+# Panel A: RBIAS (manual) by method x family x n_obs
 panelA <- sim_data$rbias_df |>
   filter(Group == "Out-of-sample performance") |>
   ggplot(aes(x = method, y = value, fill = method)) +
-  # ...
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  geom_boxplot(outlier.size = 0.4, alpha = 0.7) +
+  facet_grid(n_obs ~ fit_family) +
+  labs(x = NULL,
+       y = "Out-of-sample RBIAS (%)\nbias_adjust = 'manual'",
+       title = "A. RBIAS after Jensen correction, by method") +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none")
 
-# Panel B ggplot
+# Panel B: per-refit RE variance by method x family x n_obs
 panelB <- sim_data$revar_df |>
   ggplot(aes(x = method, y = refit_re_var, fill = method)) +
-  # ...
+  geom_hline(aes(yintercept = full_data_re_var),
+             linetype = "dashed", color = "grey40") +
+  geom_boxplot(outlier.size = 0.4, alpha = 0.7) +
+  facet_grid(n_obs ~ fit_family, scales = "free_y") +
+  labs(x = NULL,
+       y = "Per-refit RE variance",
+       title = "B. Per-refit random-effect variance, by method") +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none")
 
 panelA / panelB
 ```
