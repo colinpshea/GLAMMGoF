@@ -544,6 +544,30 @@ The `bias_adjust` and `conditional_predictions` restrictions for log-transformed
 
 The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above.
 
+### Potential sources of residual bias after correction
+
+The analytical log-normal correction closes most of the marginal bias in log-link mixed models, but residual negative bias can persist under specific conditions. When you observe uncorrected bias remaining after applying jensen_correct() or the equivalent internal correction, the sources below are the most likely candidates. None of these are problems with your model per se — they are conditions under which the sum-of-variances correction has known limitations, and identifying which one applies tells you something useful about where your response-scale predictions may be unreliable.
+
+A note on how to use this diagnostic: RBIAS and related metrics are informative about where the correction is falling short and, by extension, where response-scale predictions from the model may not be delivering what you expect. That is a legitimate and useful thing to know. What they are not is a model-selection criterion. Iterating on random-effect structure until RBIAS looks better risks removing real structure from the model to optimize a metric, which defeats the purpose. Design-based considerations (does the grouping capture genuine non-independence, do you need to predict to new levels, does partial pooling matter for your inference) and standard fit-based criteria remain the appropriate basis for random-effect specification. Use the diagnostic to understand your model, not to reshape it.
+
+#### Random effects with few levels (< ~10)
+
+The correction depends on σ̂² from the fitted model, and variance components estimated from small numbers of groups are downward-biased and highly variable. REML partially corrects small-sample bias but cannot fully compensate below roughly 10 levels. An under-estimated σ̂² produces under-correction, which shows up as residual negative bias on the response scale.
+
+To investigate: refit the model with the small-group factor as a fixed effect and compare. If fixed-effect estimates remain stable, residual variance does not inflate substantially, and the residual bias resolves, the fixed-effect specification was probably more appropriate on modeling grounds anyway — grouping factors with fewer than ~5–8 levels are commonly recommended as fixed regardless. If fixed effects shift or residual variance inflates, the random effect is capturing structure the fixed-effect specification cannot absorb, and the residual bias is a correction limitation to report alongside your predictions rather than a modeling problem to fix.
+
+#### Random slopes
+
+jensen_correct() currently applies a sum-of-variances correction that treats random-slope variance as if it contributed uniformly across observations. The exact marginal correction for a random slope depends on the covariate values at which predictions are made, and intercept–slope covariance complicates it further. This is documented as a known approximation and per-observation slope corrections are planned for a future release. Residual bias in models with random slopes is often traceable to this approximation rather than to any of the other sources listed here.
+
+#### Non-Gaussian random-effect distributions
+
+The analytical correction assumes the random effects are Gaussian. In ecological data, conditional modes are often visibly skewed or heavy-tailed — a few sites, years, or individuals are genuine outliers relative to a Gaussian working assumption. When the true random-effect distribution departs substantially from Gaussian, exp(0.5 Σσ̂²) can under- or over-correct depending on the direction of the departure. A qqnorm() check on the conditional modes for each grouping factor is a quick visual diagnostic; substantial non-normality is a signal that the correction is not the whole story and that the model itself may benefit from revisiting (e.g., additional fixed effects that absorb the outlying structure).
+
+#### Unmodeled overdispersion
+
+If Pearson dispersion — sum(resid(model, "pearson")^2) / df.residual(model) — exceeds ~1.2 in a Poisson model, some residual marginal bias on the response scale is coming from unmodeled overdispersion rather than from the correction itself. Refitting as negative binomial and re-running validation typically resolves it.
+
 ### Recommended workflow for inference and predictions
 
 The following general workflow is recommended for log-link GLMMs with random effects, and applies equally to models fit to a log-transformed response. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
