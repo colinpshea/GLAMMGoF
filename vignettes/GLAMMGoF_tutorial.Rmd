@@ -424,7 +424,7 @@ bp_countModelGLMM_uncorrected <- bias_precision(
 ```
 
 ```{r bp-countModelGLMM-uncorrected-load, echo = FALSE}
-bp_countModelGLMM_corrected <- readRDS(
+bp_countModelGLMM_uncorrected <- readRDS(
   system.file("extdata", "bp_countModelGLMM_uncorrected.rds", package = "GLAMMGoF")
 )
 bp_countModelGLMM_uncorrected$bias_precision_summary <-
