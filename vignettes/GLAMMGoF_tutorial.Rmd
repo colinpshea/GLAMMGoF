@@ -452,6 +452,54 @@ panelB <- sim_data$revar_df |>
 panelA / panelB
 ```
 
+#### A worked example: correcting for a single random intercept
+
+The only difference here is that now we are setting `bias_adjust = "manual"`
+
+```{r bp-countModelGLMM-corrected}
+bp_countModelGLMM_corrected <- bias_precision(
+  nReps = 100, 
+  testModel = countModel_GLMM, 
+  testData = countData, 
+  propTrain = 0.8, 
+  DHARMaPlot = TRUE, 
+  testZI = TRUE, 
+  DHARMaReps = 1000, 
+  seed = 123, 
+  method = "holdout",
+  bias_adjust = "manual")
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+bp_countModelGLMM_corrected$bias_precision_summary <- bp_countModelGLMM_corrected$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(bp_countModelGLMM_corrected$bias_precision_summary, 8))
+```
+
+And compare this to results using the default setting of `bias_adjust = "none"`
+
+```{r bp-countModelGLMM-uncorrected}
+bp_countModelGLMM_uncorrected <- bias_precision(
+  nReps = 100, 
+  testModel = countModel_GLMM, 
+  testData = countData, 
+  propTrain = 0.8, 
+  DHARMaPlot = TRUE, 
+  testZI = TRUE, 
+  DHARMaReps = 1000, 
+  seed = 123, 
+  method = "holdout",
+  bias_adjust = "none")
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(bp_countModelGLMM_uncorrected$bias_precision_summary, 8))
+```
+
+RBIAS drops from roughly -6% to near zero, confirming that the Jensen correction has aligned the marginal predictions with the response-scale mean. Precision metrics also shift with the re-scaling, but it is the change in RBIAS that tells you the bias has been resolved.  
+
 #### A worked example: the doubly-biased case
 
 The example below simulates data from a log-normal LMM with known variance components, then compares the naive back-transform against the correction built from the random effect variance alone and the full correction including the residual term.
