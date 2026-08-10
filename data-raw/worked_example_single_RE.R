@@ -35,5 +35,3 @@ saveRDS(bp_countModelGLMM_uncorrected,
         file = "C:/Users/Colin.Shea/OneDrive - Florida Fish and Wildlife Conservation/R Packages/GLAMMGoF/inst/extdata/bp_countModelGLMM_uncorrected.rds")
 saveRDS(bp_countModelGLMM_corrected,
         file = "C:/Users/Colin.Shea/OneDrive - Florida Fish and Wildlife Conservation/R Packages/GLAMMGoF/inst/extdata/bp_countModelGLMM_corrected.rds")
-
-
