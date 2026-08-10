@@ -462,9 +462,7 @@ bp_countModelGLMM_corrected <- bias_precision(
   testModel = countModel_GLMM, 
   testData = countData, 
   propTrain = 0.8, 
-  DHARMaPlot = TRUE, 
-  testZI = TRUE, 
-  DHARMaReps = 1000, 
+  DHARMaPlot = FALSE, 
   seed = 123, 
   method = "holdout",
   bias_adjust = "manual")
@@ -486,9 +484,7 @@ bp_countModelGLMM_uncorrected <- bias_precision(
   testModel = countModel_GLMM, 
   testData = countData, 
   propTrain = 0.8, 
-  DHARMaPlot = TRUE, 
-  testZI = TRUE, 
-  DHARMaReps = 1000, 
+  DHARMaPlot = FALSE, 
   seed = 123, 
   method = "holdout",
   bias_adjust = "none")
@@ -498,7 +494,7 @@ bp_countModelGLMM_uncorrected <- bias_precision(
 knitr::kable(head(bp_countModelGLMM_uncorrected$bias_precision_summary, 8))
 ```
 
-RBIAS drops from roughly -6% to near zero, confirming that the Jensen correction has aligned the marginal predictions with the response-scale mean. Precision metrics also shift with the re-scaling, but it is the change in RBIAS that tells you the bias has been resolved.  
+RBIAS moves from roughly -4% closer to zero, confirming that the Jensen correction has aligned the marginal predictions with the response-scale mean. Precision metrics also shift with the re-scaling, but it is the change in RBIAS that tells you the negative bias has been resolved.  
 
 #### A worked example: the doubly-biased case
 
