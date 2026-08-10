@@ -414,41 +414,48 @@ preds_se_adjusted <- preds_se * correction
 
 Re-run the example from above using the default setting of `bias_adjust = "none"` (nReps = 1000 now instead of 100)
 
-```{r bp-countModelGLMM-uncorrected}
+```{r bp-countModelGLMM-uncorrected-display, eval = FALSE}
+# Shown for reference; pre-computed with nReps = 1000. See
+# data-raw/precompute_bp_countModelGLMM.R for the generating script.
 bp_countModelGLMM_uncorrected <- bias_precision(
-  nReps = 1000, 
-  testModel = countModel_GLMM, 
-  testData = countData, 
-  propTrain = 0.8, 
-  DHARMaPlot = FALSE, 
-  seed = 123, 
-  method = "holdout",
-  bias_adjust = "none")
+  nReps = 1000, testModel = countModel_GLMM, testData = countData,
+  propTrain = 0.8, DHARMaPlot = FALSE, seed = 123,
+  method = "holdout", bias_adjust = "none")
 ```
 
-```{r, warning=FALSE, comment=NA, echo=FALSE}
+```{r bp-countModelGLMM-uncorrected-load, echo = FALSE}
+bp_countModelGLMM_corrected <- readRDS(
+  system.file("extdata", "bp_countModelGLMM_uncorrected.rds", package = "GLAMMGoF")
+)
+bp_countModelGLMM_uncorrected$bias_precision_summary <-
+  bp_countModelGLMM_uncorrected$bias_precision_summary |>
+  dplyr::mutate(dplyr::across(c(mn, lwr95, upr95), ~ round(., 2)))
+```
+
+```{r, warning = FALSE, comment = NA, echo = FALSE}
 knitr::kable(head(bp_countModelGLMM_uncorrected$bias_precision_summary, 8))
 ```
-
 Now for the bias-corrected fun: the only difference here is that we are now setting `bias_adjust = "manual"`
 
-```{r bp-countModelGLMM-corrected}
+```{r bp-countModelGLMM-corrected-display, eval = FALSE}
+# Shown for reference; pre-computed with nReps = 1000. See
+# data-raw/precompute_bp_countModelGLMM.R for the generating script.
 bp_countModelGLMM_corrected <- bias_precision(
-  nReps = 1000, 
-  testModel = countModel_GLMM, 
-  testData = countData, 
-  propTrain = 0.8, 
-  DHARMaPlot = FALSE, 
-  seed = 123, 
-  method = "holdout",
-  bias_adjust = "manual")
+  nReps = 1000, testModel = countModel_GLMM, testData = countData,
+  propTrain = 0.8, DHARMaPlot = FALSE, seed = 123,
+  method = "holdout", bias_adjust = "manual")
 ```
 
-```{r, warning=FALSE, comment=NA, echo=FALSE}
-bp_countModelGLMM_corrected$bias_precision_summary <- bp_countModelGLMM_corrected$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
+```{r bp-countModelGLMM-corrected-load, echo = FALSE}
+bp_countModelGLMM_corrected <- readRDS(
+  system.file("extdata", "bp_countModelGLMM_corrected.rds", package = "GLAMMGoF")
+)
+bp_countModelGLMM_corrected$bias_precision_summary <-
+  bp_countModelGLMM_corrected$bias_precision_summary |>
+  dplyr::mutate(dplyr::across(c(mn, lwr95, upr95), ~ round(., 2)))
 ```
 
-```{r, warning=FALSE, comment=NA, echo=FALSE}
+```{r, warning = FALSE, comment = NA, echo = FALSE}
 knitr::kable(head(bp_countModelGLMM_corrected$bias_precision_summary, 8))
 ```
 
