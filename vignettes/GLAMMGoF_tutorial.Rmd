@@ -494,7 +494,7 @@ bp_countModelGLMM_uncorrected <- bias_precision(
 knitr::kable(head(bp_countModelGLMM_uncorrected$bias_precision_summary, 8))
 ```
 
-RBIAS moves from roughly -4% closer to zero, confirming that the Jensen correction has aligned the marginal predictions with the response-scale mean. Precision metrics also shift with the re-scaling, but it is the change in RBIAS that tells you the negative bias has been resolved.  
+RBIAS shifts from roughly −4.5% to +1–2% for both in-sample and out-of-sample performance. (For reference, countModelGLMM has σ̂ ≈ 0.36, giving a correction factor of exp(σ̂²/2) ≈ 1.07. This is a modest ~7% multiplicative shift that is nonetheless enough to move RBIAS from clearly negative to near zero.) The correction has resolved the systematic underprediction from Jensen's inequality; the small residual positive bias reflects the convexity of exp() applied to a plug-in σ̂², discussed further below. Precision metrics also shift with the r-escaling, but it is the change in RBIAS that tells you the Jensen's inequality bias has been resolved.    
 
 #### A worked example: the doubly-biased case
 
