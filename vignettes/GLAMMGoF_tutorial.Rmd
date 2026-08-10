@@ -410,6 +410,50 @@ preds_se   <- predict(countModel_GLMM, newdata = countData,
 preds_se_adjusted <- preds_se * correction
 ```
 
+#### A worked example: correcting for a single random intercept
+
+Re-run the example from above using the default setting of `bias_adjust = "none"` (nReps = 1000 now instead of 100)
+
+```{r bp-countModelGLMM-uncorrected}
+bp_countModelGLMM_uncorrected <- bias_precision(
+  nReps = 1000, 
+  testModel = countModel_GLMM, 
+  testData = countData, 
+  propTrain = 0.8, 
+  DHARMaPlot = FALSE, 
+  seed = 123, 
+  method = "holdout",
+  bias_adjust = "none")
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(bp_countModelGLMM_uncorrected$bias_precision_summary, 8))
+```
+
+Now for the bias-corrected fun: the only difference here is that we are now setting `bias_adjust = "manual"`
+
+```{r bp-countModelGLMM-corrected}
+bp_countModelGLMM_corrected <- bias_precision(
+  nReps = 1000, 
+  testModel = countModel_GLMM, 
+  testData = countData, 
+  propTrain = 0.8, 
+  DHARMaPlot = FALSE, 
+  seed = 123, 
+  method = "holdout",
+  bias_adjust = "manual")
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+bp_countModelGLMM_corrected$bias_precision_summary <- bp_countModelGLMM_corrected$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
+```
+
+```{r, warning=FALSE, comment=NA, echo=FALSE}
+knitr::kable(head(bp_countModelGLMM_corrected$bias_precision_summary, 8))
+```
+
+RBIAS shifts from roughly −4.5% to +1–2% for both in-sample and out-of-sample performance. For reference, countModelGLMM has σ̂ ≈ 0.36 against a true σ = 0.5, which reflects a low draw from the sampling distribution of σ̂  that is unsurprising with only 10 Site levels in the simulated random effect. An estimated σ̂ ≈ 0.36 results in a correction factor of exp(σ̂²/2) ≈ 1.07, which is a modest ~7% multiplicative shift that is nonetheless enough to move RBIAS from clearly negative to near zero. The correction has resolved the systematic underprediction from Jensen's inequality, and the small residual positive bias reflects both the convexity of exp() applied to a plug-in σ̂² (discussed further in "sigma-sweep" figure, above) and the fact that the correction factor inherits σ̂'s sampling error. This is why the "manual" line in the "sigma-sweep" figure is an average across many simulated datasets rather than a guaranteed result for any single fit. Precision metrics also shift with the re-scaling, but it is the change in RBIAS that tells you Jensen's inequality bias has been resolved.   
+
 #### A note about `holdout` vs `bootstrap` resampling methods when diagnosing and adjusting for Jensen's inequality bias
 
 Note on method choice for random-effect models: `method = "holdout"` is recommended over `method = "bootstrap"` when the design has few observations per random-effect group. Case bootstrap with replacement duplicates rows within re-sampled training sets, and these duplicates appear to the model as within-group replicates. When groups are sparse, each duplicated row has disproportionate leverage over that group's apparent within-group structure, systematically inflating the estimated random-effect variance in refitted training models relative to the full-data fit. When bias_adjust = "manual" is used, the correction factor is computed once from the full-data model and therefore under-corrects the inflated per-refit Jensen bias under bootstrap, leaving residual negative RBIAS in the output. The effect is largely independent of model specification; it appears in both correctly-specified and misspecified fits when groups are sparse, and diminishes substantially when groups have many observations regardless of specification. The issue is particularly acute for balanced repeated-measures designs (e.g., a fixed number of sub-samples per site or subject), where case bootstrap generates duplicated rows at rates and structures inconsistent with the sampling design. Cluster bootstrap (resampling entire groups) or parametric bootstrap would be more appropriate resampling schemes; `GLAMMGoF` currently supports neither, so `method = "holdout"` is the recommended choice.
@@ -451,50 +495,6 @@ panelB <- sim_data$revar_df |>
 
 panelA / panelB
 ```
-
-#### A worked example: correcting for a single random intercept
-
-The only difference here is that now we are setting `bias_adjust = "manual"`
-
-```{r bp-countModelGLMM-corrected}
-bp_countModelGLMM_corrected <- bias_precision(
-  nReps = 100, 
-  testModel = countModel_GLMM, 
-  testData = countData, 
-  propTrain = 0.8, 
-  DHARMaPlot = FALSE, 
-  seed = 123, 
-  method = "holdout",
-  bias_adjust = "manual")
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
-bp_countModelGLMM_corrected$bias_precision_summary <- bp_countModelGLMM_corrected$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bp_countModelGLMM_corrected$bias_precision_summary, 8))
-```
-
-And compare this to results using the default setting of `bias_adjust = "none"`
-
-```{r bp-countModelGLMM-uncorrected}
-bp_countModelGLMM_uncorrected <- bias_precision(
-  nReps = 100, 
-  testModel = countModel_GLMM, 
-  testData = countData, 
-  propTrain = 0.8, 
-  DHARMaPlot = FALSE, 
-  seed = 123, 
-  method = "holdout",
-  bias_adjust = "none")
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
-knitr::kable(head(bp_countModelGLMM_uncorrected$bias_precision_summary, 8))
-```
-
-RBIAS shifts from roughly −4.5% to +1–2% for both in-sample and out-of-sample performance. For reference, countModelGLMM has σ̂ ≈ 0.36 against a true σ = 0.5, which reflects a low draw from the sampling distribution of σ̂  that is unsurprising with only 10 Site levels in the simulated random effect. An estimated σ̂ ≈ 0.36 results in a correction factor of exp(σ̂²/2) ≈ 1.07, which is a modest ~7% multiplicative shift that is nonetheless enough to move RBIAS from clearly negative to near zero. The correction has resolved the systematic underprediction from Jensen's inequality, and the small residual positive bias reflects both the convexity of exp() applied to a plug-in σ̂² (discussed further below) and the fact that the correction factor inherits σ̂'s sampling error. This is why the "manual" line in the "sigma-sweep" figure (above) is an average across many simulated datasets rather than a guaranteed result for any single fit. Precision metrics also shift with the re-scaling, but it is the change in RBIAS that tells you Jensen's inequality bias has been resolved.   
 
 #### A worked example: the doubly-biased case
 
