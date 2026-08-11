@@ -1,3 +1,14 @@
+# GLAMMGoF 1.4.0
+
+## New features
+
+* Added a boot_predict() function that allows for bootstrapping of response
+  scale predictions (means, standard errors, and confidence intervals at 
+  specified alpha labels), with additional options for correction of bias
+  from Jensen's inequality due to log-transformed responses or the presence
+  of random effects in models with a log-link function. See ?boot_predict for
+  details.
+
 # GLAMMGoF 1.3.1
 
 ## New features

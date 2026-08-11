@@ -620,6 +620,112 @@ The `bias_adjust` and `conditional_predictions` restrictions for log-transformed
 
 The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above.
 
+### `boot_predict()`: response-scale predictions with parametric bootstrap intervals
+
+The previous sections established that Jensen's inequality bias in log-link GLMMs can be diagnosed with `bias_precision()` and quantified with `jensen_correct()`. The final piece of the workflow is producing response-scale predictions that carry both a proper uncertainty quantification and the Jensen correction. `boot_predict()` does this.
+
+The problem the function solves is straightforward. Standard `predict(mod, se.fit = TRUE)` returns marginal predictions and delta-method Wald standard errors on the link scale. For a log-link GLMM, back-transforming those to the response scale via `exp()` requires either (a) accepting the asymmetric, sometimes-poor approximation that a delta method gives for a nonlinear transformation of a normal quantity, or (b) writing a parametric bootstrap by hand. Neither option is what a typical user wants. And neither option applies the Jensen correction; that step is left to the user to remember to do afterward.
+
+`boot_predict()` handles both. It draws `n_sim` samples from the joint asymptotic distribution of the fixed-effect coefficients, transforms each draw through the model's inverse-link function, applies the Jensen correction if requested, and returns the mean, standard error, and confidence-interval bounds of the resulting bootstrap distribution alongside the covariate values used for prediction. The output is a data frame ready to plot or table.
+
+#### Basic usage
+
+The simplest call produces predictions on an auto-generated grid built from the model's covariates. Factor covariates expand to their observed levels; numeric covariates default to their mean:
+
+```{r bp-boot-basic, warning = FALSE, comment = NA}
+bp_uncorrected <- boot_predict(
+  mod         = countModel_GLMM,
+  n_sim       = 1000,
+  bias_adjust = "none",
+  seed        = 123
+)
+
+bp_uncorrected
+```
+
+The output has one row per prediction. `boot_mean` and `boot_se` summarize the bootstrap distribution; `boot_lwr` and `boot_upr` are the two-tailed confidence-interval bounds (defaulting to 95%, controlled via `alpha`).
+
+To apply the Jensen correction, set `bias_adjust = "manual"`:
+
+```{r bp-boot-corrected, warning = FALSE, comment = NA}
+bp_corrected <- boot_predict(
+  mod         = countModel_GLMM,
+  n_sim       = 1000,
+  bias_adjust = "manual",
+  seed        = 123
+)
+
+bp_corrected
+```
+
+Notice that each row's prediction has shifted upward by approximately the same multiplicative factor. This is the Jensen correction working as expected: it applies uniformly to all predictions and their uncertainty bounds, preserving the *shape* of any covariate-response relationship while correcting its *level*. The scalar correction factor itself is stored on the output for reference:
+
+```{r bp-jensen-factor, warning = FALSE, comment = NA}
+attr(bp_corrected, "jensen_factor")
+```
+
+For `countModel_GLMM` this factor is roughly 1.07, consistent with the σ̂ ≈ 0.36 estimate discussed in the worked example above.
+
+#### Response curves over a continuous covariate
+
+For plotting a fitted response curve, expand a numeric covariate over its observed range rather than holding it at the mean. The `numeric_default = "range"` argument does this:
+
+```{r bp-boot-curve, warning = FALSE, comment = NA, message = FALSE}
+bp_curve <- boot_predict(
+  mod             = countModel_GLMM,
+  numeric_default = "range",
+  numeric_length  = 30,
+  n_sim           = 1000,
+  bias_adjust     = "manual",
+  seed            = 123
+)
+
+ggplot(bp_curve, aes(x = Temp, y = boot_mean, colour = Season, fill = Season)) +
+  geom_ribbon(aes(ymin = boot_lwr, ymax = boot_upr),
+              alpha = 0.15, colour = NA) +
+  geom_line(linewidth = 0.9) +
+  labs(y = "Predicted count (Jensen-corrected)",
+       x = "Temperature") +
+  theme_bw()
+```
+
+The ribbons carry the full bootstrap uncertainty on the response scale, including the fixed-effect coefficient covariance. Because the Jensen correction shifts every draw by the same scalar, the ribbon shapes are unchanged from the uncorrected version; only their level differs.
+
+#### Prediction at user-specified covariate values
+
+For predictions at specific covariate values rather than a swept range, use the `at` argument. Values passed via `at` override the `numeric_default` expansion for the named covariates:
+
+```{r bp-boot-at, warning = FALSE, comment = NA, eval = FALSE}
+boot_predict(
+  mod         = countModel_GLMM,
+  at          = list(Temp = c(10, 15, 20)),
+  n_sim       = 1000,
+  bias_adjust = "manual",
+  seed        = 123
+)
+```
+
+The resulting grid crosses each Season level with each specified Temp value, giving 4 × 3 = 12 rows. For a fully user-controlled prediction target, pass a complete `newdata` data frame instead; `boot_predict()` will use it directly without auto-generating a grid.
+
+#### Backend support and scope notes
+
+`boot_predict()` supports the same set of model backends as `jensen_correct()`: `glmmTMB`, `lme4` (including `lmerMod`, `glmerMod`, and `glmer.nb` fits), `MASS::glm.nb`, and base `stats::glm` and `stats::lm`. GAMs fit with `mgcv` are not currently supported because variance-component extraction from smooth terms uses a different pathway that is not yet integrated with `jensen_correct()`. Bayesian model objects (e.g., `brmsfit`) are also unsupported; for those, use the package's native posterior-prediction functions and apply `jensen_correct()` to the response-scale draws directly.
+
+Zero-inflated models are supported when fit with `glmmTMB` using a `ziformula`. Both intercept-only and covariate-dependent zero-inflation are handled correctly, with the Jensen correction applied to the marginal expectation `(1 − p_zi) · E[Y | Y > 0]` that the function returns.
+
+For fixed-effect log-link GLMs (no random effects) and identity-response models with no log transform, no Jensen correction is warranted; setting `bias_adjust = "manual"` in those cases produces an informative warning and returns unchanged predictions. For logit-link models, no closed-form scalar correction exists and the same warning applies.
+
 ### Recommended workflow for inference and predictions
 
 The following general workflow is recommended for log-link GLMMs with random effects, and applies equally to models fit to a log-transformed response. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
+
+#### The complete workflow
+
+The full diagnose-correct-predict workflow for a log-link GLMM with random effects is:
+
+1. Fit the model to all available data (maximizing information for inference).
+2. Diagnose Jensen bias with `bias_precision(bias_adjust = "none")` and inspect RBIAS.
+3. Confirm the correction resolves the bias with `bias_precision(bias_adjust = "manual")`.
+4. Produce corrected response-scale predictions with `boot_predict(bias_adjust = "manual")` for reporting, figures, and management outputs.
+
+Steps 2 and 3 are diagnostic; the corrected predictions in step 4 are what should be used for any response-scale reporting where the arithmetic-mean interpretation matters. Fixed-effect inference (contrasts, effect directions, p-values) is unaffected by Jensen bias and does not require correction; use the un-transformed model for those purposes as usual.
