@@ -146,7 +146,11 @@ dependent \code{ziformula}. Predictions are on the marginal scale
 Jensen correction (when requested) is applied to the whole
 marginal expectation, which is correct when random effects appear
 only in the conditional (count) submodel. Random effects on the
-zero-inflation submodel are not currently supported.
+zero-inflation submodel are not currently supported. Note that
+for zero-inflated models, uncertainty in the conditional and
+zero-inflation components is propagated independently; hence,
+covariance between these parameter blocks is not currently
+incorporated.
 
 \strong{Grid auto-build.} When \code{newdata} is not supplied, a
 prediction grid is constructed by crossing the levels of each
