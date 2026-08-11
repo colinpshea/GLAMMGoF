@@ -236,7 +236,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
               "See ?bias_precision.")
 
     # An identity-link Gaussian model with random effects is ambiguous: it is
-    # either an ordinary LMM (no retransformation, no bias, correction
+    # either an ordinary LMM (no re-transformation, no bias, correction
     # unwarranted) or a model fit to a pre-computed log column (correction
     # warranted, but the residual term cannot be detected from the formula and
     # is therefore missing). Neither case is correctly served by the default

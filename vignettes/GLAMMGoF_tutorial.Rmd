@@ -338,7 +338,7 @@ whether the residual variance sits inside or outside the back-transformation. Th
 
 #### Diagnosing and correcting Jensen's inequality bias
 
-`bias_precision()` provides a `bias_adjust` argument with two options for diagnosing and correcting Jensen's inequality bias. The `"manual"` correction is available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
+`bias_precision()` provides a `bias_adjust` argument for diagnosing and correcting Jensen's inequality bias. The `"manual"` correction is available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
 
 **Step 1** - Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
 
