@@ -427,13 +427,13 @@ bp_countModelGLMM_uncorrected <- bias_precision(
 bp_countModelGLMM_uncorrected <- readRDS(
   system.file("extdata", "bp_countModelGLMM_uncorrected.rds", package = "GLAMMGoF")
 )
-bp_countModelGLMM_uncorrected$bias_precision_summary <-
-  bp_countModelGLMM_uncorrected$bias_precision_summary |>
+bp_countModelGLMM_uncorrected <-
+  bp_countModelGLMM_uncorrected |>
   dplyr::mutate(dplyr::across(c(mn, lwr95, upr95), ~ round(., 2)))
 ```
 
 ```{r, warning = FALSE, comment = NA, echo = FALSE}
-knitr::kable(head(bp_countModelGLMM_uncorrected$bias_precision_summary, 8))
+knitr::kable(head(bp_countModelGLMM_uncorrected, 8))
 ```
 Now for the bias-corrected fun: the only difference here is that we are now setting `bias_adjust = "manual"`
 
@@ -450,13 +450,13 @@ bp_countModelGLMM_corrected <- bias_precision(
 bp_countModelGLMM_corrected <- readRDS(
   system.file("extdata", "bp_countModelGLMM_corrected.rds", package = "GLAMMGoF")
 )
-bp_countModelGLMM_corrected$bias_precision_summary <-
-  bp_countModelGLMM_corrected$bias_precision_summary |>
+bp_countModelGLMM_corrected <-
+  bp_countModelGLMM_corrected |>
   dplyr::mutate(dplyr::across(c(mn, lwr95, upr95), ~ round(., 2)))
 ```
 
 ```{r, warning = FALSE, comment = NA, echo = FALSE}
-knitr::kable(head(bp_countModelGLMM_corrected$bias_precision_summary, 8))
+knitr::kable(head(bp_countModelGLMM_corrected, 8))
 ```
 
 RBIAS shifts from roughly −4.5% to +1–2% for both in-sample and out-of-sample performance. For reference, countModelGLMM has σ̂ ≈ 0.36 against a true σ = 0.5, which reflects a low draw from the sampling distribution of σ̂  that is unsurprising with only 10 Site levels in the simulated random effect. An estimated σ̂ ≈ 0.36 results in a correction factor of exp(σ̂²/2) ≈ 1.07, which is a modest ~7% multiplicative shift that is nonetheless enough to move RBIAS from clearly negative to near zero. The correction has resolved the systematic underprediction from Jensen's inequality, and the small residual positive bias reflects both the convexity of exp() applied to a plug-in σ̂² (discussed further in "sigma-sweep" figure, above) and the fact that the correction factor inherits σ̂'s sampling error. This is why the "manual" line in the "sigma-sweep" figure is an average across many simulated datasets rather than a guaranteed result for any single fit. Precision metrics also shift with the re-scaling, but it is the change in RBIAS that tells you Jensen's inequality bias has been resolved.   

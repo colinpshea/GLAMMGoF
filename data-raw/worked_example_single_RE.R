@@ -19,6 +19,7 @@ bp_countModelGLMM_uncorrected <- bias_precision(
   method      = "holdout",
   bias_adjust = "none"
 )
+bp_countModelGLMM_uncorrected$bias_precision_summary
 
 bp_countModelGLMM_corrected <- bias_precision(
   nReps       = 1000,
@@ -31,7 +32,8 @@ bp_countModelGLMM_corrected <- bias_precision(
   bias_adjust = "manual"
 )
 
-saveRDS(bp_countModelGLMM_uncorrected,
+# Note that only the summary objects are exported to extdata to cut down on the size of the package
+saveRDS(bp_countModelGLMM_uncorrected$bias_precision_summary,
         file = "C:/Users/Colin.Shea/OneDrive - Florida Fish and Wildlife Conservation/R Packages/GLAMMGoF/inst/extdata/bp_countModelGLMM_uncorrected.rds")
-saveRDS(bp_countModelGLMM_corrected,
+saveRDS(bp_countModelGLMM_corrected$bias_precision_summary,
         file = "C:/Users/Colin.Shea/OneDrive - Florida Fish and Wildlife Conservation/R Packages/GLAMMGoF/inst/extdata/bp_countModelGLMM_corrected.rds")
