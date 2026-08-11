@@ -252,6 +252,13 @@
 #'   may not require correction when the goal is population-level generalization.
 #'   See the package vignette for a decision framework.
 #'
+#'   For \code{log(y + c)} transforms with a positive constant,
+#'   \code{\link{jensen_correct}} will error rather than silently apply an
+#'   incorrect back-transformation. The multiplicative Jensen correction still
+#'   applies but does not account for the additive shift, and fitting a
+#'   count-family model (Poisson, negative binomial, or zero-inflated variants)
+#'   is generally preferable to log-shift transforms of zero-heavy data.
+#'
 #' @references Thorson, J.T. and Kristensen, K. (2016) Implementing a generic
 #'   method for bias correction in statistical models using random effects, with
 #'   spatial and population dynamics examples. \emph{Fisheries Research}, 175,

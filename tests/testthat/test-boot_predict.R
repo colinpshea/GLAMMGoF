@@ -224,7 +224,6 @@ test_that("boot_predict errors informatively on zeroinfl objects", {
   )
 })
 
-
 # ──────────────────────────────────────────────────────────────
 # Reproducibility
 # ──────────────────────────────────────────────────────────────

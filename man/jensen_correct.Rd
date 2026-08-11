@@ -130,6 +130,13 @@ individual heterogeneity) warrant correction when making response-scale
 predictions. Random effects that represent study-specific nuisance variation
 may not require correction when the goal is population-level generalization.
 See the package vignette for a decision framework.
+
+For \code{log(y + c)} transforms with a positive constant,
+\code{\link{jensen_correct}} will error rather than silently apply an
+incorrect back-transformation. The multiplicative Jensen correction still
+applies but does not account for the additive shift, and fitting a
+count-family model (Poisson, negative binomial, or zero-inflated variants)
+is generally preferable to log-shift transforms of zero-heavy data.
 }
 \examples{
 \dontrun{
