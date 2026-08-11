@@ -39,7 +39,8 @@ fit_glm <- function() {
 }
 
 fit_lm <- function() {
-  stats::lm(log(y + 1) ~ Season + Temp, data = countData)
+  d <- countData[countData$y > 0,]
+  stats::lm(log(y) ~ Season + Temp, data = d)
 }
 
 fit_negbin <- function() {

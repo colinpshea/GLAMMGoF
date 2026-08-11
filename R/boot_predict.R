@@ -184,6 +184,7 @@
 #'
 #' @importFrom MASS mvrnorm
 #' @importFrom stats coef vcov model.frame model.matrix reformulate terms formula plogis median quantile sd family
+#' @importFrom reformulas nobars
 #' @export
 boot_predict <- function(mod,
                          newdata          = NULL,

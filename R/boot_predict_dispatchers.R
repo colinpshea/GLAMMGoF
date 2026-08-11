@@ -61,9 +61,9 @@
 .bp_formula <- function(mod) UseMethod(".bp_formula")
 
 .bp_formula.glmmTMB <- function(mod) {
-  lme4::nobars(stats::formula(mod, component = "cond"))
+  reformulas::nobars(stats::formula(mod, component = "cond"))
 }
-.bp_formula.merMod  <- function(mod) lme4::nobars(stats::formula(mod))
+.bp_formula.merMod  <- function(mod) reformulas::nobars(stats::formula(mod))
 .bp_formula.default <- function(mod) stats::formula(mod)  # lm/glm/negbin
 
 # ── Zero-inflation structure ───────────────────────────────────
@@ -91,7 +91,7 @@
 
   zi_formula <- NULL
   if (mode == "covariate") {
-    zi_formula <- lme4::nobars(mod$modelInfo$allForm$ziformula)
+    zi_formula <- reformulas::nobars(mod$modelInfo$allForm$ziformula)
   }
 
   list(mode = mode, fixef = zi_fixef, vcov = zi_vcov, formula = zi_formula)

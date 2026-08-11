@@ -40,6 +40,7 @@ Imports:
     ,mgcViz
     ,mgcv
     ,rlang
+    ,reformulas
     ,nlme
 Depends: 
     ggplot2,
