@@ -643,7 +643,7 @@ bp_uncorrected <- boot_predict(
 bp_uncorrected
 ```
 
-The output has one row per prediction. `boot_mean` and `boot_se` summarize the bootstrap distribution; `boot_lwr` and `boot_upr` are the two-tailed confidence-interval bounds (defaulting to 95%, controlled via `alpha`).
+The output has one row per prediction. `boot_mean` and `boot_se` summarize the bootstrap distribution; `boot_lwr` and `boot_upr` are the two-tailed confidence-interval bounds (defaulting to 95%, controlled via `alpha`). The intervals returned are percentile intervals from the parametric bootstrap distribution. Higher-order interval methods (bias-corrected and accelerated, BCa) are motivated by concerns about estimator bias and variance heterogeneity that do not apply to the parametric-bootstrap setup used here, where draws come directly from the asymptotic distribution centered on the fitted point estimate.
 
 To apply the Jensen correction, set `bias_adjust = "manual"`:
 
@@ -709,7 +709,7 @@ The resulting grid crosses each Season level with each specified Temp value, giv
 
 #### Backend support and scope notes
 
-`boot_predict()` supports the same set of model backends as `jensen_correct()`: `glmmTMB`, `lme4` (including `lmerMod`, `glmerMod`, and `glmer.nb` fits), `MASS::glm.nb`, and base `stats::glm` and `stats::lm`. GAMs fit with `mgcv` are not currently supported because variance-component extraction from smooth terms uses a different pathway that is not yet integrated with `jensen_correct()`. Bayesian model objects (e.g., `brmsfit`) are also unsupported; for those, use the package's native posterior-prediction functions and apply `jensen_correct()` to the response-scale draws directly.
+`boot_predict()` supports the same set of model backends as `jensen_correct()`: `glmmTMB`, `lme4` (including `lmerMod`, `glmerMod`, and `glmer.nb` fits), `MASS::glm.nb`, and base `stats::glm` and `stats::lm`. GAMs fit with `mgcv` are not currently supported because variance-component extraction from smooth terms uses a different pathway that is not yet integrated with `jensen_correct()`. Bayesian model objects (\code{brmsfit}, \code{stanreg}) are not supported directly. If marginal response-scale predictions are computed by exponentiating linear-predictor draws at \code{re_formula = NA}, \code{\link{jensen_correct}} applied to the resulting response-scale draws provides the appropriate correction. If marginal predictions are computed via \code{posterior_epred()} with proper Monte Carlo integration over the random-effect posterior, no additional correction is needed and \code{\link{jensen_correct}} should not be applied.   
 
 Zero-inflated models are supported when fit with `glmmTMB` using a `ziformula`. Both intercept-only and covariate-dependent zero-inflation are handled correctly, with the Jensen correction applied to the marginal expectation `(1 − p_zi) · E[Y | Y > 0]` that the function returns. Note also that for zero-inflated models, uncertainty in the conditional and zero-inflation components is propagated independently; covariance between these parameter blocks is not currently incorporated.
 
