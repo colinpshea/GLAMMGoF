@@ -438,7 +438,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
 
   results_summary <- results_df %>%
     group_by(Group, Metric) %>%
-    summarise(mn    = mean(value),
+    summarise(mn = mean(value),
+              md = median(value),
               lwr95 = quantile(value, 0.025),
               upr95 = quantile(value, 0.975),
               .groups = "drop")
