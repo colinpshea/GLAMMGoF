@@ -37,6 +37,7 @@ Imports:
     ,lme4
     ,MASS
     ,magrittr
+    ,methods
     ,mgcViz
     ,mgcv
     ,rlang
