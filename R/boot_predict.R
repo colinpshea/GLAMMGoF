@@ -86,7 +86,11 @@ boot_predict <- function(mod,
     ## ---- Identify offset structure (used by auto-grid + offset resolver) ----
     tt_cond     <- stats::terms(cond_frm)
     off_idx     <- attr(tt_cond, "offset")
-    off_arg     <- if (!is.null(mod$call) && !is.null(mod$call$offset)) mod$call$offset else NULL
+    off_arg <- if (isS4(mod)) {
+      if ("call" %in% methods::slotNames(mod)) mod@call$offset else NULL
+    } else if (!is.null(mod$call)) {
+      mod$call$offset
+    } else NULL
     off_vars    <- character(0)
     if (!is.null(off_idx)) {
         off_expr <- attr(tt_cond, "variables")[[off_idx + 1]]
