@@ -1,3 +1,12 @@
+GLAMMGoF 1.4.1
+
+## New features
+
+* boot_predict() now returns a boot_median column alongside boot_mean. The mean of exponentiated draws includes a small implicit Jensen adjustment from parameter uncertainty, while boot_median approximates the plug-in point prediction exp(Xβ̂) returned by predict(). Divergence between the two flags high parameter uncertainty. See ?boot_predict for details.
+
+* boot_predict() now recognizes model offsets (formula-side and argument-side) and includes them in the linear predictor. Previously offsets were silently ignored, producing predictions off by a multiplicative factor of exp(offset). A new offset argument lets users specify a reference offset directly. See ?boot_predict for details.
+
+
 # GLAMMGoF 1.4.0
 
 ## New features

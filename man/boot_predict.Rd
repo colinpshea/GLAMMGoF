@@ -2,12 +2,13 @@
 % Please edit documentation in R/boot_predict.R
 \name{boot_predict}
 \alias{boot_predict}
-\title{Parametric bootstrap predictions with optional Jensen's inequality correction}
+\title{Parametric-bootstrap predictions from GLMs and (G)LMMs}
 \usage{
 boot_predict(
   mod,
   newdata = NULL,
   at = NULL,
+  offset = NULL,
   numeric_default = "mean",
   numeric_length = 20,
   n_sim = 5000,
@@ -17,202 +18,70 @@ boot_predict(
 )
 }
 \arguments{
-\item{mod}{A fitted model object. Supported classes:
-\code{\link[glmmTMB]{glmmTMB}}, \code{\link[lme4]{merMod}} (including
-\code{lmerMod}, \code{glmerMod}, and negative binomial fits from
-\code{glmer.nb}), \code{\link[MASS]{glm.nb}} (\code{negbin} objects),
-\code{\link[stats]{glm}}, and \code{\link[stats]{lm}}. \code{mgcv}
-GAMs and \code{pscl::zeroinfl} models are not currently supported;
-passing one produces an informative error.}
+\item{mod}{A fitted model of a supported class (glmmTMB, lme4::glmerMod,
+lme4::lmerMod, lme4::glmer.nb, MASS::glm.nb, stats::glm, stats::lm).
+GAMs are not currently supported.}
 
-\item{newdata}{Optional data frame of covariate values at which to
-predict. If \code{NULL} (the default), a grid is auto-generated
-from the model's covariates using the rules described in Details.}
+\item{newdata}{Optional data frame at which to predict. If \code{NULL}, an
+auto-grid is constructed from the fixed-effect variables (offset
+variables are excluded and handled via the \code{offset} argument or
+defaults; see Details).}
 
-\item{at}{Optional named list of explicit covariate values to use in
-the auto-generated grid, e.g. \code{at = list(x = c(0, 1, 2))}.
-Values passed via \code{at} override the defaults derived from
-\code{numeric_default}. Ignored when \code{newdata} is supplied.}
+\item{at}{Optional named list of values at which to evaluate specific
+variables in the auto-grid (e.g., \code{at = list(x = c(-1, 0, 1))}).}
 
-\item{numeric_default}{Controls how continuous covariates are expanded
-in the auto-generated grid. One of \code{"mean"} (single value at
-the mean; default), \code{"median"}, \code{"range"}
-(\code{numeric_length} equally spaced values from min to max),
-or \code{"quartiles"} (Q1, median, Q3). A user-supplied function
-taking a numeric vector and returning a vector may also be passed.
-A named list of specifications may be used for per-covariate
-control, e.g. \code{numeric_default = list(x = "range", z = "mean")};
-any covariate not named in the list falls back to \code{"mean"}.
-Ignored when \code{newdata} is supplied.}
+\item{offset}{Optional numeric scalar or vector on the link scale
+(e.g., \code{log(effort)} for log-link models). When supplied, this value
+is added to the linear predictor for all prediction rows and takes
+precedence over any offset variables present in \code{newdata} or in the
+fitted model. Scalars are recycled to \code{nrow(newdata)}. See Details.}
 
-\item{numeric_length}{Integer giving the length of the sequence used
-when \code{numeric_default = "range"}. Defaults to 20.}
+\item{numeric_default, numeric_length}{Controls for auto-grid construction
+over numeric predictors.}
 
-\item{n_sim}{Integer giving the number of parametric bootstrap draws.
-Defaults to 5000. Larger values reduce Monte Carlo noise in the
-summary statistics at the cost of runtime; 1000 is usually
-sufficient for stable point estimates, 5000 or more for stable
-tail quantiles.}
+\item{n_sim}{Number of parametric bootstrap draws (default 5000).}
 
-\item{alpha}{Numeric in (0, 1) giving the two-sided confidence level.
-Defaults to 0.05, producing 95\\% intervals via the
-\code{alpha / 2} and \code{1 - alpha / 2} quantiles of the
-bootstrap distribution.}
+\item{alpha}{CI level (default 0.05 → 95\% intervals).}
 
-\item{bias_adjust}{Character. One of \code{"none"} (default) or
-\code{"manual"}. When \code{"manual"}, the analytical Jensen's
-inequality correction from \code{\link{jensen_correct}} is applied
-to the bootstrap predictions. See Details.}
+\item{bias_adjust}{One of \code{"none"} (default) or \code{"manual"}; \code{"manual"}
+multiplies each prediction by \code{jensen_correct(mod)} to correct for
+Jensen's inequality bias from the random-effect variance components.
+Has no effect on logit-link models (warning issued).}
 
-\item{seed}{Optional integer passed to \code{set.seed()} for
-reproducibility. When \code{NULL} (the default), the current RNG
-state is used.}
+\item{seed}{Optional integer seed for reproducibility.}
 }
 \value{
-A data frame containing the columns of \code{newdata} (or
-the auto-generated grid) augmented with:
-\describe{
-\item{\code{boot_mean}}{Mean of the bootstrap distribution at
-each prediction row.}
-\item{\code{boot_se}}{Standard deviation of the bootstrap
-distribution at each prediction row.}
-\item{\code{boot_lwr}}{Lower confidence bound
-(\code{alpha / 2} quantile).}
-\item{\code{boot_upr}}{Upper confidence bound
-(\code{1 - alpha / 2} quantile).}
-}
-The returned object also carries the following attributes:
-\code{draws} (the full \code{n_rows} \eqn{\times} \code{n_sim}
-bootstrap matrix), \code{jensen_factor} (the scalar correction
-applied, or 1 if none), \code{bias_adjust}, \code{link},
-\code{n_sim}, and \code{alpha}.
+A data frame with \code{newdata} columns plus \code{boot_mean},
+\code{boot_median}, \code{boot_se}, \code{boot_lwr}, \code{boot_upr}. The raw draws matrix
+and metadata are returned as attributes.
 }
 \description{
-Produces population-level (marginal) predictions from a fitted model,
-with confidence intervals derived from a parametric bootstrap over the
-joint asymptotic distribution of the fixed-effect coefficients. When
-the fitted model has variance components on the log scale, the
-analytical Jensen's inequality correction can be applied by setting
-\code{bias_adjust = "manual"}, delivering response-scale predictions that
-are calibrated to the arithmetic mean of the response rather than the
-geometric mean.
+Generate response-scale predictions with uncertainty intervals via
+parametric bootstrap of the fixed-effect coefficients. Handles model
+offsets (formula-side and argument-side) and supports an optional
+analytical Jensen's inequality bias correction via \code{bias_adjust = "manual"}.
 }
 \details{
-\strong{Prediction target.} Predictions are population-level
-(marginal), corresponding to \code{re.form = ~0} in the standard
-\code{predict()} interface: random effects are set to zero and the
-output represents the expected response for a new observation whose
-group-level context is unknown. This is the appropriate target for
-predicting to new sites, new years, or new individuals, and it is
-the target to which the Jensen correction applies.
-
-\strong{Parametric bootstrap.} Fixed-effect coefficient uncertainty
-is propagated by drawing \code{n_sim} samples from the joint
-asymptotic distribution \code{MvNormal(coef(mod), vcov(mod))} on the
-link scale, transforming to the response scale via the model's
-inverse-link function, and summarizing across draws. This captures
-full covariance among fixed effects, including correlations that
-delta-method approximations may not represent accurately for
-non-linear back-transformations.
-
-\strong{Variance-component uncertainty is treated as plug-in.} The
-Jensen correction factor \eqn{\exp(\Sigma \sigma^2 / 2)} uses
-\eqn{\hat{\sigma}^2} at its fitted point estimate. Uncertainty in
-\eqn{\hat{\sigma}^2} is not propagated through the bootstrap. This
-matches the plug-in convention used elsewhere in the ecosystem
-(\code{\link{jensen_correct}}, \code{ggeffects::predict_response}
-with \code{bias_correction = TRUE}) and is a reasonable
-approximation at ecological RE variances. For a discussion of when
-plug-in behavior may under- or over-correct, see the tutorial
-vignette section on residual bias sources.
-
-\strong{Jensen correction scope.} Setting \code{bias_adjust = "manual"}
-invokes \code{\link{jensen_correct}}, which resolves the appropriate
-correction factor from the fitted model. For log-link mixed models
-(\code{glmmTMB} or \code{lme4} with a log link and random effects),
-this is \eqn{\exp(\Sigma \sigma^2_u / 2)}. For log-transformed
-responses (\code{lm(log(y) ~ x)} or the mixed-model analogue), this
-is \eqn{\exp((\sigma^2_\varepsilon + \Sigma \sigma^2_u) / 2)}. For
-fixed-effect log-link GLMs and identity-response models with no log
-transform, no correction is needed and the factor is 1; a warning
-is emitted in that case to alert the user that \code{bias_adjust}
-had no effect. For \code{logit}-link models, no closed-form scalar
-correction exists and a warning is emitted.
-
-\strong{Zero-inflated models.} Zero-inflation is supported for
-\code{glmmTMB} models with either intercept-only or covariate-
-dependent \code{ziformula}. Predictions are on the marginal scale
-\eqn{E[Y] = (1 - p_{\mathrm{zi}}) \cdot E[Y | Y > 0]}, and the
-Jensen correction (when requested) is applied to the whole
-marginal expectation, which is correct when random effects appear
-only in the conditional (count) submodel. Random effects on the
-zero-inflation submodel are not currently supported. Note that
-for zero-inflated models, uncertainty in the conditional and
-zero-inflation components is propagated independently; hence,
-covariance between these parameter blocks is not currently
-incorporated.
-
-\strong{Grid auto-build.} When \code{newdata} is not supplied, a
-prediction grid is constructed by crossing the levels of each
-categorical predictor with the \code{numeric_default} expansion of
-each continuous predictor. Grids exceeding 10,000 rows trigger an
-error to prevent unintentionally massive bootstrap runs; supply
-\code{newdata} explicitly, narrow the grid via \code{at}, or reduce
-\code{numeric_length} to proceed.
-}
-\note{
-Support is currently limited to fixed effects in the parametric
-bootstrap. GAMs (\code{mgcv}) are not supported because variance
-components from smooth terms require a different extraction
-pathway (\code{gam.vcomp()}) that is not yet integrated with
-\code{\link{jensen_correct}}. Bayesian model objects
-(\code{brmsfit}, \code{stanreg}) are not supported; use the
-package's native posterior-prediction functions and apply
-\code{\link{jensen_correct}} to the response-scale draws.
-}
-\section{Reproducibility}{
-
-Setting \code{seed} produces fully reproducible output. Two calls
-with the same \code{mod}, \code{newdata} (or grid inputs), and
-\code{seed} return identical predictions.
+\strong{Offset handling.} If the fitted model contains an offset (either as
+\code{offset()} in the formula or as an \verb{offset =} argument), \code{boot_predict()}
+will resolve it in the following order of precedence:
+\enumerate{
+\item If the user supplies the \code{offset} argument, that value is used.
+\item Else if \code{newdata} contains the offset variable(s), the offset
+expression is evaluated on \code{newdata}.
+\item Else offset defaults to 0 (i.e., predictions at the per-unit-exposure
+reference), and a warning is issued.
 }
 
-\examples{
-\dontrun{
-# Fixed-effect log-link GLM: no correction needed, factor = 1
-fit_glm <- glmmTMB::glmmTMB(y ~ Season + Temp,
-                            family = glmmTMB::nbinom2,
-                            data = countData)
-boot_predict(fit_glm, bias_adjust = "none", seed = 123)
+Auto-generated grids exclude offset variables; use the \code{offset} argument
+to specify the reference exposure at which grid predictions should be made.
 
-# Log-link GLMM with one random effect: correction applied
-fit_glmm <- glmmTMB::glmmTMB(y ~ Season + Temp + (1 | Site),
-                             family = glmmTMB::nbinom2,
-                             data = countData)
-out <- boot_predict(fit_glmm, bias_adjust = "manual", seed = 123)
-attr(out, "jensen_factor")   # correction factor applied
-
-# Custom grid: predict at specific Temp values across all Seasons
-boot_predict(fit_glmm,
-             at = list(Temp = c(10, 15, 20)),
-             bias_adjust = "manual",
-             seed = 123)
-
-# Full workflow: diagnose bias, then generate corrected predictions
-bias_precision(fit_glmm, testData = countData,
-               bias_adjust = "none")     # RBIAS negative
-bias_precision(fit_glmm, testData = countData,
-               bias_adjust = "manual")   # RBIAS near zero
-boot_predict(fit_glmm, bias_adjust = "manual", seed = 123)
-}
-
-}
-\seealso{
-\code{\link{jensen_correct}} for the correction-factor calculation
-used internally, and for applying the correction to predictions
-produced by other packages. \code{\link{bias_precision}} for
-resampling-based validation that diagnoses Jensen bias in
-out-of-sample predictions. The tutorial vignette
-(\code{vignette("GLAMMGoF_tutorial")}) works through the full
-diagnose-correct-predict workflow.
+\strong{Output columns.} \code{boot_mean} is the mean of \code{exp(Xβ_j)} across draws
+and includes a small implicit Jensen adjustment from parameter
+uncertainty. \code{boot_median} approximates the plug-in point prediction
+\verb{exp(Xβ̂)}. For well-identified models these agree closely; substantial
+divergence flags high parameter uncertainty (e.g., small n,
+near-separation, sparse designs). Both are useful — the mean is the
+correct marginal quantity when integrating over parameter uncertainty;
+the median is closer to what most users mean by "the model's prediction."
 }
