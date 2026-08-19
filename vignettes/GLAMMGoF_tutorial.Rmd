@@ -716,7 +716,7 @@ When a fitted model contains an offset, there are two ways to specify the offset
 
 **Option 1: The `offset` argument.** This is usually the cleanest approach and works with either `at` or `newdata` grid construction. The value is on the *link scale*, so for a model with `offset(log(area))`, `offset = log(100)` produces predictions at an area of 100 units.
 
-```{r bp-boot-offset, warning = FALSE, comment = NA, message = FALSE}
+```{r bp-boot-offset, warning = FALSE, comment = NA, message = FALSE, eval = FALSE}
 boot_predict(
   mod         = countModel_GLMM_with_offset,
   at          = list(Temp = c(10, 15, 20)),
@@ -729,7 +729,7 @@ boot_predict(
 
 **Option 2: The offset variable in `newdata`.** When you want per-row offsets (e.g., predicting at each row's actual exposure), include the offset variable as a column in `newdata` using its *original name* (here, `area`) on the *raw scale* (not log-transformed because the model's own offset expression handles the transformation).
 
-```{r bp-boot-offset-grid, warning = FALSE, comment = NA, message = FALSE}
+```{r bp-boot-offset-grid, warning = FALSE, comment = NA, message = FALSE, eval = FALSE}
 pred_dat_offset <- expand.grid(
   Season = unique(countData$Season),
   Temp   = seq(min(countData$Temp), max(countData$Temp), length.out = 30),
