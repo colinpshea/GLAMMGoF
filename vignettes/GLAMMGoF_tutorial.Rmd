@@ -689,7 +689,7 @@ boot_predict(
 The resulting grid in this example crosses each Season level with each specified Temp value, giving 4 × 3 = 12 rows. For a fully user-controlled prediction target, pass a complete `newdata` data frame instead; `boot_predict()` will use it directly without auto-generating a grid, as shown below.
 
 ```{r bp-boot-curve_custom-grid, warning = FALSE, comment = NA, message = FALSE}
-pred_dat <- expand.grid(Season = unique(countDat$Season), Temp = seq(min(countDat$Temp), max(countDat$Temp), length.out = 30))
+pred_dat <- expand.grid(Season = unique(countData$Season), Temp = seq(min(countData$Temp), max(countData$Temp), length.out = 30))
 
 bp_curve <- boot_predict(
   mod             = countModel_GLMM,
@@ -731,8 +731,8 @@ boot_predict(
 
 ```{r bp-boot-offset-grid, warning = FALSE, comment = NA, message = FALSE}
 pred_dat_offset <- expand.grid(
-  Season = unique(countDat$Season),
-  Temp   = seq(min(countDat$Temp), max(countDat$Temp), length.out = 30),
+  Season = unique(countData$Season),
+  Temp   = seq(min(countData$Temp), max(countData$Temp), length.out = 30),
   area   = 100
 )
 
