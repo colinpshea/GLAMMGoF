@@ -216,26 +216,33 @@ boot_predict <- function(mod,
     }
 
     ## ---- Parametric bootstrap draws ----
-    cond_draws <- MASS::mvrnorm(n_sim, mu = bhat, Sigma = Vhat)
-    if (is.null(dim(cond_draws))) cond_draws <- matrix(cond_draws, ncol = 1)
-
+    ## When a zi component exists, draw cond and zi fixed effects JOINTLY
+    ## from vcov(mod, full = TRUE), restricted to the cond+zi block (theta /
+    ## dispersion rows excluded). glmmTMB estimates both components in one
+    ## joint likelihood, so their asymptotic cross-covariance need not be
+    ## zero -- treating them as independent understates/overstates response-
+    ## scale uncertainty by whatever that cross-covariance actually is.
     zi_draws <- NULL
     if (zi$mode != "none") {
-        zi_draws <- MASS::mvrnorm(n_sim, mu = zi$fixef, Sigma = zi$vcov)
-        if (is.null(dim(zi_draws))) zi_draws <- matrix(zi_draws, ncol = 1)
-    }
+      Vfull <- stats::vcov(mod, full = TRUE)
+      grp   <- names(dimnames(Vfull)[[1]])
+      keep  <- grepl("^cond[0-9]+$", grp) | grepl("^zi[0-9]*$", grp)
+      Vjoint <- Vfull[keep, keep, drop = FALSE]
 
-    link_fun <- switch(link, log = exp, logit = stats::plogis, identity = identity)
+      mu_joint <- c(bhat, zi$fixef)
+      stopifnot(
+        "vcov(mod, full=TRUE) cond+zi block size doesn't match fixef length -- check for a dispersion component" =
+          nrow(Vjoint) == length(mu_joint)
+      )
 
-    resp <- matrix(NA_real_, nrow = nrow(newdata), ncol = n_sim)
-    for (j in seq_len(n_sim)) {
-        eta_cond <- as.vector(X_cond %*% cond_draws[j, ]) + off_vec
-        mu_cond  <- link_fun(eta_cond)
-        p_zi <- switch(zi$mode,
-                       none      = 0,
-                       intercept = stats::plogis(zi_draws[j, 1]),
-                       covariate = stats::plogis(as.vector(X_zi %*% zi_draws[j, ])))
-        resp[, j] <- mu_cond * (1 - p_zi)
+      joint_draws <- MASS::mvrnorm(n_sim, mu = mu_joint, Sigma = Vjoint)
+      if (is.null(dim(joint_draws))) joint_draws <- matrix(joint_draws, nrow = n_sim)
+
+      cond_draws <- joint_draws[, seq_along(bhat), drop = FALSE]
+      zi_draws   <- joint_draws[, length(bhat) + seq_along(zi$fixef), drop = FALSE]
+    } else {
+      cond_draws <- MASS::mvrnorm(n_sim, mu = bhat, Sigma = Vhat)
+      if (is.null(dim(cond_draws))) cond_draws <- matrix(cond_draws, ncol = 1)
     }
 
     ## ---- Jensen correction (RE-variance based) ----
