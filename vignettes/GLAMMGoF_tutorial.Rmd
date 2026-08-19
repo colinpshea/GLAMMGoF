@@ -672,21 +672,34 @@ attr(bp_corrected, "jensen_factor")
 
 For `countModel_GLMM` this factor is roughly 1.07, consistent with the σ̂ ≈ 0.36 estimate discussed in the worked example above.
 
-#### Response curves over a continuous covariate
+#### Prediction at user-specified covariate values
 
-For plotting a fitted response curve, expand a numeric covariate over its observed range rather than holding it at the mean. The `numeric_default = "range"` argument does this:
+For predictions at specific covariate values rather than the default mean value, there are two options. The `at` argument can be used to specify values for model covariates the user wishes to vary. Values passed via `at` override the `numeric_default` expansion for the named covariates, and any covariates **not** included in the `at` argument are subject to the `numeric_default` setting. 
 
-```{r bp-boot-curve, warning = FALSE, comment = NA, message = FALSE}
+```{r bp-boot-at, warning = FALSE, comment = NA, eval = FALSE}
+boot_predict(
+  mod         = countModel_GLMM,
+  at          = list(Temp = c(10, 15, 20)),
+  n_sim       = 1000,
+  bias_adjust = "manual",
+  seed        = 123
+)
+```
+
+The resulting grid in this example crosses each Season level with each specified Temp value, giving 4 × 3 = 12 rows. For a fully user-controlled prediction target, pass a complete `newdata` data frame instead; `boot_predict()` will use it directly without auto-generating a grid, as shown below.
+
+```{r bp-boot-curve_custom-grid, warning = FALSE, comment = NA, message = FALSE}
+pred_dat <- expand.grid(Season = unique(countDat$Season), Temp = seq(min(countDat$Temp), max(countDat$Temp), length.out = 30))
+
 bp_curve <- boot_predict(
   mod             = countModel_GLMM,
-  numeric_default = "range",
-  numeric_length  = 30,
+  newdata = pred_dat,
   n_sim           = 1000,
   bias_adjust     = "manual",
   seed            = 123
 )
 
-ggplot(bp_curve, aes(x = Temp, y = boot_mean, colour = Season, fill = Season)) +
+ggplot(bp_curve, aes(x = Temp, y = boot_median, colour = Season, fill = Season)) +
   geom_ribbon(aes(ymin = boot_lwr, ymax = boot_upr),
               alpha = 0.15, colour = NA) +
   geom_line(linewidth = 0.9) +
@@ -697,23 +710,44 @@ ggplot(bp_curve, aes(x = Temp, y = boot_mean, colour = Season, fill = Season)) +
 
 The ribbons carry the full bootstrap uncertainty on the response scale, including the fixed-effect coefficient covariance. Because the Jensen correction shifts every draw by the same scalar, the ribbon shapes are unchanged from the uncorrected version; only their level differs.
 
-#### Prediction at user-specified covariate values
+#### Dealing with offsets
 
-For predictions at specific covariate values rather than a swept range, use the `at` argument. Similarly, when the fitted model contains an offset, use the `offset` argument to specify a reference exposure at which to make predictions (on the link scale, for example, offset = log(100) for a log-link model with offset(log(area))). Values passed via `at` override the `numeric_default` expansion for the named covariates:
+When a fitted model contains an offset, there are two ways to specify the offset value for predictions.
 
-```{r bp-boot-at, warning = FALSE, comment = NA, eval = FALSE}
+**Option 1: The `offset` argument.** This is usually the cleanest approach and works with either `at` or `newdata` grid construction. The value is on the *link scale*, so for a model with `offset(log(area))`, `offset = log(100)` produces predictions at an area of 100 units.
+
+```{r bp-boot-offset, warning = FALSE, comment = NA, message = FALSE}
 boot_predict(
-  mod         = countModel_GLMM,
-  at          = list(Temp = c(10, 15, 20)), offset = log(100),
+  mod         = countModel_GLMM_with_offset,
+  at          = list(Temp = c(10, 15, 20)),
+  offset      = log(100),
   n_sim       = 1000,
   bias_adjust = "manual",
   seed        = 123
 )
 ```
 
-The resulting grid crosses each Season level with each specified Temp value, giving 4 × 3 = 12 rows. For a fully user-controlled prediction target, pass a complete `newdata` data frame instead; `boot_predict()` will use it directly without auto-generating a grid.
+**Option 2: The offset variable in `newdata`.** When you want per-row offsets (e.g., predicting at each row's actual exposure), include the offset variable as a column in `newdata` using its *original name* (here, `area`) on the *raw scale* (not log-transformed because the model's own offset expression handles the transformation).
 
-#### Backend support and scope notes
+```{r bp-boot-offset-grid, warning = FALSE, comment = NA, message = FALSE}
+pred_dat_offset <- expand.grid(
+  Season = unique(countDat$Season),
+  Temp   = seq(min(countDat$Temp), max(countDat$Temp), length.out = 30),
+  area   = 100
+)
+
+boot_predict(
+  mod         = countModel_GLMM_with_offset,
+  newdata     = pred_dat_offset,
+  n_sim       = 1000,
+  bias_adjust = "manual",
+  seed        = 123
+)
+```
+
+Note that the `at` argument cannot be used to specify offsets because offset variables are excluded from the auto-grid by design. Use the `offset` argument or a `newdata` frame instead.
+
+#### Back-end support and scope notes
 
 `boot_predict()` supports the same set of model backends as `jensen_correct()`: `glmmTMB`, `lme4` (including `lmerMod`, `glmerMod`, and `glmer.nb` fits), `MASS::glm.nb`, and base `stats::glm` and `stats::lm`. GAMs fit with `mgcv` are not currently supported because variance-component extraction from smooth terms uses a different pathway that is not yet integrated with `jensen_correct()`. Bayesian model objects (\code{brmsfit}, \code{stanreg}) are not supported directly. If marginal response-scale predictions are computed by exponentiating linear-predictor draws at \code{re_formula = NA}, \code{\link{jensen_correct}} applied to the resulting response-scale draws provides the appropriate correction. If marginal predictions are computed via \code{posterior_epred()} with proper Monte Carlo integration over the random-effect posterior, no additional correction is needed and \code{\link{jensen_correct}} should not be applied.   
 
