@@ -626,11 +626,11 @@ The previous sections established that Jensen's inequality bias in log-link GLMM
 
 The problem the function solves is straightforward. Standard `predict(mod, se.fit = TRUE)` returns marginal predictions and delta-method Wald standard errors on the link scale. For a log-link GLMM, back-transforming those to the response scale via `exp()` requires either (a) accepting the asymmetric, sometimes-poor approximation that a delta method gives for a nonlinear transformation of a normal quantity, or (b) writing a parametric bootstrap by hand. Neither option is what a typical user wants. And neither option applies the Jensen correction; that step is left to the user to remember to do afterward.
 
-`boot_predict()` handles both. It draws `n_sim` samples from the joint asymptotic distribution of the fixed-effect coefficients, transforms each draw through the model's inverse-link function, applies the Jensen correction if requested, and returns the mean, standard error, and confidence-interval bounds of the resulting bootstrap distribution alongside the covariate values used for prediction. The output is a data frame ready to plot or table.
+`boot_predict()` handles both. It draws `n_sim` samples from the joint asymptotic distribution of the fixed-effect coefficients, transforms each draw through the model's inverse-link function, applies the Jensen correction if requested, and returns the mean, median, standard error, and confidence-interval bounds of the resulting bootstrap distribution alongside the covariate values used for prediction. The output is a data frame ready to plot or table.
 
 #### Basic usage
 
-The simplest call produces predictions on an auto-generated grid built from the model's covariates. Factor covariates expand to their observed levels; numeric covariates default to their . When the fitted model contains an offset, the offset variables must be present in the prediction grid or supplied via the `offset` argument  (see `?boot_predict` for details).
+The simplest call produces predictions on an auto-generated grid built from the model's covariates. Factor covariates expand to their observed levels; numeric covariates default to their mean observed value in the data. When the fitted model contains an offset, the offset variables must be present in the prediction grid or supplied via the `offset` argument  (see `?boot_predict` for details).
 
 ```{r bp-boot-basic, warning = FALSE, comment = NA}
 bp_uncorrected <- boot_predict(
