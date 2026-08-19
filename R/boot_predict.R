@@ -207,21 +207,19 @@ boot_predict <- function(mod,
     cond_rhs <- stats::reformulate(attr(stats::terms(cond_frm), "term.labels"),
                                    intercept = attr(stats::terms(cond_frm), "intercept"))
     X_cond <- stats::model.matrix(cond_rhs, data = newdata)
+    stopifnot(nrow(X_cond) == nrow(newdata))
+    stopifnot(identical(colnames(X_cond), names(bhat)))
 
     X_zi <- NULL
     if (zi$mode == "covariate") {
-        zi_rhs <- stats::reformulate(attr(stats::terms(zi$formula), "term.labels"),
-                                     intercept = attr(stats::terms(zi$formula), "intercept"))
-        X_zi <- stats::model.matrix(zi_rhs, data = newdata)
+      zi_rhs <- stats::reformulate(attr(stats::terms(zi$formula), "term.labels"),
+                                   intercept = attr(stats::terms(zi$formula), "intercept"))
+      X_zi <- stats::model.matrix(zi_rhs, data = newdata)
+      stopifnot(nrow(X_zi) == nrow(newdata))
+      stopifnot(identical(colnames(X_zi), names(zi$fixef)))
     }
 
     ## ---- Parametric bootstrap draws ----
-    ## When a zi component exists, draw cond and zi fixed effects JOINTLY
-    ## from vcov(mod, full = TRUE), restricted to the cond+zi block (theta /
-    ## dispersion rows excluded). glmmTMB estimates both components in one
-    ## joint likelihood, so their asymptotic cross-covariance need not be
-    ## zero -- treating them as independent understates/overstates response-
-    ## scale uncertainty by whatever that cross-covariance actually is.
     zi_draws <- NULL
     if (zi$mode != "none") {
       Vfull <- stats::vcov(mod, full = TRUE)
@@ -243,6 +241,19 @@ boot_predict <- function(mod,
     } else {
       cond_draws <- MASS::mvrnorm(n_sim, mu = bhat, Sigma = Vhat)
       if (is.null(dim(cond_draws))) cond_draws <- matrix(cond_draws, ncol = 1)
+    }
+
+    link_fun <- switch(link, log = exp, logit = stats::plogis, identity = identity)
+
+    resp <- matrix(NA_real_, nrow = nrow(newdata), ncol = n_sim)
+    for (j in seq_len(n_sim)) {
+      eta_cond <- as.vector(X_cond %*% cond_draws[j, ]) + off_vec
+      mu_cond  <- link_fun(eta_cond)
+      p_zi <- switch(zi$mode,
+                     none      = 0,
+                     intercept = stats::plogis(zi_draws[j, 1]),
+                     covariate = stats::plogis(as.vector(X_zi %*% zi_draws[j, ])))
+      resp[, j] <- mu_cond * (1 - p_zi)
     }
 
     ## ---- Jensen correction (RE-variance based) ----
