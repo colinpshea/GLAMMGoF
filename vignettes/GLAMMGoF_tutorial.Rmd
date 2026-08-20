@@ -757,6 +757,8 @@ jf <- jensen_correct(countModel_GLMM2)  # 1.143358
 ##### The corrected/uncorrected ratio from boot_predict
 bp_corr   <- boot_predict(countModel_GLMM2, n_sim = 10000, bias_adjust = "manual", seed = 1)
 bp_uncorr <- boot_predict(countModel_GLMM2, n_sim = 10000, bias_adjust = "none",   seed = 1)
+
+##### Compare ratios for each Seasonal estimate (4 total)
 bp_corr$boot_median / bp_uncorr$boot_median  # ~1.143 across every row
 bp_corr$boot_mean / bp_uncorr$boot_mean  # ~1.143 across every row
 
