@@ -752,19 +752,27 @@ Note that the `at` argument cannot be used to specify offsets because offset var
 Here, we use `countModel_GLMM2` to verify agreement between the calculated Jensen adjustment factor and means and medians calculated using `boot_predict()`
 
 ##### The Jensen factor
+```{r, manual-jf}
 jf <- jensen_correct(countModel_GLMM2)  # 1.143358
+```
 
 ##### The corrected/uncorrected ratio from boot_predict
+```{r, boot-corr}
 bp_corr   <- boot_predict(countModel_GLMM2, n_sim = 10000, bias_adjust = "manual", seed = 1)
 bp_uncorr <- boot_predict(countModel_GLMM2, n_sim = 10000, bias_adjust = "none",   seed = 1)
+```
 
 ##### Compare ratios for each Seasonal estimate (4 total)
+```{r, jf-ratio}
 bp_corr$boot_median / bp_uncorr$boot_median  # ~1.143 across every row
 bp_corr$boot_mean / bp_uncorr$boot_mean  # ~1.143 across every row
+```
 
 ##### Verify agreement
+```{r, jf-boot-agreement}
 all.equal(mean(bp_corr$boot_median / bp_uncorr$boot_median), jf, tolerance = 0.01)
 all.equal(mean(bp_corr$boot_mean / bp_uncorr$boot_mean), jf, tolerance = 0.01)
+```
 
 #### Back-end support and scope notes
 
