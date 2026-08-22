@@ -23,7 +23,8 @@ Description: Provides resampling-based predictive validation for generalized
     underestimation of the arithmetic mean that arises from Jensen's
     inequality when back-transforming predictions to the response scale, via
     analytical corrections for log-link and log-normal models, with or without
-    random effects.
+    random effects. Marginal and bias-adjusted response-scale predictions can
+    also be calculated using parametric bootstrapping.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

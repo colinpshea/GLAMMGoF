@@ -2,7 +2,7 @@ GLAMMGoF 1.4.2
 
 ## New features
 
-* boot_predict() now uses joint MVN from the conditional and zero-inflation models when bootstrapping predictions from a zero-inflated model. Previous versions used independent nultivariate normal draws for each component. 
+* boot_predict() now uses joint MVN from the conditional and zero-inflation models when bootstrapping predictions from a zero-inflated model. Previous versions used independent multivariate normal draws for each component. 
 
 GLAMMGoF 1.4.1
 
