@@ -130,7 +130,7 @@
   }
 
   if (resolved == "log_link" && rev$re_var == 0)
-    warning("No random effects found with a log link: the correction factor is ",
+    message("No random effects found with a log link: the correction factor is ",
             "1. Log-link GLMs (no random effects) require no Jensen correction.")
 
   V <- rev$re_var + resid_var

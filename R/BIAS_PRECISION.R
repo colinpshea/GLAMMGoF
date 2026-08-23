@@ -264,8 +264,17 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
           "transformation is visible, or supply correction_factor = ",
           "exp((sigma^2_resid + sum(sigma^2_RE)) / 2) directly."
         )
-    }
+      # Log-link GLM with no random effects: exp(0/2) = 1, correction is a no-op.
+      # Mirrors the message in .jensen_factor() so bias_precision() and
+      # jensen_correct() behave symmetrically on the same input.
+      if (!is.null(fam_full) &&
+          identical(fam_full$link, "log") &&
+          rev_full$re_var == 0)
+        message("No random effects found with a log link: the correction factor ",
+                "is 1. Log-link GLMs (no random effects) require no Jensen ",
+                "correction.")
 
+    }
     resid_var <- if (is_lognormal) sigma(testModel)^2 else 0
     exp((rev_full$re_var + resid_var) / 2)
   } else {
