@@ -190,7 +190,7 @@ test_that("non-natural log bases are rejected", {
 test_that("log-link GLM without random effects returns factor 1 with a warning", {
   dat <- sim_count(seed = 10)
   mp  <- glm(y ~ x, family = poisson, data = dat)
-  expect_warning(f <- jensen_correct(mp), "correction factor is 1")
+  expect_message(f <- jensen_correct(mp), "correction factor is 1")
   expect_equal(f, 1)
 })
 

@@ -159,9 +159,9 @@ test_that("bias_adjust has no numeric effect on fixed-effect log-link GLM", {
   expect_equal(out_none$boot_upr,  out_man$boot_upr,  tolerance = 1e-10)
 })
 
-test_that("bias_adjust = 'manual' emits informative warning for no-RE model", {
+test_that("bias_adjust = 'manual' emits informative message for no-RE model", {
   skip_if_not_installed_all(c("glmmTMB"))
-  expect_warning(
+  expect_message(
     boot_predict(countModel_GLM, bias_adjust = "manual",
                  n_sim = 100, seed = 1),
     regexp = "no random effects"

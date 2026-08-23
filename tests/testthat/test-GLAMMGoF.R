@@ -29,7 +29,7 @@ test_that("jensen_correct returns scalar > 1 for glmmTMB with RE", {
 })
 
 test_that("jensen_correct returns 1 with warning for model with no REs", {
-  expect_warning(cf <- jensen_correct(countModel_GLM))
+  expect_message(cf <- jensen_correct(countModel_GLM))
   expect_equal(cf, 1)
 })
 
