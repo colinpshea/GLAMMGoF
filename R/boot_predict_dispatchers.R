@@ -113,8 +113,10 @@
   }
   if (inherits(mod, c("brmsfit", "stanfit", "stanreg"))) {
     stop("boot_predict() does not support Bayesian model objects. ",
-         "Use the posterior draws directly (e.g. brms::posterior_epred()) ",
-         "and apply GLAMMGoF::jensen_correct() to the response-scale draws.",
+         "If posterior predictions are drawn directly on the response scale (e.g. brms::posterior_epred()), ",
+         "no bias correction is needed. ",
+         "If link-scale posterior draws are used (e.g. brms::posterior_linpred()), ",
+         "apply GLAMMGoF::jensen_correct() to the back-transformed response-scale summaries.",
          call. = FALSE)
   }
   if (inherits(mod, c("gam", "bam", "gamm"))) {
