@@ -107,16 +107,6 @@ Both functions assess in- and out-of-sample predictive performance for generaliz
 
 Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets. Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training data set contains the same number of observations as the original data set, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller data sets, but is slightly less intuitive than the holdout approach. For models without random effects and reasonably sized data sets, both methods should produce similar results. Differences can emerge for random-effect models, particularly when random-effect groups have few observations. See "A note about holdout vs bootstrap resampling methods when diagnosing and adjusting for Jensen's inequality bias" below for details. 
 
-#### A note about zero-inflated models
-
-For zero-heavy count or continuous data, the choice of performance metric matters. `RBIAS` in particular can behave unexpectedly when the response contains zeros or values near zero, because the relative error formulation divides by the observed value, producing unstable or extreme terms that can dominate the average and give a misleading impression of systematic underprediction. This is a known limitation of relative bias metrics rather than evidence of poor model fit (Hyndman and Koehler 2006), and is most likely to occur when zeros are common but the zero-generating process is not explicitly modeled.
-
--   In these situations, `RMedAE` or `RMAE` may provide more reliable summaries of predictive performance. `RMedAE` is robust to extreme errors because it is based on the median absolute error rather than the mean, and therefore better reflects predictive accuracy for a typical observation. `RMAE` can also be useful because absolute-error metrics weight errors linearly rather than quadratically, making them less sensitive to extreme observations than `RMSE`-based measures.
-
--   When combined with the `DHARMa` zero-inflation test (`testZI = TRUE`), these metrics provide a more complete assessment than any single measure alone. `RMedAE` or `RMAE` summarize predictive accuracy, while the ZI test evaluates whether the model correctly reproduces the observed frequency of zeros. A significant ZI test result with `ratioObsSim > 1` indicates that the model is underpredicting zeros, suggesting that a zero-inflated model family or additional sources of heterogeneity should be considered.
-
-There are two example data sets, `countData` and `logitData`, with integer and binary response variables, respectively. Each data set also includes a variety of continuous and categorical predictor variables. Additionally, there are 12 example model objects (6 beginning with `count` and 6 beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible `R` packages
-
 ### `bias_precision()`
 
 #### Using the `bias_precision()` function
@@ -192,6 +182,16 @@ And now look at a plot of the summaries...
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 bp$bias_precision_hist
 ```
+
+#### A note about zero-heavy data
+
+For zero-heavy count or continuous data, the choice of performance metric matters. `RBIAS` in particular can behave unexpectedly when the response contains zeros or values near zero, because the relative error formulation divides by the observed value, producing unstable or extreme terms that can dominate the average and give a misleading impression of systematic underprediction. This is a known limitation of relative bias metrics rather than evidence of poor model fit (Hyndman and Koehler 2006), and is most likely to occur when zeros are common but the zero-generating process is not explicitly modeled.
+
+-   In these situations, `RMedAE` or `RMAE` may provide more reliable summaries of predictive performance. `RMedAE` is robust to extreme errors because it is based on the median absolute error rather than the mean, and therefore better reflects predictive accuracy for a typical observation. `RMAE` can also be useful because absolute-error metrics weight errors linearly rather than quadratically, making them less sensitive to extreme observations than `RMSE`-based measures.
+
+-   When combined with the `DHARMa` zero-inflation test (`testZI = TRUE`), these metrics provide a more complete assessment than any single measure alone. `RMedAE` or `RMAE` summarize predictive accuracy, while the ZI test evaluates whether the model correctly reproduces the observed frequency of zeros. A significant ZI test result with `ratioObsSim > 1` indicates that the model is underpredicting zeros, suggesting that a zero-inflated model family or additional sources of heterogeneity should be considered.
+
+There are two example data sets, `countData` and `logitData`, with integer and binary response variables, respectively. Each data set also includes a variety of continuous and categorical predictor variables. Additionally, there are 12 example model objects (6 beginning with `count` and 6 beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible `R` packages
 
 ### `brier_auc()`
 
