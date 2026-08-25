@@ -322,17 +322,21 @@ The general principle is: **if the random effect represents variation you would 
 The single most important distinction is whether the log appears as a **link function** or as a **transformation of the response**, because this determines
 whether the residual variance sits inside or outside the back-transformation. The family alone does not tell you: a Gaussian model can appear on either side of this line.
 
+In the notation below, $u$ denotes a random-effect deviation (e.g., site-level intercept) assumed to be Gaussian with mean 0 and variance $\sigma^2_u$, and $\epsilon$ denotes the residual error term, also Gaussian with variance $\sigma^2_\epsilon$. In log-link models, $\epsilon$ is additive on the response scale (outside the exponential); in log-transformed-response models, $\epsilon$ is additive on the log scale (inside the exponential). This distinction determines whether residual variance contributes to the Jensen correction.
+
 | Model | Formula | Residual is additive on... | Correction |
 |:---|:---|:---|:---|
 | Log-link GLM | `y ~ x, family = poisson` | (no log-scale random component) | none needed |
-| Log-link GLMM | `y ~ x + (1|site), family = nbinom2` | response scale | $\exp(\sigma^2_u/2)$ |
+| Log-link GLMM | `y ~ x + (1|site), family = poisson` | response scale | $\exp(\sigma^2_u/2)$ |
 | Gaussian log **link** | `y ~ x + (1|site), family = gaussian("log")` | response scale | $\exp(\sigma^2_u/2)$ |
 | Log-normal LM | `log(y) ~ x` | **log scale** | $\exp(\sigma^2_\varepsilon/2)$ |
 | Log-normal LMM | `log(y) ~ x + (1|site)` | **log scale** | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
 
-`gaussian(link = "log")` and `log(y) ~ x` are easy to conflate, as both involve a Gaussian likelihood and an exponential, but they are different models. With a log link the response is untransformed and the residual error is additive on the *response* scale, outside $\exp()$, so it contributes nothing to the re-transformation bias. With a log-transformed response the residual error is additive on the *log* scale, inside $\exp()$, so it contributes fully.
+Notably, `gaussian(link = "log")` and `log(y) ~ x` are easy to conflate, as both involve a Gaussian likelihood and an exponential; however, they are different models. With a log link the response is untransformed and the residual error is additive on the *response* scale, outside $\exp()$, so it contributes nothing to the re-transformation bias. With a log-transformed response the residual error is additive on the *log* scale, inside $\exp()$, so it contributes fully.
 
 `GLAMMGoF` resolves this automatically by inspecting the left-hand side of the model formula rather than the family or link, so both cases are handled correctly without user intervention. Only a natural log is supported; `log10()` and `log2()` responses are rejected with an informative error, since each requires a different back-transformation.
+
+Lastly, for distributional families with free dispersion parameters (`gamma`, `tweedie`, negative binomial via `nbinom1`/`nbinom2`) used with a log link, the dispersion parameter does not contribute to the Jensen correction on the conditional mean. This holds whether dispersion is constant or modeled as a function of covariates via `dispformula`; the log link used internally by `dispformula` is a numerical convenience for keeping the dispersion parameter positive, and does not put the dispersion inside the exponential that produces $E[Y|X]$. Modeling dispersion can of course affect estimation of the fixed effects and their standard errors through the likelihood, but that is a separate matter from the back-transformation bias the Jensen correction addresses. Only $\sigma^2_u$ from the random effects enters the correction factor. For Gaussian families, the correction depends on whether the log appears as a link function or as a response transformation (see the table above).
 
 #### Diagnosing and correcting Jensen's inequality bias
 
