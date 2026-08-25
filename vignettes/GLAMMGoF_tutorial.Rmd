@@ -101,7 +101,7 @@ The two functions used to assess predictive performance are `bias_precision` and
 
 ### Important things to know
 
-### Inclusion of random effects
+#### Inclusion of random effects
 
 Both functions accept models with or without random effects. By default, predictive performance is based on population-level (marginal) predictions, meaning random effects are excluded during prediction (re.form = ~0). This behavior can be changed via the conditional_predictions argument (see “Marginal vs conditional predictions” below for details). 
 
