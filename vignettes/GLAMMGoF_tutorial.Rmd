@@ -767,7 +767,7 @@ Note that the `at` argument cannot be used to specify offsets because offset var
 
 #### User-specified correction factors in `boot_predict`
 
-The `correction_factor` argument allows users to supply their own scalar correction factor rather than relying on the internal `jensen_correct(mod)` computation. This is useful when only a subset of random-effect variance components should contribute to the correction; for example, when a model contains both substantive REs (site-level effects that should be marginalized) and nuisance REs (observer or batch effects that should not). The user can compute `cf = exp(sum(substantive_variances) / 2)` from `VarCorr(mod)` and supply it as `correction_factor = cf`. When supplied, `correction_factor` overrides `bias_adjust`.
+The `correction_factor` argument allows users to supply their own scalar correction factor rather than relying on the internal `jensen_correct(mod)` computation. This is useful when only a subset of random-effect variance components should contribute to the correction; for example, when a model contains both substantive REs (site-level effects that should be marginalized) and nuisance REs (observer or batch effects that should not). The user can compute `cf = exp(sum(substantive_variances) / 2)` from `VarCorr(mod)` and supply it as `correction_factor = cf`. When supplied, `correction_factor` overrides `bias_adjust` and an informative message is issued.
 
 #### Demonstrate agreement between `jensen_correct()` and `boot_predict()`
 

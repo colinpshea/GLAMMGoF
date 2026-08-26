@@ -360,6 +360,17 @@ test_that("correction_factor: overrides bias_adjust with a message", {
   expect_equal(attr(bp, "jensen_factor"), cf_user)
 })
 
+test_that("correction_factor: overrides bias_adjust = 'none' with a message", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  expect_message(
+    bp <- boot_predict(countModel_GLMM, bias_adjust = "none",
+                       correction_factor = 1.10,
+                       n_sim = 500, seed = 1),
+    regexp = "overriding"
+  )
+  expect_equal(attr(bp, "jensen_factor"), 1.10)
+})
+
 test_that("correction_factor: correction_factor = 1 is a valid no-op", {
   skip_if_not_installed_all(c("glmmTMB"))
   bp_one  <- boot_predict(countModel_GLMM, correction_factor = 1,

@@ -279,6 +279,9 @@ boot_predict <- function(mod,
       if (bias_adjust == "manual") {
         message("`correction_factor` supplied; overriding `bias_adjust = \"manual\"` ",
                 "and the internally-computed Jensen correction from `jensen_correct()`.")
+      } else if (bias_adjust == "none") {
+        message("`correction_factor` supplied; overriding `bias_adjust = \"none\"`. ",
+                "Predictions will be multiplied by the supplied correction factor.")
       }
       if (link == "logit") {
         message("`correction_factor` applied to a logit-link model. ",
