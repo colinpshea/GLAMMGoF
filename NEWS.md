@@ -1,3 +1,9 @@
+GLAMMGoF 1.4.3
+
+## New features
+
+* boot_predict() now accepts a correction_factor argument for supplying a user-computed Jensen correction on the response scale, overriding the internal jensen_correct(mod) computation. Useful when only a subset of random-effect variance components should contribute to the correction.
+
 GLAMMGoF 1.4.2
 
 ## New features

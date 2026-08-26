@@ -321,3 +321,90 @@ test_that("output carries all expected attributes with correct values", {
   expect_equal(attrs$alpha, 0.10)
   expect_true(is.numeric(attrs$jensen_factor))
 })
+
+# ──────────────────────────────────────────────────────────────
+# correction_factor tests (6 total)
+# ──────────────────────────────────────────────────────────────
+
+test_that("correction_factor: user-supplied scalar is applied correctly", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  cf_user <- 1.25
+  bp_user <- boot_predict(countModel_GLMM, correction_factor = cf_user,
+                          n_sim = 500, seed = 1)
+  bp_none <- boot_predict(countModel_GLMM, bias_adjust = "none",
+                          n_sim = 500, seed = 1)
+  # Each corrected prediction equals the uncorrected prediction times cf_user.
+  expect_equal(bp_user$boot_mean,   bp_none$boot_mean   * cf_user, tolerance = 1e-8)
+  expect_equal(bp_user$boot_median, bp_none$boot_median * cf_user, tolerance = 1e-8)
+  # The jensen_factor attribute reflects the supplied value.
+  expect_equal(attr(bp_user, "jensen_factor"), cf_user)
+})
+
+test_that("correction_factor: NULL default uses internal jensen_correct", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  bp_manual <- boot_predict(countModel_GLMM, bias_adjust = "manual",
+                            n_sim = 500, seed = 1)
+  expect_equal(attr(bp_manual, "jensen_factor"),
+               jensen_correct(countModel_GLMM), tolerance = 1e-8)
+})
+
+test_that("correction_factor: overrides bias_adjust with a message", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  cf_user <- 1.10
+  expect_message(
+    bp <- boot_predict(countModel_GLMM, bias_adjust = "manual",
+                       correction_factor = cf_user,
+                       n_sim = 500, seed = 1),
+    regexp = "overriding"
+  )
+  expect_equal(attr(bp, "jensen_factor"), cf_user)
+})
+
+test_that("correction_factor: correction_factor = 1 is a valid no-op", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  bp_one  <- boot_predict(countModel_GLMM, correction_factor = 1,
+                          n_sim = 500, seed = 1)
+  bp_none <- boot_predict(countModel_GLMM, bias_adjust = "none",
+                          n_sim = 500, seed = 1)
+  expect_equal(bp_one$boot_mean, bp_none$boot_mean, tolerance = 1e-8)
+  expect_equal(attr(bp_one, "jensen_factor"), 1)
+})
+
+test_that("correction_factor: invalid values are rejected", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  expect_error(
+    boot_predict(countModel_GLMM, correction_factor = -1,
+                 n_sim = 100, seed = 1),
+    regexp = "positive finite"
+  )
+  expect_error(
+    boot_predict(countModel_GLMM, correction_factor = 0,
+                 n_sim = 100, seed = 1),
+    regexp = "positive finite"
+  )
+  expect_error(
+    boot_predict(countModel_GLMM, correction_factor = c(1.1, 1.2),
+                 n_sim = 100, seed = 1),
+    regexp = "positive finite"
+  )
+  expect_error(
+    boot_predict(countModel_GLMM, correction_factor = "1.1",
+                 n_sim = 100, seed = 1),
+    regexp = "positive finite"
+  )
+  expect_error(
+    boot_predict(countModel_GLMM, correction_factor = NA_real_,
+                 n_sim = 100, seed = 1),
+    regexp = "positive finite"
+  )
+})
+
+test_that("correction_factor: applied to logit-link model with informational message", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  expect_message(
+    bp <- boot_predict(logitModel_GLMM, correction_factor = 1.1,
+                       n_sim = 500, seed = 1),
+    regexp = "logit"
+  )
+  expect_equal(attr(bp, "jensen_factor"), 1.1)
+})

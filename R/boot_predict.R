@@ -26,7 +26,17 @@
 #' @param bias_adjust One of `"none"` (default) or `"manual"`; `"manual"`
 #'   multiplies each prediction by `jensen_correct(mod)` to correct for
 #'   Jensen's inequality bias from the random-effect variance components.
-#'   Has no effect on logit-link models (warning issued).
+#'   Has no effect on logit-link models (warning issued). Overridden by
+#'   `correction_factor` if that argument is supplied.
+#' @param correction_factor Optional positive numeric scalar giving a
+#'   user-supplied Jensen correction factor to apply on the response scale
+#'   (i.e., predictions are multiplied by this value). When supplied,
+#'   overrides `bias_adjust` and the internally-computed correction from
+#'   `jensen_correct(mod)`. Useful when the default correction is not what
+#'   is wanted — for example, to include only a subset of random-effect
+#'   variance components (e.g., substantive REs but not nuisance REs), or
+#'   to apply a correction computed externally from another source.
+#'   Supply `1` for no correction. Defaults to `NULL` (use `bias_adjust`).
 #' @param seed Optional integer seed for reproducibility.
 #'
 #' @details
@@ -66,6 +76,7 @@ boot_predict <- function(mod,
                          n_sim = 5000,
                          alpha = 0.05,
                          bias_adjust = c("none", "manual"),
+                         correction_factor = NULL,
                          seed = NULL) {
 
     bias_adjust <- match.arg(bias_adjust)
@@ -258,15 +269,34 @@ boot_predict <- function(mod,
 
     ## ---- Jensen correction (RE-variance based) ----
     jf <- 1
-    if (bias_adjust == "manual") {
-        if (link == "logit") {
-            warning("bias_adjust = 'manual' has no effect for logit-link models. ",
-                    "Jensen's inequality correction only applies where predictions ",
-                    "are back-transformed via the exponential.", call. = FALSE)
-        } else {
-            jf   <- jensen_correct(mod)
-            resp <- resp * jf
-        }
+    if (!is.null(correction_factor)) {
+      # User-supplied override: validate and apply.
+      if (!is.numeric(correction_factor) || length(correction_factor) != 1L ||
+          !is.finite(correction_factor) || correction_factor <= 0) {
+        stop("`correction_factor` must be a single positive finite numeric value.",
+             call. = FALSE)
+      }
+      if (bias_adjust == "manual") {
+        message("`correction_factor` supplied; overriding `bias_adjust = \"manual\"` ",
+                "and the internally-computed Jensen correction from `jensen_correct()`.")
+      }
+      if (link == "logit") {
+        message("`correction_factor` applied to a logit-link model. ",
+                "Note that Jensen's inequality correction typically does not ",
+                "apply where predictions are back-transformed via the logistic ",
+                "function; ensure this is intended.")
+      }
+      jf   <- correction_factor
+      resp <- resp * jf
+    } else if (bias_adjust == "manual") {
+      if (link == "logit") {
+        warning("bias_adjust = 'manual' has no effect for logit-link models. ",
+                "Jensen's inequality correction only applies where predictions ",
+                "are back-transformed via the exponential.", call. = FALSE)
+      } else {
+        jf   <- jensen_correct(mod)
+        resp <- resp * jf
+      }
     }
 
     ## ---- Assemble output ----

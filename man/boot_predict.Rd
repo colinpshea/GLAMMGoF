@@ -14,6 +14,7 @@ boot_predict(
   n_sim = 5000,
   alpha = 0.05,
   bias_adjust = c("none", "manual"),
+  correction_factor = NULL,
   seed = NULL
 )
 }
@@ -46,7 +47,18 @@ over numeric predictors.}
 \item{bias_adjust}{One of \code{"none"} (default) or \code{"manual"}; \code{"manual"}
 multiplies each prediction by \code{jensen_correct(mod)} to correct for
 Jensen's inequality bias from the random-effect variance components.
-Has no effect on logit-link models (warning issued).}
+Has no effect on logit-link models (warning issued). Overridden by
+\code{correction_factor} if that argument is supplied.}
+
+\item{correction_factor}{Optional positive numeric scalar giving a
+user-supplied Jensen correction factor to apply on the response scale
+(i.e., predictions are multiplied by this value). When supplied,
+overrides \code{bias_adjust} and the internally-computed correction from
+\code{jensen_correct(mod)}. Useful when the default correction is not what
+is wanted — for example, to include only a subset of random-effect
+variance components (e.g., substantive REs but not nuisance REs), or
+to apply a correction computed externally from another source.
+Supply \code{1} for no correction. Defaults to \code{NULL} (use \code{bias_adjust}).}
 
 \item{seed}{Optional integer seed for reproducibility.}
 }
