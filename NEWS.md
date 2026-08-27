@@ -1,8 +1,34 @@
+GLAMMGoF 1.4.4
+
+## Documentation
+
+* Clarified that `bias_precision()`, `boot_predict()`, and `jensen_correct()`
+  all correctly handle `glmmTMB` models fit with
+  `family = lognormal(link = "log")`. This family targets `E[Y]` on the
+  response scale via internal MLE handling of residual variance, so only
+  random-effect variance requires external correction. An informational
+  message is emitted when the correction is applied, clarifying what is
+  and is not being corrected.
+
+* Vignette expanded with a note distinguishing `glmmTMB`'s lognormal family
+  parameterization from `log(y) ~ ., family = gaussian`, and a new section
+  on potential sources of residual bias after Jensen correction.
+
+## Internal
+
+* Improved consistency of informational messages across functions when the
+  Jensen correction is applied to lognormal-family models.
+
 GLAMMGoF 1.4.3
 
 ## New features
 
-* boot_predict() now accepts a correction_factor argument for supplying a user-computed Jensen correction on the response scale, overriding the internal jensen_correct(mod) computation. Useful when only a subset of random-effect variance components should contribute to the correction.
+* `boot_predict()` gains a `correction_factor` argument for supplying a
+  user-computed Jensen correction on the response scale, overriding the
+  internal `jensen_correct(mod)` computation. Useful when only a subset of
+  random-effect variance components should contribute to the correction
+  (e.g., substantive REs but not nuisance REs), or when the correction has
+  been computed externally.
 
 GLAMMGoF 1.4.2
 

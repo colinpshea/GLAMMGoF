@@ -296,3 +296,112 @@ test_that("Poisson GLMM metrics are unaffected by the lognormal changes (regress
                         seed = 1, verbose = FALSE)
   expect_true(all(is.finite(res$bias_precision_summary$mn)))
 })
+
+test_that("glmmTMB lognormal: correction is RE-only, not residual", {
+  skip_if_not_installed("glmmTMB")
+
+  set.seed(1)
+  n_grp <- 20
+  n_per <- 15
+  N <- n_grp * n_per
+  dat <- data.frame(
+    Group = factor(rep(1:n_grp, each = n_per)),
+    X1    = rnorm(N)
+  )
+  b <- rnorm(n_grp, 0, 0.4)
+  logY <- 2 + 0.5 * dat$X1 + b[dat$Group] + rnorm(N, 0, 0.5)
+  dat$Y <- exp(logY)
+
+  m <- glmmTMB::glmmTMB(Y ~ X1 + (1 | Group),
+                        family = glmmTMB::lognormal(link = "log"),
+                        data = dat)
+
+  # The correction factor applied should be exp(sigma^2_RE / 2), NOT
+  # exp((sigma^2_RE + sigma^2_epsilon) / 2). Verify by supplying the RE-only
+  # value as correction_factor and confirming behavior matches internal manual.
+  re_var  <- glmmTMB::VarCorr(m)$cond$Group[1, 1]
+  cf_re_only <- exp(re_var / 2)
+
+  bp_internal <- suppressMessages(
+    bias_precision(nReps = 50, testModel = m, testData = dat,
+                   method = "holdout", DHARMaPlot = FALSE,
+                   bias_adjust = "manual", seed = 123, verbose = FALSE)
+  )
+  bp_explicit <- suppressMessages(
+    bias_precision(nReps = 50, testModel = m, testData = dat,
+                   method = "holdout", DHARMaPlot = FALSE,
+                   bias_adjust = "manual",
+                   correction_factor = cf_re_only,
+                   seed = 123, verbose = FALSE)
+  )
+
+  # The correction is applied identically to marginal predictions in both cases,
+  # so RBIAS should match essentially exactly.
+  rbias_internal <- bp_internal$bias_precision_summary$mn[
+    as.character(bp_internal$bias_precision_summary$Group)  == "Out-of-sample performance" &
+      as.character(bp_internal$bias_precision_summary$Metric) == "RBIAS"
+  ]
+  rbias_explicit <- bp_explicit$bias_precision_summary$mn[
+    as.character(bp_explicit$bias_precision_summary$Group)  == "Out-of-sample performance" &
+      as.character(bp_explicit$bias_precision_summary$Metric) == "RBIAS"
+  ]
+  expect_equal(rbias_internal, rbias_explicit, tolerance = 0.01)
+})
+
+test_that("glmmTMB lognormal: message fires only under bias_adjust='manual'", {
+  skip_if_not_installed("glmmTMB")
+
+  set.seed(2)
+  dat <- data.frame(
+    Group = factor(rep(1:10, each = 15)),
+    X1    = rnorm(150)
+  )
+  b <- rnorm(10, 0, 0.3)
+  dat$Y <- exp(1 + 0.4 * dat$X1 + b[dat$Group] + rnorm(150, 0, 0.4))
+
+  m <- glmmTMB::glmmTMB(Y ~ X1 + (1 | Group),
+                        family = glmmTMB::lognormal(link = "log"),
+                        data = dat)
+
+  # Message should fire under bias_adjust = "manual".
+  expect_message(
+    bias_precision(nReps = 20, testModel = m, testData = dat,
+                   method = "holdout", DHARMaPlot = FALSE,
+                   bias_adjust = "manual", seed = 1, verbose = FALSE),
+    regexp = "lognormal family detected"
+  )
+
+  # Message should NOT fire under bias_adjust = "none".
+  expect_no_message(
+    bias_precision(nReps = 20, testModel = m, testData = dat,
+                   method = "holdout", DHARMaPlot = FALSE,
+                   bias_adjust = "none", seed = 1, verbose = FALSE),
+    message = "lognormal family detected"
+  )
+})
+
+test_that("jensen_correct: glmmTMB lognormal returns RE-only correction", {
+  skip_if_not_installed("glmmTMB")
+
+  set.seed(3)
+  dat <- data.frame(
+    Group = factor(rep(1:15, each = 20)),
+    X1    = rnorm(300)
+  )
+  b <- rnorm(15, 0, 0.5)
+  dat$Y <- exp(2 + 0.3 * dat$X1 + b[dat$Group] + rnorm(300, 0, 0.6))
+
+  m <- glmmTMB::glmmTMB(Y ~ X1 + (1 | Group),
+                        family = glmmTMB::lognormal(link = "log"),
+                        data = dat)
+
+  cf       <- jensen_correct(m)
+  re_var   <- glmmTMB::VarCorr(m)$cond$Group[1, 1]
+  expected <- exp(re_var / 2)
+
+  expect_equal(cf, expected, tolerance = 1e-8)
+  # And to be explicit: NOT the residual + RE correction.
+  resid_var <- sigma(m)^2  # note: this is the internal MLE-based sigma, on the response scale
+  wrong     <- exp((re_var + resid_var) / 2)
+  expect_true(abs(cf - expected) < abs(cf - wrong))
+})

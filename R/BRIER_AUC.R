@@ -168,7 +168,7 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
   if (bias_adjust == "manual")
     stop("bias_adjust = 'manual' is not supported for binomial models. ",
          "The analytical correction exp(sigma^2/2) is only valid for log-link ",
-         "models (e.g. Poisson, negative binomial); for logit-link models there ",
+         "models (e.g. Poisson, negative binomial) with random effects and to log-transformed response models; for logit-link models there ",
          "is no equivalent closed-form correction. No bias adjustment is currently ",
          "supported for binomial GLMMs in brier_auc() - use bias_adjust = 'none' ",
          "and interpret Brier score / log loss relative to the null model baseline. ",

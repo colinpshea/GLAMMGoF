@@ -89,6 +89,12 @@ boot_predict <- function(mod,
     cond_frm <- .bp_formula(mod)
     zi       <- .bp_zi_info(mod)
 
+    ## Inline family detection (replaces the previous .bp_family_info() call).
+    ## family_name is used only by the lognormal_note() helper below to decide
+    ## whether to emit the glmmTMB-lognormal informational message.
+    family_info <- tryCatch(stats::family(mod), error = function(e) NULL)
+    family_name <- if (!is.null(family_info)) family_info$family else NA_character_
+
     if (!link %in% c("log", "logit", "identity")) {
         stop("boot_predict() currently supports log, logit, and identity ",
              "links only. Got link = '", link, "'.", call. = FALSE)
@@ -269,6 +275,22 @@ boot_predict <- function(mod,
 
     ## ---- Jensen correction (RE-variance based) ----
     jf <- 1
+
+    # Local helper: emit the glmmTMB lognormal note whenever a correction is
+    # actually being applied to a lognormal-family model, regardless of whether
+    # the correction came from jensen_correct() or from a user override.
+    lognormal_note <- function() {
+      if (isTRUE(identical(family_name, "lognormal")) && inherits(mod, "glmmTMB")) {
+        message(
+          "glmmTMB lognormal family detected: this family parameterizes the ",
+          "linear predictor to target E[Y] on the response scale, so residual ",
+          "variance is handled internally and does not enter the Jensen ",
+          "correction. Only random-effect variance is corrected for marginal ",
+          "predictions."
+        )
+      }
+    }
+
     if (!is.null(correction_factor)) {
       # User-supplied override: validate and apply.
       if (!is.numeric(correction_factor) || length(correction_factor) != 1L ||
@@ -279,6 +301,7 @@ boot_predict <- function(mod,
       if (bias_adjust == "manual") {
         message("`correction_factor` supplied; overriding `bias_adjust = \"manual\"` ",
                 "and the internally-computed Jensen correction from `jensen_correct()`.")
+        lognormal_note()
       } else if (bias_adjust == "none") {
         message("`correction_factor` supplied; overriding `bias_adjust = \"none\"`. ",
                 "Predictions will be multiplied by the supplied correction factor.")
@@ -297,6 +320,7 @@ boot_predict <- function(mod,
                 "Jensen's inequality correction only applies where predictions ",
                 "are back-transformed via the exponential.", call. = FALSE)
       } else {
+        lognormal_note()
         jf   <- jensen_correct(mod)
         resp <- resp * jf
       }

@@ -31,7 +31,7 @@
 #' @param testZI Logical. If `TRUE` and `DHARMaPlot = TRUE`, runs `testZeroInflation` on the simulated residuals. Most relevant for count models (Poisson, negative binomial, ZIP, hurdle). Default is `TRUE`.
 #' @param seed Optional integer seed for reproducibility. If NULL (the default), no seed is set and results will differ across runs.
 #' @param method Character string specifying the resampling method.`"holdout"` (the default) partitions the data into training and testing sets without replacement, following the `propTrain` argument.`"bootstrap"` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For random-effect models with few observations per group, `"holdout"` is recommended: case bootstrap with replacement can inflate per-refit random-effect variance estimates when groups are sparse, causing `bias_adjust = "manual"` to under-correct. See the vignette for details
-#' @param bias_adjust Character string specifying the bias adjustment method for marginal predictions in `glmmTMB` and `lme4` models. One of `"none"` (the default) or `"manual"`. `"none"` uses standard population-level predictions (`re.form = ~0`) with no correction, preserving the full RBIAS signal driven by Jensen's inequality and allowing it to be used diagnostically. `"manual"` applies an analytical correction to marginal predictions: population-level predictions (`re.form = ~0`) are multiplied by `exp(V / 2)`, where `V` is the sum of the variance components that are additive on the log scale, i.e. that sit inside the exponential back-transformation. For log-link models `V` is the total random effect variance summed across all RE terms extracted from `VarCorr()`. For lognormal models - those fit to a natural-log-transformed response, `log(y) ~ .` - the residual variance is also additive on the log scale, so `V` additionally includes `sigma(testModel)^2`; such models are subject to retransformation bias from both sources simultaneously and a correction omitting the residual term will under-correct, often substantially, since the residual variance is frequently the larger component. Whether the residual term is included is determined by inspecting the response transformation in the model formula, not the family or link, so a Gaussian model with a log *link* on an untransformed response (`family = gaussian("log")`, where the residual is additive on the response scale and outside the exponential) correctly receives the random-effect-only correction. This option is supported for `glmmTMB` and `lme4` model objects, and for `lm`/`glm` objects with a log-transformed response. This argument is silently ignored for `mgcv` GAM/GAMM models. See the note below for details.
+#' @param bias_adjust Character string specifying the bias adjustment method for marginal predictions in `glmmTMB` and `lme4` models. One of `"none"` (the default) or `"manual"`. `"none"` uses standard population-level predictions (`re.form = ~0`) with no correction, preserving the full RBIAS signal driven by Jensen's inequality and allowing it to be used diagnostically. `"manual"` applies an analytical correction to marginal predictions: population-level predictions (`re.form = ~0`) are multiplied by `exp(V / 2)`, where `V` is the sum of the variance components that are additive on the log scale, i.e. that sit inside the exponential back-transformation. For log-link models `V` is the total random effect variance summed across all RE terms extracted from `VarCorr()`. For lognormal models, those fit to a natural-log-transformed response, `log(y) ~ .`, the residual variance is also additive on the log scale, so `V` additionally includes `sigma(testModel)^2`; such models are subject to retransformation bias from both sources simultaneously and a correction omitting the residual term will under-correct, often substantially, since the residual variance is frequently the larger component. Whether the residual term is included is determined by inspecting the response transformation in the model formula, not the family or link, so a Gaussian model with a log *link* on an untransformed response (`family = gaussian("log")`, where the residual is additive on the response scale and outside the exponential) correctly receives the random-effect-only correction. This option is supported for `glmmTMB` and `lme4` model objects, and for `lm`/`glm` objects with a log-transformed response. This argument is silently ignored for `mgcv` GAM/GAMM models. See the note below for details. For glmmTMB models with `family = lognormal(link = "log")`, only the random-effect variance is corrected because this family's parameterization targets `E[Y]` on the response scale internally, with residual variance handled by the MLE rather than sitting on the log scale.
 #' @note This function does not currently support binomial models with cbind() or proportion responses, and for binary 0/1 responses, use brier_auc(). This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
 #'
 #' **Random effects and Jensen's inequality:** By default, all predictions are population-level (i.e., random effects are set to zero via `re.form = ~0`). For models with a nonlinear link function (e.g., log, logit) and random effects, back-transforming the linear predictor to the response scale introduces a systematic negative bias in the predicted arithmetic mean. This occurs because Jensen's inequality implies that `E[exp(eta)] > exp(E[eta])` for any random variable `eta`, so `exp(beta_0)` underestimates the true mean by a factor of approximately `exp(sigma^2 / 2)`, where `sigma^2` is the total random effect variance (summed across all RE terms). It follows that log-normal models with random effects are subject to both sources of bias simultaneously (residual variance and random effect variance), requiring a combined correction of `exp((sigma^2_residual + sigma^2_random_effect) / 2)`, where both variance components are additive on the natural log scale. The magnitude of this bias grows rapidly with RE variance: a model with two random effects of modest size (e.g., SD = 0.3 and 0.4) can produce marginal predictions that underestimate observed values by 10% or more. Consistent negative `RBIAS` in the output of this function - particularly when both in-sample and out-of-sample values are negative - may therefore reflect this structural property of the model rather than misspecification. To obtain bias-corrected marginal predictions, set `bias_adjust = "manual"` (available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response). For lognormal models the correction applied is the combined `exp((sigma^2_residual + sum(sigma^2_RE)) / 2)`. Note that no correction is available for `mgcv` models.
@@ -235,6 +235,24 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
               "variance is small or the covariate is centered near zero. ",
               "See ?bias_precision.")
 
+    # glmmTMB's family = lognormal(link = "log") parameterizes the linear
+    # predictor to target E[Y] directly on the response scale, so residual
+    # variance is handled internally by the MLE and does NOT contribute to
+    # the correction. Only RE variance needs correction for marginal
+    # predictions. The correction computation below arrives at this result
+    # automatically (is_lognormal is FALSE because the formula LHS is Y, not
+    # log(Y); resid_var is therefore 0), but users benefit from an explicit
+    # confirmation that the special case has been recognized.
+    if (inherits(testModel, "glmmTMB") &&
+        identical(family(testModel)$family, "lognormal")) {
+      message(
+        "glmmTMB lognormal family detected: this family parameterizes the ",
+        "linear predictor to target E[Y] on the response scale, so residual ",
+        "variance is handled internally and does not enter the Jensen ",
+        "correction. Only random-effect variance is corrected for marginal ",
+        "predictions."
+      )
+    }
     # An identity-link Gaussian model with random effects is ambiguous: it is
     # either an ordinary LMM (no re-transformation, no bias, correction
     # unwarranted) or a model fit to a pre-computed log column (correction
@@ -279,20 +297,6 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     exp((rev_full$re_var + resid_var) / 2)
   } else {
     1
-  }
-
-  # Detect glmmTMB's lognormal family separately because its parameterization
-  # already accounts for residual-scale Jensen bias.
-  is_glmmTMB_lognormal <- inherits(testModel, "glmmTMB") &&
-    identical(family(testModel)$family, "lognormal")
-
-  if (is_glmmTMB_lognormal) {
-    message(
-      "Lognormal model detected: glmmTMB parameterizes this family on the ",
-      "arithmetic-mean scale, so no Jensen correction is needed for the ",
-      "residual variance. Any correction applied here is for random-effect ",
-      "variance only."
-    )
   }
 
   # --- Fit helper: dispatch on model class, return NULL on failure ---
