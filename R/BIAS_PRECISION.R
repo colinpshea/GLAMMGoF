@@ -281,6 +281,20 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     1
   }
 
+  # Detect glmmTMB's lognormal family separately because its parameterization
+  # already accounts for residual-scale Jensen bias.
+  is_glmmTMB_lognormal <- inherits(testModel, "glmmTMB") &&
+    identical(family(testModel)$family, "lognormal")
+
+  if (is_glmmTMB_lognormal) {
+    message(
+      "Lognormal model detected: glmmTMB parameterizes this family on the ",
+      "arithmetic-mean scale, so no Jensen correction is needed for the ",
+      "residual variance. Any correction applied here is for random-effect ",
+      "variance only."
+    )
+  }
+
   # --- Fit helper: dispatch on model class, return NULL on failure ---
   fit_model <- function(train) {
     tryCatch({
