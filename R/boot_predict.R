@@ -316,16 +316,34 @@ boot_predict <- function(mod,
       resp <- resp * jf
     } else if (bias_adjust == "manual") {
       if (link == "logit") {
-        warning("bias_adjust = 'manual' has no effect for logit-link models. ",
-                "Jensen's inequality correction only applies where predictions ",
-                "are back-transformed via the exponential.", call. = FALSE)
+        warning("bias_adjust = 'manual' has no effect for logit-link models...", call. = FALSE)
       } else {
         lognormal_note()
-        jf   <- jensen_correct(mod)
+        jf <- tryCatch(
+          jensen_correct(mod),
+          error = function(e) {
+            # Catch the identity-Gaussian ambiguity and rethrow with
+            # boot_predict()-specific suggestions.
+            if (grepl("identity link and no visible log-transform", conditionMessage(e))) {
+              stop(
+                "Cannot determine the correction automatically for this model: ",
+                "identity link with no visible log-transform of the response.\n",
+                " * If this is an ordinary linear or linear mixed model, no Jensen ",
+                "correction is warranted -- use `bias_adjust = 'none'`.\n",
+                " * If the response is a pre-computed log column (e.g. 'logy'), ",
+                "either refit the model as `log(y) ~ .` so the transformation is ",
+                "visible, or supply `correction_factor = exp((sigma^2_resid + ",
+                "sum(sigma^2_RE)) / 2)` directly.",
+                call. = FALSE
+              )
+            } else {
+              stop(e)  # Re-raise any other error unchanged
+            }
+          }
+        )
         resp <- resp * jf
       }
     }
-
     ## ---- Assemble output ----
     out <- cbind(newdata,
                  boot_mean   = rowMeans(resp),
