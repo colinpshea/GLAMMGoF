@@ -588,6 +588,7 @@ diag <- bias_precision(nReps = 100, testModel = mod, testData = dat,
                        bias_adjust = "manual", correction_factor = cf_full)
 ```
 
+For `glmmTMB` `family = lognormal(link = "log")` (Path B in the package's internals), the residual variance is absorbed into the mean parameterization internally, so the correction is RE-only regardless of `dispformula`. `jensen_correct(mod)` returns the scalar RE-only correction; `jensen_correction(mod)` returns the same scalar with a note that the dispformula was seen and deliberately not used.  
 
 #### A note about `holdout` vs `bootstrap` resampling methods when diagnosing and adjusting for Jensen's inequality bias
 
