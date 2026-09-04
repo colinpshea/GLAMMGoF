@@ -55,7 +55,7 @@
 #'   covariates referenced in the dispformula.
 #' @param include_re Logical. If \code{TRUE} (default) the correction
 #'   includes \eqn{\sum_k \sigma^2_k} from all random-intercept blocks. If
-#'   \code{FALSE}, only the residual/dispersion contribution is included —
+#'   \code{FALSE}, only the residual/dispersion contribution is included --
 #'   useful when RE variance is handled elsewhere, or when only the
 #'   dispformula contribution is wanted as a diagnostic.
 #'
@@ -92,15 +92,15 @@
 #' @export
 jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
 
-  # ── Validate model class ────────────────────────────────────────────────
+  # -- Validate model class ------------------------------------------------
   if (!inherits(model, c("glmmTMB", "merMod", "glm", "lm")))
     stop("jensen_correction() supports glmmTMB, lme4 (merMod), glm, and lm ",
          "model objects. For other model types, extract the relevant ",
          "variances manually and compute exp(sum(variances) / 2).",
          call. = FALSE)
 
-  # ── Classify the model into one of four paths ───────────────────────────
-  # path_A     : log(y) ~ ..., residual variance INSIDE exp() — enters correction
+  # -- Classify the model into one of four paths ---------------------------
+  # path_A     : log(y) ~ ..., residual variance INSIDE exp() -- enters correction
   # path_B     : family = lognormal, mean parameterization absorbs residual
   # log_link   : link = "log", residual is OUTSIDE exp() and does not enter
   # unsupported: identity link, no log-transform, or non-log link (logit, etc.)
@@ -133,7 +133,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
          "and natural-log-response models only.", call. = FALSE)
   }
 
-  # ── Random-effect variance sum (with slope guard) ───────────────────────
+  # -- Random-effect variance sum (with slope guard) -----------------------
   rev    <- .re_variance_sum(model)
   re_sum <- if (include_re) rev$re_var else 0
   if (include_re && rev$slopes)
@@ -144,7 +144,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
             "available via predict(., do.bias.correct = TRUE).",
             call. = FALSE)
 
-  # ── Dispformula detection (glmmTMB only) ────────────────────────────────
+  # -- Dispformula detection (glmmTMB only) --------------------------------
   has_dispformula <- FALSE
   if (inherits(model, "glmmTMB")) {
     disp_frm <- tryCatch(stats::formula(model, component = "disp"),
@@ -153,7 +153,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
       has_dispformula <- !identical(deparse(disp_frm), "~1")
   }
 
-  # ── Paths where dispformula is IRRELEVANT to E[Y] ───────────────────────
+  # -- Paths where dispformula is IRRELEVANT to E[Y] -----------------------
   # log_link : residual is outside exp(); dispformula affects Var(Y) not E[Y]
   # path_B   : glmmTMB lognormal absorbs residual into the mean parameterization
   # For both, the correction is RE-only regardless of dispformula.
@@ -180,7 +180,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
     return(exp(re_sum / 2))
   }
 
-  # ── Path A: natural-log response, residual variance enters the correction ─
+  # -- Path A: natural-log response, residual variance enters the correction -
   # Two subcases:
   #   (a) trivial dispformula (or non-glmmTMB backend): sigma() returns a
   #       scalar; return scalar exp((sigma^2 + RE_sum) / 2).
@@ -198,7 +198,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
     return(exp((resid_var + re_sum) / 2))
   }
 
-  # Dispformula subcase — newdata is required
+  # Dispformula subcase -- newdata is required
   if (is.null(newdata))
     stop("Model has a non-trivial dispformula; the residual variance ",
          "depends on covariates and the Jensen correction is a per-row ",
@@ -215,7 +215,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
   # We reconstruct this directly rather than calling predict(mod, type = "disp",
   # newdata = ...) because predict.glmmTMB validates newdata against the whole
   # model (including cond-model RE grouping variables), and callers of this
-  # helper — including boot_predict()'s auto-grid — reasonably supply newdata
+  # helper -- including boot_predict()'s auto-grid -- reasonably supply newdata
   # with only the dispformula covariates.
   disp_frm <- tryCatch(stats::formula(model, component = "disp"),
                        error = function(e) NULL)
@@ -234,7 +234,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
   if (is.null(beta_disp) || length(beta_disp) == 0L)
     stop("Could not extract dispersion fixed effects via fixef(model)$disp. ",
          "This should not happen for a glmmTMB model with a non-trivial ",
-         "dispformula — please report with a reproducible example.",
+         "dispformula -- please report with a reproducible example.",
          call. = FALSE)
 
   X_disp <- tryCatch(
