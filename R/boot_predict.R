@@ -5,6 +5,15 @@
 #' offsets (formula-side and argument-side) and supports an optional
 #' analytical Jensen's inequality bias correction via `bias_adjust = "manual"`.
 #'
+#' Natural-log-response models (`log(y) ~ ...`, family Gaussian — often
+#' called "lognormal LMMs") are supported: the response transform is
+#' detected from the formula LHS and the linear-predictor draws are
+#' exponentiated to the response scale regardless of the family link
+#' (which is `"identity"` for these models). For such fits with a
+#' non-trivial `dispformula`, the per-row Jensen correction is obtained
+#' internally from [jensen_correction()]; users may also compute it
+#' externally and supply it via `correction_factor`.
+#'
 #' @param mod A fitted model of a supported class (glmmTMB, lme4::glmerMod,
 #'   lme4::lmerMod, lme4::glmer.nb, MASS::glm.nb, stats::glm, stats::lm).
 #'   GAMs are not currently supported.
@@ -24,19 +33,27 @@
 #' @param n_sim Number of parametric bootstrap draws (default 5000).
 #' @param alpha CI level (default 0.05 → 95% intervals).
 #' @param bias_adjust One of `"none"` (default) or `"manual"`; `"manual"`
-#'   multiplies each prediction by `jensen_correct(mod)` to correct for
-#'   Jensen's inequality bias from the random-effect variance components.
-#'   Has no effect on logit-link models (warning issued). Overridden by
-#'   `correction_factor` if that argument is supplied.
-#' @param correction_factor Optional positive numeric scalar giving a
-#'   user-supplied Jensen correction factor to apply on the response scale
-#'   (i.e., predictions are multiplied by this value). When supplied,
-#'   overrides `bias_adjust` and the internally-computed correction from
-#'   `jensen_correct(mod)`. Useful when the default correction is not what
-#'   is wanted — for example, to include only a subset of random-effect
-#'   variance components (e.g., substantive REs but not nuisance REs), or
-#'   to apply a correction computed externally from another source.
-#'   Supply `1` for no correction. Defaults to `NULL` (use `bias_adjust`).
+#'   applies the Jensen's inequality correction for retransformation bias
+#'   from random-effect (and, for natural-log-response models, residual)
+#'   variance components. For most models the scalar correction from
+#'   [jensen_correct()] is used; for natural-log-response glmmTMB fits with
+#'   a non-trivial `dispformula` the per-row correction from
+#'   [jensen_correction()] is used automatically, and `newdata` must be
+#'   supplied (or auto-constructable). Has no effect on logit-link models
+#'   (warning issued). Overridden by `correction_factor` if that argument
+#'   is supplied.
+#' @param correction_factor Optional positive numeric giving a user-supplied
+#'   Jensen correction factor to apply on the response scale (i.e.,
+#'   predictions are multiplied by this value). May be a scalar or a
+#'   numeric vector of length `nrow(newdata)`; a vector is applied
+#'   row-wise via `sweep()` and is the appropriate shape when residual
+#'   variance depends on covariates (glmmTMB natural-log-response models
+#'   with a `dispformula`). When supplied, overrides `bias_adjust` and the
+#'   internally-computed correction. Useful when the default correction is
+#'   not what is wanted — for example, to include only a subset of
+#'   random-effect variance components (substantive REs but not nuisance
+#'   REs), or to apply a correction computed externally. Supply `1` for no
+#'   correction. Defaults to `NULL` (use `bias_adjust`).
 #' @param seed Optional integer seed for reproducibility.
 #'
 #' @details
@@ -100,6 +117,45 @@ boot_predict <- function(mod,
              "links only. Got link = '", link, "'.", call. = FALSE)
     }
 
+    ## ---- Detect natural-log response (Path A) ------------------------------
+    ## For log(y) ~ ..., family = gaussian (identity link), the fitted model
+    ## targets E[log Y | X]; the linear predictor is on the log scale even
+    ## though the family link is 'identity'. We must exponentiate the draws
+    ## to reach the response (median) scale. The Jensen correction (residual
+    ## + RE variance) then converts median(Y|X) to E[Y|X].
+    ##
+    ## Detection keys on the formula LHS via .detect_log_response(), not on
+    ## family/link — so gaussian(link = 'log') on an untransformed response
+    ## is NOT Path A (link_fun = exp handles it correctly) and does not
+    ## receive a residual-variance term in the correction (the residual sits
+    ## outside exp() there). Non-natural logs (log2/log10/log1p) are rejected
+    ## because the back-transformation and its variance scaling differ.
+    lr <- .detect_log_response(mod)
+    if (lr$logged && !lr$natural)
+        stop("boot_predict() supports natural-log response transforms only; ",
+             "the formula uses '", lr$base, "'. Refit on the natural-log ",
+             "scale (log(y) ~ .) or supply predictions transformed manually.",
+             call. = FALSE)
+    is_path_A <- isTRUE(lr$natural)
+    if (is_path_A && link != "identity")
+        stop("Model has log(y) on the response but a non-identity family ",
+             "link ('", link, "'). This combination is unusual and ",
+             "boot_predict() does not handle it. Refit with either a bare ",
+             "response and a log link (family = ...(link = 'log')), or with ",
+             "log(y) on the response and identity link (family = gaussian).",
+             call. = FALSE)
+
+    ## Path A with a non-trivial glmmTMB dispformula: sigma^2(x) varies by
+    ## row, so the Jensen correction is per-observation and comes from
+    ## jensen_correction() rather than jensen_correct(). Detected here (not
+    ## deferred to the Jensen block) so the auto-grid can include disp
+    ## covariates that aren't already in the conditional formula.
+    path_A_dispformula <- is_path_A && inherits(mod, "glmmTMB") && {
+      dfrm <- tryCatch(stats::formula(mod, component = "disp"),
+                       error = function(e) NULL)
+      !is.null(dfrm) && !identical(deparse(dfrm), "~1")
+    }
+
     ## ---- Identify offset structure (used by auto-grid + offset resolver) ----
     tt_cond     <- stats::terms(cond_frm)
     off_idx     <- attr(tt_cond, "offset")
@@ -134,7 +190,14 @@ boot_predict <- function(mod,
     if (is.null(newdata)) {
         cond_vars  <- all.vars(cond_frm)[-1]
         zi_vars    <- if (!is.null(zi$formula)) all.vars(zi$formula) else character(0)
-        fixed_vars <- unique(c(cond_vars, zi_vars))
+        ## For Path A with dispformula, ensure disp covariates are in the
+        ## auto-grid so jensen_correction() can extract per-row sigma. This
+        ## is a no-op when the dispformula shares all its covariates with
+        ## the conditional formula (the common case).
+        disp_vars  <- if (path_A_dispformula) {
+            all.vars(stats::formula(mod, component = "disp"))
+        } else character(0)
+        fixed_vars <- unique(c(cond_vars, zi_vars, disp_vars))
         ## Exclude offset variables from the auto-grid; they're handled separately
         fixed_vars <- setdiff(fixed_vars, off_vars)
 
@@ -260,7 +323,11 @@ boot_predict <- function(mod,
       if (is.null(dim(cond_draws))) cond_draws <- matrix(cond_draws, ncol = 1)
     }
 
-    link_fun <- switch(link, log = exp, logit = stats::plogis, identity = identity)
+    link_fun <- if (is_path_A) {
+      exp                             # Path A: log(y) LHS, exponentiate draws
+    } else {
+      switch(link, log = exp, logit = stats::plogis, identity = identity)
+    }
 
     resp <- matrix(NA_real_, nrow = nrow(newdata), ncol = n_sim)
     for (j in seq_len(n_sim)) {
@@ -273,8 +340,14 @@ boot_predict <- function(mod,
       resp[, j] <- mu_cond * (1 - p_zi)
     }
 
-    ## ---- Jensen correction (RE-variance based) ----
+    ## ---- Jensen correction (RE-variance based, plus residual for Path A) ----
     jf <- 1
+
+    # Apply-correction helper: handles scalar OR length-nrow(newdata) vector
+    # uniformly via a single call site downstream.
+    apply_cf <- function(mat, cf) {
+      if (length(cf) == 1L) mat * cf else sweep(mat, 1L, cf, `*`)
+    }
 
     # Local helper: emit the glmmTMB lognormal note whenever a correction is
     # actually being applied to a lognormal-family model, regardless of whether
@@ -291,16 +364,30 @@ boot_predict <- function(mod,
       }
     }
 
+    # Detect the "Path A with dispformula" case that must be routed through
+    # jensen_correction() (per-row correction) rather than jensen_correct()
+    # (scalar path, which would fail because sigma() returns NA for glmmTMB
+    # dispformulas with more than one parameter). Actual detection happens
+    # near the top of the function so it can inform the auto-grid; the
+    # value is reused here.
+
     if (!is.null(correction_factor)) {
-      # User-supplied override: validate and apply.
-      if (!is.numeric(correction_factor) || length(correction_factor) != 1L ||
-          !is.finite(correction_factor) || correction_factor <= 0) {
-        stop("`correction_factor` must be a single positive finite numeric value.",
+      # User-supplied override: validate shape and content, then apply.
+      if (!is.numeric(correction_factor) ||
+          !all(is.finite(correction_factor)) ||
+          any(correction_factor <= 0)) {
+        stop("`correction_factor` must be positive, finite, and numeric ",
+             "(scalar or vector).", call. = FALSE)
+      }
+      if (length(correction_factor) != 1L &&
+          length(correction_factor) != nrow(newdata)) {
+        stop("`correction_factor` must be length 1 or length nrow(newdata) (",
+             nrow(newdata), "). Got length ", length(correction_factor), ".",
              call. = FALSE)
       }
       if (bias_adjust == "manual") {
         message("`correction_factor` supplied; overriding `bias_adjust = \"manual\"` ",
-                "and the internally-computed Jensen correction from `jensen_correct()`.")
+                "and the internally-computed Jensen correction.")
         lognormal_note()
       } else if (bias_adjust == "none") {
         message("`correction_factor` supplied; overriding `bias_adjust = \"none\"`. ",
@@ -313,18 +400,34 @@ boot_predict <- function(mod,
                 "function; ensure this is intended.")
       }
       jf   <- correction_factor
-      resp <- resp * jf
+      resp <- apply_cf(resp, jf)
     } else if (bias_adjust == "manual") {
       if (link == "logit") {
-        warning("bias_adjust = 'manual' has no effect for logit-link models...", call. = FALSE)
+        warning("bias_adjust = 'manual' has no effect for logit-link models; ",
+                "Jensen's inequality direction and magnitude vary with the ",
+                "linear predictor and no scalar correction is appropriate.",
+                call. = FALSE)
+      } else if (path_A_dispformula) {
+        # Route to jensen_correction() for per-row extraction of sigma^2(x)
+        # from the dispformula. jensen_correct() would fail here because
+        # glmmTMB's sigma() returns NA when betadisp has more than one entry.
+        jf <- tryCatch(
+          jensen_correction(mod, newdata = newdata),
+          error = function(e) {
+            stop("Failed to compute per-row Jensen correction via ",
+                 "jensen_correction() for this natural-log-response model ",
+                 "with a non-trivial dispformula: ", conditionMessage(e),
+                 "\nSupply `correction_factor` explicitly instead.",
+                 call. = FALSE)
+          }
+        )
       } else {
         lognormal_note()
         jf <- tryCatch(
           jensen_correct(mod),
           error = function(e) {
-            # Catch the identity-Gaussian ambiguity and rethrow with
-            # boot_predict()-specific suggestions.
-            if (grepl("identity link and no visible log-transform", conditionMessage(e))) {
+            msg <- conditionMessage(e)
+            if (grepl("identity link and no visible log-transform", msg)) {
               stop(
                 "Cannot determine the correction automatically for this model: ",
                 "identity link with no visible log-transform of the response.\n",
@@ -336,13 +439,28 @@ boot_predict <- function(mod,
                 "sum(sigma^2_RE)) / 2)` directly.",
                 call. = FALSE
               )
+            } else if (grepl("Could not extract a residual standard deviation", msg)) {
+              # sigma-NA case that jensen_correct() surfaces. path_A_dispformula
+              # should have caught the common cause above; this branch is a
+              # backstop for other sigma-NA failure modes.
+              stop(
+                "Could not extract a scalar residual variance for the Jensen ",
+                "correction (sigma() returned NA). This typically means the ",
+                "model has a non-trivial dispformula whose per-row correction ",
+                "cannot be reduced to a single number. Compute it explicitly ",
+                "via `jensen_correction(mod, newdata = ...)` and pass the ",
+                "result as `correction_factor`.",
+                call. = FALSE
+              )
             } else {
               stop(e)  # Re-raise any other error unchanged
             }
           }
         )
-        resp <- resp * jf
       }
+      # Apply whatever correction we computed above (may be scalar or vector).
+      # jf remains 1 if the logit branch above only warned without setting jf.
+      if (!identical(jf, 1)) resp <- apply_cf(resp, jf)
     }
     ## ---- Assemble output ----
     out <- cbind(newdata,
