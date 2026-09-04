@@ -1,3 +1,82 @@
+# GLAMMGoF 1.5.0
+
+## New features
+
+* New function `jensen_correction()` computes the Jensen's inequality
+  retransformation-bias correction factor for log-link and natural-log-response
+  models. Complements `jensen_correct()` by handling the case the scalar path
+  cannot: glmmTMB natural-log-response models with a non-trivial `dispformula`,
+  where residual variance depends on covariates and the correction is a
+  length-`nrow(newdata)` vector rather than a scalar. Returns bare numeric
+  (scalar or vector) suitable for passing to `boot_predict()` or
+  `bias_precision()` via `correction_factor`.
+
+* `boot_predict()` now supports natural-log-response models
+  (`log(y) ~ ...`, family Gaussian — often called "lognormal LMMs" in the
+  ecological literature). Previously these returned log-scale draws silently
+  because the family link is `"identity"`; now the response transform is
+  detected from the formula LHS and draws are exponentiated to the response
+  scale. For such fits with a non-trivial `dispformula`, `bias_adjust = "manual"`
+  auto-routes to `jensen_correction()` for the per-row correction.
+
+* `boot_predict()`'s `correction_factor` argument now accepts a numeric vector
+  of length `nrow(newdata)` in addition to a scalar, applied row-wise via
+  `sweep()`. Enables user-supplied per-row corrections computed from any
+  source, not just `jensen_correction()`.
+
+* `bias_precision()` gains `...` for forwarding backend-specific arguments
+  to per-replicate refits. Useful primarily for `control` (e.g.
+  `control = glmmTMB::glmmTMBControl(optCtrl = list(iter.max = 10000))` when
+  a model requires raised convergence limits), but also for `start`, `weights`,
+  `contrasts`, `na.action`, and other backend-specific arguments. Arguments
+  that `bias_precision()` sets internally from `testModel` (`formula`, `data`,
+  `family`, `dispformula`, `ziformula`) are rejected with an informative error.
+
+* `bias_precision()`'s `correction_factor` argument now accepts a numeric
+  vector of length `nrow(testData)` in addition to a scalar. The vector is
+  filtered alongside `testData`'s NA rows internally, then sliced per
+  replicate via the resampling indices so each observation receives its own
+  correction. Enables `bias_precision()` to give honest RBIAS diagnostics for
+  glmmTMB natural-log-response models with a non-trivial `dispformula`,
+  where a scalar correction is dishonest under heterogeneous σ²(x).
+
+## Bug fixes
+
+* `boot_predict()` on natural-log-response glmmTMB models with a non-trivial
+  `dispformula` and `bias_adjust = "manual"` previously errored opaquely on
+  `sigma()` returning `NA` (glmmTMB's convention when `betadisp` has more
+  than one parameter). Now auto-routes to `jensen_correction()` for the
+  per-row correction; the sigma-NA error path remains as a backstop with an
+  informative message pointing at `correction_factor` for edge cases.
+
+* `bias_precision()` on the same class of models previously propagated `NA`
+  silently through `cf_internal = exp((re_var + NA) / 2)`, producing all-NA
+  metrics that were then filtered out — appearing as "the correction did
+  nothing." Now hard-errors before the loop with instructions to use
+  `jensen_correction(mod, newdata = testData)` and supply the result as a
+  vector `correction_factor`.
+
+## Behavior changes
+
+* `bias_precision()` with `bias_adjust = "manual"` on a glmmTMB natural-log-
+  response model with a non-trivial `dispformula` no longer runs to
+  completion returning meaningless (all-NA) metrics. It errors immediately
+  with instructions. Technically a breaking change from the previous silent-
+  NA behavior, but the previous behavior was returning garbage and no user
+  code depending on that garbage output can be affected in a meaningful way.
+
+## Under the hood
+
+* `jensen_correction()` extracts per-row σ²(x) directly from
+  `model.matrix(dispformula, newdata) %*% fixef(mod)$disp` rather than via
+  `predict(mod, type = "disp")`, which allowed us to bypass `predict.glmmTMB`'s
+  whole-model validation. Consequence: `newdata` for `jensen_correction()`
+  needs only the covariates referenced in the dispersion formula, not the
+  conditional-model random-effect grouping variables. This is what enables
+  `boot_predict()`'s auto-grid (which excludes RE grouping variables) to
+  drive the row-wise correction path.
+
+
 GLAMMGoF 1.4.4
 
 ## Documentation
