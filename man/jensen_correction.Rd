@@ -19,7 +19,7 @@ covariates referenced in the dispformula.}
 
 \item{include_re}{Logical. If \code{TRUE} (default) the correction
 includes \eqn{\sum_k \sigma^2_k} from all random-intercept blocks. If
-\code{FALSE}, only the residual/dispersion contribution is included —
+\code{FALSE}, only the residual/dispersion contribution is included --
 useful when RE variance is handled elsewhere, or when only the
 dispformula contribution is wanted as a diagnostic.}
 }

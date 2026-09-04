@@ -383,30 +383,46 @@ test_that("correction_factor: correction_factor = 1 is a valid no-op", {
 
 test_that("correction_factor: invalid values are rejected", {
   skip_if_not_installed_all(c("glmmTMB"))
+
+  # Negative, zero, non-numeric, and non-finite values fail the type/value check
   expect_error(
     boot_predict(countModel_GLMM, correction_factor = -1,
                  n_sim = 100, seed = 1),
-    regexp = "positive finite"
+    regexp = "positive, finite"
   )
   expect_error(
     boot_predict(countModel_GLMM, correction_factor = 0,
                  n_sim = 100, seed = 1),
-    regexp = "positive finite"
-  )
-  expect_error(
-    boot_predict(countModel_GLMM, correction_factor = c(1.1, 1.2),
-                 n_sim = 100, seed = 1),
-    regexp = "positive finite"
+    regexp = "positive, finite"
   )
   expect_error(
     boot_predict(countModel_GLMM, correction_factor = "1.1",
                  n_sim = 100, seed = 1),
-    regexp = "positive finite"
+    regexp = "positive, finite"
   )
   expect_error(
     boot_predict(countModel_GLMM, correction_factor = NA_real_,
                  n_sim = 100, seed = 1),
-    regexp = "positive finite"
+    regexp = "positive, finite"
+  )
+
+  # A positive, finite numeric VECTOR of the wrong length fails the shape check
+  # (vectors of correct length are now supported for per-row corrections)
+  expect_error(
+    boot_predict(countModel_GLMM, correction_factor = c(1.1, 1.2),
+                 n_sim = 100, seed = 1),
+    regexp = "length 1 or length nrow"
+  )
+})
+
+test_that("correction_factor: correct-length vector is accepted", {
+  skip_if_not_installed_all(c("glmmTMB"))
+  bp_scalar <- boot_predict(countModel_GLMM, correction_factor = 1.1,
+                            n_sim = 100, seed = 1)
+  cf_vec <- rep(1.1, nrow(bp_scalar))
+  expect_no_error(
+    boot_predict(countModel_GLMM, correction_factor = cf_vec,
+                 n_sim = 100, seed = 1)
   )
 })
 
