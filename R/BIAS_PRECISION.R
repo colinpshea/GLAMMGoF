@@ -80,7 +80,8 @@
 #' @importFrom dplyr group_by summarise mutate bind_rows
 #' @importFrom tidyr pivot_longer separate
 #' @importFrom ggplot2 ggplot aes geom_histogram geom_vline facet_grid theme_bw theme element_blank element_line element_text labs unit scale_y_continuous
-#' @param correction_factor Optional numeric scalar. If supplied and `bias_adjust = "manual"`, this value is used directly as the lognormal bias correction factor instead of computing it from `VarCorr(testModel)`. This is primarily useful in simulation contexts where the true random effect variance is known, allowing the correction to be anchored to the true `sigma^2` rather than the potentially noisy estimated variance from the fitted model. For example, in a simulation sweeping over sigma values, pass `exp(sigma^2 / 2)` directly to avoid instability at high sigma where `VarCorr()` estimates from training subsets are unreliable. In applied use with real data, leave this as `NULL` (the default) so the correction is computed from the full-data `testModel` via `VarCorr()`. Ignored when `bias_adjust` is not `"manual"`. For lognormal models, note that a supplied `correction_factor` replaces the entire correction, so it must include the residual variance as well as the random effect variance, i.e. `exp((sigma^2_residual + sigma^2_RE) / 2)`; supplying `exp(sigma^2_RE / 2)` will silently under-correct.
+#' @param correction_factor Optional positive numeric. May be a single scalar (applied uniformly across replicates) or a numeric vector of length `nrow(testData)` (before NA filtering; the vector is filtered alongside testData internally, then sliced per replicate via the resampling indices so that each observation receives its own correction wherever it lands). When supplied with `bias_adjust = "manual"`, this value replaces the automatically-computed correction. A scalar is primarily useful in simulation contexts where the true random effect variance is known, allowing the correction to be anchored to the true `sigma^2` rather than the potentially noisy estimated variance from the fitted model. A vector is the appropriate shape for glmmTMB natural-log-response models with a non-trivial `dispformula`, where the residual variance depends on covariates and no scalar approximation is honest; compute via `jensen_correction(testModel, newdata = testData)`. Ignored when `bias_adjust` is not `"manual"`. For lognormal models, note that a supplied `correction_factor` replaces the entire correction, so it must include the residual variance as well as the random effect variance, i.e. `exp((sigma^2_residual + sigma^2_RE) / 2)`; supplying `exp(sigma^2_RE / 2)` will silently under-correct.
+#' @param ... Additional arguments forwarded to the backend fitting function on each per-replicate refit (glmmTMB, glmer, glmer.nb, lmer, glm, glm.nb, lm, gam). Useful for backend-specific arguments like `control` (e.g. `control = glmmTMBControl(optCtrl = list(iter.max = 10000, eval.max = 10000))` for glmmTMB models with slow convergence), `start`, `weights`, `contrasts`, or `na.action`. Arguments that bias_precision() sets internally from testModel (`formula`, `data`, `family`, `dispformula`, `ziformula`) are rejected with an informative error to prevent silent corruption of the refit spec. Backend-specific validity is the caller's responsibility: passing an argument a particular backend does not accept will surface as an error from that backend on the first refit attempt.
 #' @importFrom DHARMa simulateResiduals testZeroInflation
 #' @importFrom glmmTMB ranef glmmTMB
 #' @importFrom nlme VarCorr
@@ -95,7 +96,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                            bias_adjust = c("none", "manual"),
                            verbose = TRUE,
                            conditional_predictions = FALSE,
-                           correction_factor = NULL) {
+                           correction_factor = NULL,
+                           ...) {
 
   # --- specify bootstrapping method and bias adjustment
   method      <- match.arg(method)
@@ -141,6 +143,43 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
       !is_cbind && !is_prop
   )
 
+  # --- Validate user-supplied correction_factor (scalar or length-nrow(testData) vector) ---
+  # A scalar is applied uniformly across replicates. A vector must align with
+  # the rows of testData (before NA filtering); values are then sliced per
+  # replicate via train_idx / test_idx. Per-row corrections are the
+  # appropriate shape for glmmTMB natural-log-response models with a non-
+  # trivial dispformula, where residual variance depends on covariates.
+  if (!is.null(correction_factor)) {
+    if (!is.numeric(correction_factor) ||
+        !all(is.finite(correction_factor)) ||
+        any(correction_factor <= 0))
+      stop("`correction_factor` must be positive, finite, and numeric ",
+           "(scalar or vector).", call. = FALSE)
+    if (length(correction_factor) != 1L &&
+        length(correction_factor) != nrow(testData))
+      stop("`correction_factor` must be length 1 (scalar, applied uniformly) ",
+           "or length nrow(testData) = ", nrow(testData),
+           " (per-row, sliced per replicate). Got length ",
+           length(correction_factor), ".", call. = FALSE)
+  }
+
+  # --- Capture and validate '...' (forwarded to backend refit) ---
+  # Users can supply backend-specific arguments like `control`, `start`,
+  # `weights`, `contrasts`, etc. These flow through to each per-replicate
+  # refit via do.call() in fit_model(). A blocklist rejects arguments that
+  # bias_precision() sets itself from testModel — passing them via ...
+  # would silently corrupt the refit spec.
+  dots <- list(...)
+  blocked_dots <- intersect(
+    names(dots),
+    c("formula", "data", "family", "dispformula", "ziformula")
+  )
+  if (length(blocked_dots) > 0)
+    stop("`...` cannot include: ", paste(blocked_dots, collapse = ", "),
+         ". These are set internally by bias_precision() from testModel. ",
+         "Refit testModel with the desired specification instead.",
+         call. = FALSE)
+
   # Remove rows with NA in any model variable (response or covariates)
   model_vars    <- all.vars(formula(testModel))
   model_vars    <- model_vars[model_vars %in% names(testData)]
@@ -150,6 +189,14 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   n_dropped     <- n_before - nrow(testData)
   if (n_dropped == 1) warning(n_dropped, " row with NA values in model variables (response or covariates) was removed before resampling.")
   if (n_dropped > 1) warning(n_dropped, " rows with NA values in model variables (response or covariates) were removed before resampling.")
+
+  # Align a vector correction_factor with the filtered rows. A scalar cf
+  # needs no adjustment. This must happen after the NA filter so cf and
+  # testData remain row-aligned; downstream slicing uses train_idx / test_idx
+  # into the filtered space.
+  if (!is.null(correction_factor) && length(correction_factor) > 1L) {
+    correction_factor <- correction_factor[complete_rows]
+  }
 
   # --- Pre-compute model class flags (once, outside loop) ---
   mc         <- class(testModel)
@@ -235,6 +282,42 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
               "variance is small or the covariate is centered near zero. ",
               "See ?bias_precision.")
 
+    # Path A (log(y) ~ ..., Gaussian) with a non-trivial glmmTMB dispformula:
+    # the residual variance depends on covariates, so the correct correction
+    # is per-observation. This branch is reached only when the user did NOT
+    # supply correction_factor (either scalar or vector) — the vector path
+    # supplies the honest fix and is handled by the first cf branch above.
+    # Error out with the vector workflow as the primary recommendation.
+    if (is_lognormal && inherits(testModel, "glmmTMB")) {
+      dfrm <- tryCatch(formula(testModel, component = "disp"),
+                       error = function(e) NULL)
+      has_dispformula <- !is.null(dfrm) && !identical(deparse(dfrm), "~1")
+      if (has_dispformula) {
+        stop(
+          "bias_precision() cannot compute a Jensen correction automatically ",
+          "for this model: log(y) on the response combined with a non-trivial ",
+          "dispformula means the residual variance depends on covariates and ",
+          "the correction is per-observation, not scalar.\n",
+          " * Recommended: compute per-row corrections externally and supply ",
+          "them as a length-nrow(testData) vector via `correction_factor`, ",
+          "e.g.:\n",
+          "     cf <- jensen_correction(testModel, newdata = testData)\n",
+          "     bias_precision(..., correction_factor = cf)\n",
+          "   Values are sliced per replicate via the resampling indices, so ",
+          "each holdout observation receives its own correction.\n",
+          " * For prediction workflows (not diagnostics): use boot_predict() ",
+          "with bias_adjust = 'manual'. It auto-routes to jensen_correction() ",
+          "for the per-row correction at a fixed prediction grid.\n",
+          " * Fallback: supply a single scalar approximation (e.g. median of ",
+          "the per-row values) as correction_factor. Bear in mind that a ",
+          "scalar under heterogeneous dispersion is an approximation; RBIAS ",
+          "may not fully move to zero, and a few outlier rows with very high ",
+          "sigma^2(x) can pull mean(cf) far above the typical value.",
+          call. = FALSE
+        )
+      }
+    }
+
     # glmmTMB's family = lognormal(link = "log") parameterizes the linear
     # predictor to target E[Y] directly on the response scale, so residual
     # variance is handled internally by the MLE and does NOT contribute to
@@ -299,30 +382,50 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
     1
   }
 
-  # --- Fit helper: dispatch on model class, return NULL on failure ---
+  # --- Fit helper: dispatch on model class, forward `...` via do.call ---
+  # `dots` was captured at the top of bias_precision() and validated against
+  # the blocklist. It's spliced into each backend's argument list here so
+  # user-supplied backend arguments (control, start, weights, contrasts, ...)
+  # reach the per-replicate refit. Returns NULL on failure.
   fit_model <- function(train) {
     tryCatch({
       if (is_glmmTMB) {
-        glmmTMB(formula(testModel, component = "cond"),
-                family      = family(testModel),
-                dispformula = formula(testModel, component = "disp"),
-                ziformula   = formula(testModel, component = "zi"),
-                data        = train)
+        args <- c(list(formula     = formula(testModel, component = "cond"),
+                       family      = family(testModel),
+                       dispformula = formula(testModel, component = "disp"),
+                       ziformula   = formula(testModel, component = "zi"),
+                       data        = train),
+                  dots)
+        do.call(glmmTMB, args)
       } else if (is_gam) {
-        gam(formula(testModel), family = family(testModel), data = train)
+        args <- c(list(formula = formula(testModel),
+                       family  = family(testModel),
+                       data    = train), dots)
+        do.call(gam, args)
       } else if (is_glmer) {
-        if (grepl("Negative Binomial", family(testModel)$family))
-          glmer.nb(formula(testModel), data = train)
-        else
-          glmer(formula(testModel), family = family(testModel), data = train)
+        if (grepl("Negative Binomial", family(testModel)$family)) {
+          args <- c(list(formula = formula(testModel), data = train), dots)
+          do.call(glmer.nb, args)
+        } else {
+          args <- c(list(formula = formula(testModel),
+                         family  = family(testModel),
+                         data    = train), dots)
+          do.call(glmer, args)
+        }
       } else if (is_lmer) {
-        lmer(formula(testModel), data = train)
+        args <- c(list(formula = formula(testModel), data = train), dots)
+        do.call(lmer, args)
       } else if (is_negbin) {
-        glm.nb(formula(testModel), data = train)
+        args <- c(list(formula = formula(testModel), data = train), dots)
+        do.call(glm.nb, args)
       } else if (is_glm) {
-        glm(formula(testModel), family = family(testModel), data = train)
+        args <- c(list(formula = formula(testModel),
+                       family  = family(testModel),
+                       data    = train), dots)
+        do.call(glm, args)
       } else if (is_lm) {
-        lm(formula(testModel), data = train)
+        args <- c(list(formula = formula(testModel), data = train), dots)
+        do.call(lm, args)
       }
     }, error = function(e) {
       message("Model failed on replicate: ", e$message)
@@ -340,8 +443,17 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   # conditional in-sample predictions.
   # When conditional_predictions = FALSE (default), both use marginal
   # predictions for population-level generalization assessment.
+  #
+  # `idx` is the row-index into testData (train_idx or test_idx) used to
+  # slice cf_internal when it's a per-row vector. When cf_internal is a
+  # scalar, idx is unused and multiplication recycles naturally.
 
-  get_preds_base <- function(m, newdata) {
+  get_preds_base <- function(m, newdata, idx) {
+    # Resolve the local correction: scalar reuses cf_internal directly, vector
+    # slices by idx (train_idx has duplicates under bootstrap; each duplicate
+    # picks up its row's correction — correct behavior for row-property cf).
+    cf_local <- if (length(cf_internal) == 1L) cf_internal else cf_internal[idx]
+
     # --- Lognormal (log(y) ~ .): predict() returns the mean on the LOG scale ---
     # The response is Gaussian on the log scale (identity link), so predict()
     # gives the log-scale mean regardless of backend. Back-transform with exp()
@@ -361,7 +473,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
       } else {
         eta <- predict(m, newdata = newdata)          # lm / glm (no random effects)
       }
-      return(exp(eta) * cf_internal)
+      return(exp(eta) * cf_local)
     }
 
     if (is_glmmTMB) {
@@ -370,7 +482,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                 re.form = NULL, allow.new.levels = TRUE)
       } else if (bias_adjust == "manual") {
         predict(m, type = "response", newdata = newdata,
-                re.form = ~0, allow.new.levels = TRUE) * cf_internal
+                re.form = ~0, allow.new.levels = TRUE) * cf_local
       } else {
         predict(m, type = "response", newdata = newdata,
                 re.form = ~0, allow.new.levels = TRUE)
@@ -390,7 +502,7 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
                 allow.new.levels = TRUE, newdata = newdata)
       } else if (bias_adjust == "manual") {
         predict(m, type = "response", re.form = ~0,
-                allow.new.levels = TRUE, newdata = newdata) * cf_internal
+                allow.new.levels = TRUE, newdata = newdata) * cf_local
       } else {
         predict(m, type = "response", re.form = ~0,
                 allow.new.levels = TRUE, newdata = newdata)
@@ -409,12 +521,14 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
   for (j in seq_len(nReps)) {
     if (method == "holdout"){
       train_idx <- sample(seq_len(nrow(testData)), size = floor(propTrain * nrow(testData)))
-      train <- testData[ train_idx, ]
-      test  <- testData[-train_idx, ]
+      test_idx  <- setdiff(seq_len(nrow(testData)), train_idx)
+      train <- testData[train_idx, ]
+      test  <- testData[test_idx,  ]
     } else {
       train_idx <- sample(seq_len(nrow(testData)), size = nrow(testData), replace = TRUE)
-      train <- testData[ train_idx, ]
-      test  <- testData[setdiff(seq_len(nrow(testData)), unique(train_idx)), ]
+      test_idx  <- setdiff(seq_len(nrow(testData)), unique(train_idx))
+      train <- testData[train_idx, ]
+      test  <- testData[test_idx,  ]
     }
 
     m_train <- fit_model(train)
@@ -422,8 +536,8 @@ bias_precision <- function(nReps = 100, testModel = NULL, testData = NULL,
 
     y_train    <- train[[resp_var]]
     y_test     <- test[[resp_var]]
-    yhat_train <- get_preds_train(m_train, train)
-    yhat_test  <- get_preds_test(m_train, test)
+    yhat_train <- get_preds_train(m_train, train, train_idx)
+    yhat_test  <- get_preds_test( m_train, test,  test_idx)
 
     results[[j]] <- data.frame(
       train_RRMSE  = fit_cost_rrmse( y_train, yhat_train),

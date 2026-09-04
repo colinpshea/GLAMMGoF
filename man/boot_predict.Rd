@@ -45,20 +45,28 @@ over numeric predictors.}
 \item{alpha}{CI level (default 0.05 → 95\% intervals).}
 
 \item{bias_adjust}{One of \code{"none"} (default) or \code{"manual"}; \code{"manual"}
-multiplies each prediction by \code{jensen_correct(mod)} to correct for
-Jensen's inequality bias from the random-effect variance components.
-Has no effect on logit-link models (warning issued). Overridden by
-\code{correction_factor} if that argument is supplied.}
+applies the Jensen's inequality correction for retransformation bias
+from random-effect (and, for natural-log-response models, residual)
+variance components. For most models the scalar correction from
+\code{\link[=jensen_correct]{jensen_correct()}} is used; for natural-log-response glmmTMB fits with
+a non-trivial \code{dispformula} the per-row correction from
+\code{\link[=jensen_correction]{jensen_correction()}} is used automatically, and \code{newdata} must be
+supplied (or auto-constructable). Has no effect on logit-link models
+(warning issued). Overridden by \code{correction_factor} if that argument
+is supplied.}
 
-\item{correction_factor}{Optional positive numeric scalar giving a
-user-supplied Jensen correction factor to apply on the response scale
-(i.e., predictions are multiplied by this value). When supplied,
-overrides \code{bias_adjust} and the internally-computed correction from
-\code{jensen_correct(mod)}. Useful when the default correction is not what
-is wanted — for example, to include only a subset of random-effect
-variance components (e.g., substantive REs but not nuisance REs), or
-to apply a correction computed externally from another source.
-Supply \code{1} for no correction. Defaults to \code{NULL} (use \code{bias_adjust}).}
+\item{correction_factor}{Optional positive numeric giving a user-supplied
+Jensen correction factor to apply on the response scale (i.e.,
+predictions are multiplied by this value). May be a scalar or a
+numeric vector of length \code{nrow(newdata)}; a vector is applied
+row-wise via \code{sweep()} and is the appropriate shape when residual
+variance depends on covariates (glmmTMB natural-log-response models
+with a \code{dispformula}). When supplied, overrides \code{bias_adjust} and the
+internally-computed correction. Useful when the default correction is
+not what is wanted — for example, to include only a subset of
+random-effect variance components (substantive REs but not nuisance
+REs), or to apply a correction computed externally. Supply \code{1} for no
+correction. Defaults to \code{NULL} (use \code{bias_adjust}).}
 
 \item{seed}{Optional integer seed for reproducibility.}
 }
@@ -74,6 +82,15 @@ offsets (formula-side and argument-side) and supports an optional
 analytical Jensen's inequality bias correction via \code{bias_adjust = "manual"}.
 }
 \details{
+Natural-log-response models (\code{log(y) ~ ...}, family Gaussian — often
+called "lognormal LMMs") are supported: the response transform is
+detected from the formula LHS and the linear-predictor draws are
+exponentiated to the response scale regardless of the family link
+(which is \code{"identity"} for these models). For such fits with a
+non-trivial \code{dispformula}, the per-row Jensen correction is obtained
+internally from \code{\link[=jensen_correction]{jensen_correction()}}; users may also compute it
+externally and supply it via \code{correction_factor}.
+
 \strong{Offset handling.} If the fitted model contains an offset (either as
 \code{offset()} in the formula or as an \verb{offset =} argument), \code{boot_predict()}
 will resolve it in the following order of precedence:
