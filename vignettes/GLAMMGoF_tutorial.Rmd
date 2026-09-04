@@ -539,6 +539,56 @@ jensen_correct(m_precomputed)                      # error: transformation not v
 jensen_correct(m_precomputed, type = "lognormal")  # correct: exp(sigma^2_resid / 2)
 ```
 
+#### Models with covariates in the dispersion model (`glmmTMB`)
+
+When residual variance depends on covariates, `dispformula = ~ ...` in glmmTMB fits a linear model for the log-scale dispersion parameter. For lognormal LMMs (natural-log responses fit as `log(y) ~ ..., family = gaussian`), this changes what the Jensen correction looks like: `σ²` becomes a function of the covariates rather than a scalar, and the correction becomes per-observation.
+
+The scalar path breaks down. Recall that for a standard lognormal LMM with a trivial dispformula, the Jensen correction is `exp((σ² + Σσ²_k)/2)` where `σ²` is the residual variance and `Σσ²_k` sums the random-effect variances. `jensen_correct()` computes this from `sigma(mod)^2 + sum(VarCorr components)`. When `dispformula` has more than one parameter, `sigma(mod)` returns NA (`glmmTMB`'s convention), because there isn't a single dispersion value to return. The scalar correction is undefined for that model; it's not a bug, it's a signal that the model's variance structure has been generalized past what a scalar can represent.
+
+The correction becomes per-observation. `jensen_correction()` handles this case by reconstructing `σ²(x)` from the dispformula design matrix and the fitted dispersion coefficients: `σ²(xᵢ) = exp(2 · X_disp,i β̂_disp`). The correction is then ` exp((σ²(xᵢ) + Σσ²_k)/2)` per row of newdata. The random-effect contribution stays scalar because RE variances aren't functions of the covariates.
+
+Worked example
+Suppose we fit a lognormal LMM of lipid class abundance on class, phase, site, and processing group, with the same covariate structure in both the mean and dispersion models:
+
+```{r, eval=FALSE}
+mod <- glmmTMB(
+  log(class_abundance) ~ class * phase_code + site_code + processing_group +
+    (1 | sample_id),
+  dispformula = ~ class * phase_code + site_code + processing_group,
+  family = gaussian,
+  data = dat
+)
+```
+
+`jensen_correct(mod)` will error because `sigma(mod)` returns `NA`. Use `jensen_correction()` instead:
+
+```{r, eval=FALSE}
+cf <- jensen_correction(mod, newdata = dat)
+summary(cf)
+```
+
+The returned vector has one correction per row of newdata. It can be handed to `boot_predict()` (fixed grid) or `bias_precision()` (holdout resampling) via the correction_factor argument. `boot_predict()` also handles this automatically when called with `bias_adjust = "manual"`; it routes through `jensen_correction()` internally, so the user doesn't need to compute the vector by hand:
+
+```{r, eval = FALSE}
+# Automatic routing (equivalent to computing cf externally and passing it)
+pred <- boot_predict(mod, newdata = pred_grid, bias_adjust = "manual")
+```
+
+Explicit (equivalent, useful for reusing cf across multiple calls)
+```{r, eval = FALSE}
+cf <- jensen_correction(mod, newdata = pred_grid)
+pred <- boot_predict(mod, newdata = pred_grid, correction_factor = cf)
+```
+
+For `bias_precision()`, the vector must be supplied explicitly and must match `nrow(testData)`; holdout sets change per replicate, and the values are sliced internally by the resampling indices:
+
+```{r, eval = FALSE}
+cf_full <- jensen_correction(mod, newdata = dat)  # one entry per observation
+diag <- bias_precision(nReps = 100, testModel = mod, testData = dat,
+                       bias_adjust = "manual", correction_factor = cf_full)
+```
+
+
 #### A note about `holdout` vs `bootstrap` resampling methods when diagnosing and adjusting for Jensen's inequality bias
 
 Note on method choice for random-effect models: `method = "holdout"` is recommended over `method = "bootstrap"` when the design has few observations per random-effect group. Case bootstrap with replacement duplicates rows within resampled training sets, and these duplicates appear to the model as within-group replicates. When groups are sparse, each duplicated row has disproportionate leverage over that group's apparent within-group structure, systematically inflating the estimated random-effect variance in refitted training models relative to the full-data fit. When bias_adjust = "manual" is used, the correction factor is computed once from the full-data model and therefore under-corrects the inflated per-refit Jensen bias under bootstrap, leaving residual negative RBIAS in the output. The effect is largely independent of model specification; it appears in both correctly-specified and misspecified fits when groups are sparse, and diminishes substantially when groups have many observations regardless of specification. The issue is particularly acute for balanced repeated-measures designs (e.g., a fixed number of sub-samples per site or subject), where case bootstrap generates duplicated rows at rates and structures inconsistent with the sampling design. Cluster bootstrap (resampling entire groups) or parametric bootstrap would be more appropriate resampling schemes; `GLAMMGoF` currently supports neither, so `method = "holdout"` is the recommended choice.
