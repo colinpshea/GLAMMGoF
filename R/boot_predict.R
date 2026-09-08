@@ -11,7 +11,7 @@
 #' exponentiated to the response scale regardless of the family link
 #' (which is `"identity"` for these models). For such fits with a
 #' non-trivial `dispformula`, the per-row Jensen correction is obtained
-#' internally from [jensen_correction()]; users may also compute it
+#' internally from [jensen_correct_rowwise()]; users may also compute it
 #' externally and supply it via `correction_factor`.
 #'
 #' @param mod A fitted model of a supported class (glmmTMB, lme4::glmerMod,
@@ -38,7 +38,7 @@
 #'   variance components. For most models the scalar correction from
 #'   [jensen_correct()] is used; for natural-log-response glmmTMB fits with
 #'   a non-trivial `dispformula` the per-row correction from
-#'   [jensen_correction()] is used automatically, and `newdata` must be
+#'   [jensen_correct_rowwise()] is used automatically, and `newdata` must be
 #'   supplied (or auto-constructable). Has no effect on logit-link models
 #'   (warning issued). Overridden by `correction_factor` if that argument
 #'   is supplied.
@@ -147,7 +147,7 @@ boot_predict <- function(mod,
 
     ## Path A with a non-trivial glmmTMB dispformula: sigma^2(x) varies by
     ## row, so the Jensen correction is per-observation and comes from
-    ## jensen_correction() rather than jensen_correct(). Detected here (not
+    ## jensen_correct_rowwise() rather than jensen_correct(). Detected here (not
     ## deferred to the Jensen block) so the auto-grid can include disp
     ## covariates that aren't already in the conditional formula.
     path_A_dispformula <- is_path_A && inherits(mod, "glmmTMB") && {
@@ -191,7 +191,7 @@ boot_predict <- function(mod,
         cond_vars  <- all.vars(cond_frm)[-1]
         zi_vars    <- if (!is.null(zi$formula)) all.vars(zi$formula) else character(0)
         ## For Path A with dispformula, ensure disp covariates are in the
-        ## auto-grid so jensen_correction() can extract per-row sigma. This
+        ## auto-grid so jensen_correct_rowwise() can extract per-row sigma. This
         ## is a no-op when the dispformula shares all its covariates with
         ## the conditional formula (the common case).
         disp_vars  <- if (path_A_dispformula) {
@@ -365,7 +365,7 @@ boot_predict <- function(mod,
     }
 
     # Detect the "Path A with dispformula" case that must be routed through
-    # jensen_correction() (per-row correction) rather than jensen_correct()
+    # jensen_correct_rowwise() (per-row correction) rather than jensen_correct()
     # (scalar path, which would fail because sigma() returns NA for glmmTMB
     # dispformulas with more than one parameter). Actual detection happens
     # near the top of the function so it can inform the auto-grid; the
@@ -408,14 +408,14 @@ boot_predict <- function(mod,
                 "linear predictor and no scalar correction is appropriate.",
                 call. = FALSE)
       } else if (path_A_dispformula) {
-        # Route to jensen_correction() for per-row extraction of sigma^2(x)
+        # Route to jensen_correct_rowwise() for per-row extraction of sigma^2(x)
         # from the dispformula. jensen_correct() would fail here because
         # glmmTMB's sigma() returns NA when betadisp has more than one entry.
         jf <- tryCatch(
-          jensen_correction(mod, newdata = newdata),
+          jensen_correct_rowwise(mod, newdata = newdata),
           error = function(e) {
             stop("Failed to compute per-row Jensen correction via ",
-                 "jensen_correction() for this natural-log-response model ",
+                 "jensen_correct_rowwise() for this natural-log-response model ",
                  "with a non-trivial dispformula: ", conditionMessage(e),
                  "\nSupply `correction_factor` explicitly instead.",
                  call. = FALSE)
@@ -448,7 +448,7 @@ boot_predict <- function(mod,
                 "correction (sigma() returned NA). This typically means the ",
                 "model has a non-trivial dispformula whose per-row correction ",
                 "cannot be reduced to a single number. Compute it explicitly ",
-                "via `jensen_correction(mod, newdata = ...)` and pass the ",
+                "via `jensen_correct_rowwise(mod, newdata = ...)` and pass the ",
                 "result as `correction_factor`.",
                 call. = FALSE
               )

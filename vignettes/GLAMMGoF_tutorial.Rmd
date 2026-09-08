@@ -555,7 +555,7 @@ When residual variance depends on covariates, `dispformula = ~ ...` in `glmmTMB`
 
 **The scalar path breaks down.** Recall that for a standard lognormal LMM with a trivial `dispformula`, the Jensen correction is $\exp((\sigma^2 + \sum_k \sigma^2_k)/2)$, where $\sigma^2$ is the residual variance and $\sum_k \sigma^2_k$ sums the random-effect variances. `jensen_correct()` computes this from `sigma(mod)^2 + sum(VarCorr components)`. When `dispformula` has more than one parameter, `sigma(mod)` returns `NA` (`glmmTMB`'s convention), because there isn't a single dispersion value to return. The scalar correction is undefined for that model; it's not a bug, it's a signal that the model's variance structure has been generalized past what a scalar can represent.
 
-**The correction becomes per-observation.** `jensen_correction()` handles this case by reconstructing $\sigma^2(x)$ from the `dispformula` design matrix and the fitted dispersion coefficients: $\sigma^2(x_i) = \exp(2 \cdot X_{\text{disp},i} \, \hat{\beta}_{\text{disp}})$. The correction is then $\exp((\sigma^2(x_i) + \sum_k \sigma^2_k)/2)$ per row of `newdata`. The random-effect contribution stays scalar because RE variances aren't functions of the covariates.
+**The correction becomes per-observation.** `jensen_correct_rowwise()` handles this case by reconstructing $\sigma^2(x)$ from the `dispformula` design matrix and the fitted dispersion coefficients: $\sigma^2(x_i) = \exp(2 \cdot X_{\text{disp},i} \, \hat{\beta}_{\text{disp}})$. The correction is then $\exp((\sigma^2(x_i) + \sum_k \sigma^2_k)/2)$ per row of `newdata`. The random-effect contribution stays scalar because RE variances aren't functions of the covariates.
 
 **Reminder**: as stated earlier in *Which correction applies?*, for distributional families with free dispersion parameters (`gamma`, `tweedie`, negative binomial via `nbinom1`/`nbinom2`) used with a log link, the dispersion parameter does not contribute to the Jensen correction on the conditional mean. This holds whether dispersion is constant or modeled as a function of covariates via `dispformula`.
 
@@ -571,14 +571,14 @@ mod <- glmmTMB(
 )
 ```
 
-`jensen_correct(mod)` will error because `sigma(mod)` returns `NA`. Use `jensen_correction()` instead:
+`jensen_correct(mod)` will error because `sigma(mod)` returns `NA`. Use `jensen_correct_rowwise()` instead:
 
 ```{r, eval=FALSE}
-cf <- jensen_correction(mod, newdata = dat)
+cf <- jensen_correct_rowwise(mod, newdata = dat)
 summary(cf)
 ```
 
-The returned vector has one correction per row of `newdata`. It can be handed to `boot_predict()` (fixed grid) or `bias_precision()` (holdout resampling) via the `correction_factor` argument. `boot_predict()` also handles this automatically when called with `bias_adjust = "manual"`; it routes through `jensen_correction()` internally, so the user doesn't need to compute the vector by hand:
+The returned vector has one correction per row of `newdata`. It can be handed to `boot_predict()` (fixed grid) or `bias_precision()` (holdout resampling) via the `correction_factor` argument. `boot_predict()` also handles this automatically when called with `bias_adjust = "manual"`; it routes through `jensen_correct_rowwise()` internally, so the user doesn't need to compute the vector by hand:
 
 ```{r, eval = FALSE}
 # Automatic routing (equivalent to computing cf externally and passing it)
@@ -588,19 +588,19 @@ pred <- boot_predict(mod, newdata = pred_grid, bias_adjust = "manual")
 Explicit (equivalent, useful for reusing `cf` across multiple calls):
 
 ```{r, eval = FALSE}
-cf <- jensen_correction(mod, newdata = pred_grid)
+cf <- jensen_correct_rowwise(mod, newdata = pred_grid)
 pred <- boot_predict(mod, newdata = pred_grid, correction_factor = cf)
 ```
 
 For `bias_precision()`, the vector must be supplied explicitly and must match `nrow(testData)`; holdout sets change per replicate, and the values are sliced internally by the resampling indices:
 
 ```{r, eval = FALSE}
-cf_full <- jensen_correction(mod, newdata = dat)  # one entry per observation
+cf_full <- jensen_correct_rowwise(mod, newdata = dat)  # one entry per observation
 diag <- bias_precision(nReps = 100, testModel = mod, testData = dat,
                        bias_adjust = "manual", correction_factor = cf_full)
 ```
 
-For `glmmTMB` `family = lognormal(link = "log")` (Path B in the package's internals), the residual variance is absorbed into the mean parameterization internally, so the correction is RE-only regardless of `dispformula`. `jensen_correct(mod)` returns the scalar RE-only correction; `jensen_correction(mod)` returns the same scalar with a note that the `dispformula` was seen and deliberately not used.
+For `glmmTMB` `family = lognormal(link = "log")` (Path B in the package's internals), the residual variance is absorbed into the mean parameterization internally, so the correction is RE-only regardless of `dispformula`. `jensen_correct(mod)` returns the scalar RE-only correction; `jensen_correct_rowwise(mod)` returns the same scalar with a note that the `dispformula` was seen and deliberately not used.
 
 ### Response-scale predictions with `boot_predict()`
 

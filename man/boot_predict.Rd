@@ -50,7 +50,7 @@ from random-effect (and, for natural-log-response models, residual)
 variance components. For most models the scalar correction from
 \code{\link[=jensen_correct]{jensen_correct()}} is used; for natural-log-response glmmTMB fits with
 a non-trivial \code{dispformula} the per-row correction from
-\code{\link[=jensen_correction]{jensen_correction()}} is used automatically, and \code{newdata} must be
+\code{\link[=jensen_correct_rowwise]{jensen_correct_rowwise()}} is used automatically, and \code{newdata} must be
 supplied (or auto-constructable). Has no effect on logit-link models
 (warning issued). Overridden by \code{correction_factor} if that argument
 is supplied.}
@@ -88,7 +88,7 @@ detected from the formula LHS and the linear-predictor draws are
 exponentiated to the response scale regardless of the family link
 (which is \code{"identity"} for these models). For such fits with a
 non-trivial \code{dispformula}, the per-row Jensen correction is obtained
-internally from \code{\link[=jensen_correction]{jensen_correction()}}; users may also compute it
+internally from \code{\link[=jensen_correct_rowwise]{jensen_correct_rowwise()}}; users may also compute it
 externally and supply it via \code{correction_factor}.
 
 \strong{Offset handling.} If the fitted model contains an offset (either as

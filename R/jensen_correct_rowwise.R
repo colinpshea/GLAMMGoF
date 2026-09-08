@@ -19,7 +19,7 @@
 #'     on the log scale, inside \eqn{\exp()}, so
 #'     \eqn{V = \sigma^2_{resid} + \sum_k \sigma^2_k}. When the model has a
 #'     non-trivial dispformula, \eqn{\sigma^2_{resid}(x)} depends on the
-#'     covariates and \code{jensen_correction()} returns a length-\code{nrow(newdata)}
+#'     covariates and \code{jensen_correct_rowwise()} returns a length-\code{nrow(newdata)}
 #'     vector, extracting the per-row dispersion from
 #'     \code{predict(model, type = "disp", newdata = newdata)}.}
 #'   \item{Log-link GLMMs (Poisson, negative binomial, Tweedie, Gamma, or
@@ -72,29 +72,29 @@
 #' # Scalar case: log(y) ~ Gaussian with a single-covariate dispformula
 #' # collapses to the trivial dispformula case and returns a scalar
 #' m0 <- glmmTMB(log(y) ~ x + (1 | g), family = gaussian, data = dat)
-#' jensen_correction(m0)                     # exp((sigma^2 + tau^2) / 2)
+#' jensen_correct_rowwise(m0)                     # exp((sigma^2 + tau^2) / 2)
 #'
 #' # Vector case: dispformula varies with covariates
 #' m1 <- glmmTMB(log(y) ~ x + (1 | g), dispformula = ~ x,
 #'               family = gaussian, data = dat)
-#' cf <- jensen_correction(m1, newdata = pred_grid)   # length nrow(pred_grid)
+#' cf <- jensen_correct_rowwise(m1, newdata = pred_grid)   # length nrow(pred_grid)
 #' bp <- boot_predict(m1, newdata = pred_grid, correction_factor = cf)
 #'
 #' # log-link count model: RE-only, dispformula ignored with a message
 #' m2 <- glmmTMB(y ~ x + (1 | g), dispformula = ~ x,
 #'               family = nbinom2, data = dat)
-#' jensen_correction(m2)                     # scalar exp(tau^2 / 2)
+#' jensen_correct_rowwise(m2)                     # scalar exp(tau^2 / 2)
 #' }
 #'
 #' @importFrom stats formula model.matrix predict sigma family
 #' @importFrom reformulas nobars
 #' @importFrom glmmTMB fixef
 #' @export
-jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
+jensen_correct_rowwise <- function(model, newdata = NULL, include_re = TRUE) {
 
   # -- Validate model class ------------------------------------------------
   if (!inherits(model, c("glmmTMB", "merMod", "glm", "lm")))
-    stop("jensen_correction() supports glmmTMB, lme4 (merMod), glm, and lm ",
+    stop("jensen_correct_rowwise() supports glmmTMB, lme4 (merMod), glm, and lm ",
          "model objects. For other model types, extract the relevant ",
          "variances manually and compute exp(sum(variances) / 2).",
          call. = FALSE)
@@ -129,7 +129,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
          call. = FALSE)
   } else {
     stop("No log back-transformation is present (link = '", link, "', ",
-         "family = '", family, "'). jensen_correction() applies to log-link ",
+         "family = '", family, "'). jensen_correct_rowwise() applies to log-link ",
          "and natural-log-response models only.", call. = FALSE)
   }
 
@@ -137,7 +137,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
   rev    <- .re_variance_sum(model)
   re_sum <- if (include_re) rev$re_var else 0
   if (include_re && rev$slopes)
-    warning("Random slopes detected. jensen_correction() uses random-",
+    warning("Random slopes detected. jensen_correct_rowwise() uses random-",
             "intercept variances only and ignores slope variance/",
             "covariance; the returned factor is an approximation. For ",
             "glmmTMB random-slope models a more exact correction is ",
@@ -226,7 +226,7 @@ jensen_correction <- function(model, newdata = NULL, include_re = TRUE) {
   # helper handles fixed-effect dispersion only. If bars are stripped, warn.
   disp_rhs <- reformulas::nobars(disp_frm)
   if (!identical(deparse(disp_frm), deparse(disp_rhs)))
-    warning("Random effects in dispformula are ignored by jensen_correction(); ",
+    warning("Random effects in dispformula are ignored by jensen_correct_rowwise(); ",
             "only the fixed-effect part of the dispersion model contributes to ",
             "the per-row correction.", call. = FALSE)
 

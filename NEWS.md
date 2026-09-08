@@ -1,4 +1,21 @@
+# GLAMMGoF 1.5.1
+
+## New features
+
+* Restructured the vignette
+
 # GLAMMGoF 1.5.0
+
+## Under the hood
+
+* Renamed `jensen_correction()` to `jensen_correct_rowwise()` to avoid confusion
+  with `jensen_correct()`; the function's behavior is unchanged and still
+  complements `jensen_correct()` by handling the case the scalar path
+  cannot: glmmTMB natural-log-response models with a non-trivial `dispformula`,
+  where residual variance depends on covariates and the correction is a
+  length-`nrow(newdata)` vector rather than a scalar. Returns bare numeric
+  (scalar or vector) suitable for passing to `boot_predict()` or
+  `bias_precision()` via `correction_factor`.
 
 ## New features
 
