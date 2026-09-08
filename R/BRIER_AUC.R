@@ -22,6 +22,7 @@
 #' @param method Character string specifying the resampling method.`"holdout"` (the default) partitions the data into training and testing sets without replacement, following the `propTrain` argument.`"bootstrap"` samples the training data with replacement and evaluates in-sample performance on the bootstrap sample and out-of-sample performance on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). For random-effect models with few observations per group, `"holdout"` is recommended: case bootstrap with replacement can inflate per-refit random-effect variance estimates when groups are sparse. See the vignette for details.
 #' @param bias_adjust Character string. One of `"none"` (the default) or `"manual"`. `"none"` uses standard population-level predictions (`re.form = ~0`) with no correction. `"manual"` is not supported for binomial models and will throw an informative error; the analytical correction `exp(sigma^2/2)` is only valid for log-link models, and no closed-form marginal-mean correction exists for the logit link. No bias adjustment is currently supported for binomial GLMMs; the argument is retained for API parity with `bias_precision()`. See the note below for details.
 #' @param conditional_predictions Logical. If `TRUE` and the model is a `glmmTMB` or `lme4` fit with random effects, both in-sample and out-of-sample predictions are made conditionally on the estimated random effects (`re.form = NULL`, `allow.new.levels = TRUE`) rather than marginally (`re.form = ~0`). Since GLAMMGoF's holdout CV splits rows within groups rather than groups themselves, random effect estimates from the training model are valid for held-out observations from the same groups, making conditional out-of-sample predictions well-defined and meaningful. In-sample and out-of-sample metrics remain directly comparable since both use the same conditional prediction strategy; the gap between them reflects genuine overfitting to training rows rather than any marginal vs conditional distinction. The default is `FALSE`, which uses marginal predictions for both, assessing population-level generalization. This argument is supported for `glmmTMB` and `lme4` (glmer) model objects and is silently ignored for `mgcv` GAM/GAMM models.
+#' @param ... Additional arguments forwarded to the backend fitting function on each per-replicate refit (glmmTMB, glmer, glm, gam). Useful for backend-specific arguments like `control` (e.g. `control = glmmTMBControl(optCtrl = list(iter.max = 10000, eval.max = 10000))` for glmmTMB models with slow convergence, or `control = glmerControl(optimizer = "bobyqa")` for glmer models with convergence warnings), `start`, `weights`, `contrasts`, or `na.action`. Arguments that brier_auc() sets internally from testModel (`formula`, `data`, `family`, `dispformula`, `ziformula`) are rejected with an informative error to prevent silent corruption of the refit spec. Backend-specific validity is the caller's responsibility: passing an argument a particular backend does not accept will surface as an error from that backend on the first refit attempt.
 #' @note This function only supports binary 0/1 responses and does not currently support binomial models with cbind() or proportion responses. This function also supports models with spatial random effects (e.g, in glmmTMB), but it is much slower than for more conventional GLM(M)s and GAM(M)s.
 #'
 #' **Random effects and Jensen's inequality:** All predictions are population-level (i.e., random effects are set to zero via `re.form = ~0`). For models with random effects and a nonlinear link function such as the logit, backtransforming the linear predictor to the probability scale introduces a systematic bias in the predicted mean probability. This occurs because Jensen's inequality implies that `E[plogis(eta)] != plogis(E[eta])` for any random variable `eta`. The direction and magnitude of this bias depend on the curvature of the inverse-logit function at the linear predictor value, and grow with random effect variance. Consistent negative patterns in Brier score or log loss relative to the null model baseline may partly reflect this structural property of the GLMM. Unlike the log-link case handled in `bias_precision()`, the logit link does not admit a closed-form scalar correction: the marginal mean probability is `E[plogis(eta)]` under the RE distribution, which has no simple analytical form. No bias adjustment is currently supported in `brier_auc()`. When a corrected marginal probability is required, users can obtain one by Monte Carlo integration over the RE distribution outside GLAMMGoF (drawing many `eta_i^(s)` from `N(x_i^T beta, Sigma)` and averaging `plogis(eta_i^(s))` per observation).
@@ -67,7 +68,8 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
                       propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
                       seed = NULL, method = c("holdout", "bootstrap"),
                       bias_adjust = c("none", "manual"),
-                      conditional_predictions = FALSE) {
+                      conditional_predictions = FALSE,
+                      ...) {
 
   # --- specify bootstrapping method and bias adjustment
   method      <- match.arg(method)
@@ -106,6 +108,23 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
     "cbind() and proportion binomial responses are not supported. See ?bias_precision for details." =
       !is_cbind && !is_prop
   )
+
+  # --- Capture and validate '...' (forwarded to backend refit) ---
+  # Users can supply backend-specific arguments like `control`, `start`,
+  # `weights`, `contrasts`, etc. These flow through to each per-replicate
+  # refit via do.call() in fit_model(). A blocklist rejects arguments that
+  # brier_auc() sets itself from testModel — passing them via ...
+  # would silently corrupt the refit spec.
+  dots <- list(...)
+  blocked_dots <- intersect(
+    names(dots),
+    c("formula", "data", "family", "dispformula", "ziformula")
+  )
+  if (length(blocked_dots) > 0)
+    stop("`...` cannot include: ", paste(blocked_dots, collapse = ", "),
+         ". These are set internally by brier_auc() from testModel. ",
+         "Refit testModel with the desired specification instead.",
+         call. = FALSE)
 
   # Remove rows with NA in any model variable (response or covariates)
   model_vars    <- all.vars(formula(testModel))
@@ -174,21 +193,36 @@ brier_auc <- function(nReps = 100, testModel = NULL, testData = NULL,
          "and interpret Brier score / log loss relative to the null model baseline. ",
          "See ?brier_auc for details.")
 
-  # --- Fit helper: dispatch on model class, return NULL on failure ---
+  # --- Fit helper: dispatch on model class, forward `...` via do.call ---
+  # `dots` was captured at the top of brier_auc() and validated against
+  # the blocklist. It's spliced into each backend's argument list here so
+  # user-supplied backend arguments (control, start, weights, contrasts, ...)
+  # reach the per-replicate refit. Returns NULL on failure.
   fit_model <- function(train) {
     tryCatch({
       if (is_glmmTMB) {
-        glmmTMB(formula(testModel, component = "cond"),
-                family      = family(testModel),
-                dispformula = formula(testModel, component = "disp"),
-                ziformula   = formula(testModel, component = "zi"),
-                data        = train)
+        args <- c(list(formula     = formula(testModel, component = "cond"),
+                       family      = family(testModel),
+                       dispformula = formula(testModel, component = "disp"),
+                       ziformula   = formula(testModel, component = "zi"),
+                       data        = train),
+                  dots)
+        do.call(glmmTMB, args)
       } else if (is_gam) {
-        gam(formula(testModel), family = family(testModel), data = train)
+        args <- c(list(formula = formula(testModel),
+                       family  = family(testModel),
+                       data    = train), dots)
+        do.call(gam, args)
       } else if (is_glmer) {
-        glmer(formula(testModel), family = family(testModel), data = train)
+        args <- c(list(formula = formula(testModel),
+                       family  = family(testModel),
+                       data    = train), dots)
+        do.call(glmer, args)
       } else if (is_glm) {
-        glm(formula(testModel), family = family(testModel), data = train)
+        args <- c(list(formula = formula(testModel),
+                       family  = family(testModel),
+                       data    = train), dots)
+        do.call(glm, args)
       }
     }, error = function(e) {
       message("Model failed on replicate: ", e$message)

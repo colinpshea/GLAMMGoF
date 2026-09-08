@@ -8,6 +8,14 @@
 
 ## Under the hood
 
+* `brier_auc()` gains `...` for forwarding backend-specific arguments
+  to per-replicate refits. Useful primarily for `control` (e.g.
+  `control = glmmTMB::glmmTMBControl(optCtrl = list(iter.max = 10000))` when
+  a model requires raised convergence limits), but also for `start`, `weights`,
+  `contrasts`, `na.action`, and other backend-specific arguments. Arguments
+  that `bias_precision()` sets internally from `testModel` (`formula`, `data`,
+  `family`, `dispformula`, `ziformula`) are rejected with an informative error.
+
 * Renamed `jensen_correction()` to `jensen_correct_rowwise()` to avoid confusion
   with `jensen_correct()`; the function's behavior is unchanged and still
   complements `jensen_correct()` by handling the case the scalar path
