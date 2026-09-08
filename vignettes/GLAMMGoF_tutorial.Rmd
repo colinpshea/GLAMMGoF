@@ -17,10 +17,10 @@ vignette: >
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo = T,
-  warning = F,
+  echo = TRUE,
+  warning = FALSE,
   comment = NA,
-  message = F,
+  message = FALSE,
   fig.width = 8, 
   fig.height = 5
 )
@@ -28,13 +28,9 @@ knitr::opts_chunk$set(
 
 ### What does GLAMMGoF do?
 
-`GLAMMGoF` is an R package for resampling-based predictive assessment of generalized linear and generalized additive models. The two main functions in the package, `bias_precision()` and `brier_auc()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to resampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`, `lmer()`, `glmer()`, and `glmer.nb()` from `lme4`, `glm.nb()` from `MASS`, `gam()` from `mgcv`, and `glm()` and `lm()` from the stats package. Optional residual diagnostics are available via the `DHARMa` package, and an additional parametric bootstrap function, `boot_predict()`, generates response-scale predictions with associated uncertainty intervals. 
+`GLAMMGoF` is an R package for resampling-based predictive assessment of generalized linear and generalized additive models. The two main functions in the package, `bias_precision()` and `brier_auc()`, quantify in-sample and out-of-sample predictive performance by repeatedly refitting a model structure to resampled training data and evaluating predictions on held-out testing data. These functions support model objects from a variety of R packages, including `glmmTMB()` from `glmmTMB`; `lmer()`, `glmer()`, and `glmer.nb()` from `lme4`; `glm.nb()` from `MASS`; `gam()` from `mgcv`; and `glm()` and `lm()` from the `stats` package. Optional residual diagnostics are available via the `DHARMa` package, and an additional parametric bootstrap function, `boot_predict()`, generates response-scale predictions with associated uncertainty intervals.
 
--   `bias_precision()` is intended for models with continuous or integer response variables (e.g., gamma, Gaussian, negative binomial, Poisson, or Tweedie distributions) and returns relative root mean squared error (RRMSE), relative mean absolute error (RMAE), relative median absolute error (RMedAE), and relative bias (RBIAS).
-
--   `brier_auc()` is intended for models with binary response variables (i.e., logistic regression) and returns AUC, Brier score, and log loss.
-
-**Important note:** Both of these functions take an existing model fitted to the full data set and assess the predictive performance of that model structure through repeated resampling. In each of `nReps` replicates, the model is refit to a resampled training data set and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information available for inference, while resampling-based predictive assessment provides a practical way to evaluate generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited.
+**Important note:** Both `bias_precision()` and `brier_auc()` take an existing model fitted to the full data set and assess the predictive performance of that model structure through repeated resampling. In each of `nReps` replicates, the model is refit to a resampled training data set and evaluated on separate testing data. This workflow is intentional: fitting the final model to all available data maximizes information available for inference, while resampling-based predictive assessment provides a practical way to evaluate generalization without permanently withholding data. This approach is especially useful in ecological applications where sample sizes are often limited.
 
 ### Getting started
 
@@ -51,86 +47,141 @@ library(tidyr)
 library(patchwork)
 ```
 
-### How is GLAMMGoF used?
+The package ships with two example data sets, `countData` and `logitData`, with integer and binary response variables, respectively. Each data set also includes a variety of continuous and categorical predictor variables. Twelve example model objects are provided (six beginning with `count` and six beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible R packages.
 
-The two functions used to assess predictive performance are `bias_precision` and `brier_auc()`, and which one you use depends on the type of model being assessed:
+### Recommended workflow at a glance
 
-`bias_precision()`: used for models with continuous or integer response variables and estimates four predictive performance metrics using repeated resampling: `RRMSE`, `RMAE`, `RMedAE`, and `RBIAS`. For all four metrics, values closer to 0 indicate better predictive performance (see `?bias_precision` for details). All three accuracy statistics (`RRMSE`, `RMAE`, and `RMedAE`) express prediction error as a percentage of the mean observed value, which places them on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an `RRMSE` of 18% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
+For log-link GLMMs with random effects (and equally for models fit to a log-transformed response), the recommended workflow is:
 
--   `RRMSE (Relative Root Mean Squared Error)`: The square root of average squared prediction errors, expressed as a percentage of the mean observed value. Because errors are squared before averaging, RRMSE penalizes large individual errors more heavily than small ones, making it sensitive to cases where the model produces occasional extreme predictions.
+1. **Fit** the model to all available data, maximizing information for inference.
+2. **Diagnose** Jensen bias with `bias_precision(bias_adjust = "none")` and inspect `RBIAS`.
+3. **Confirm** the correction resolves the bias with `bias_precision(bias_adjust = "manual")`.
+4. **Predict** with corrected response-scale intervals using `boot_predict(bias_adjust = "manual")`.
+
+Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management (predicted abundances, density estimates, covariate effect plots), apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
+
+The rest of this vignette expands each step in turn.
+
+### Predictive performance metrics
+
+Which function you use depends on the response type. `bias_precision()` handles continuous or integer responses and returns four metrics: `RRMSE`, `RMAE`, `RMedAE`, and `RBIAS`. `brier_auc()` handles binary responses and returns `AUC`, `Brier score`, and `log loss`.
+
+#### Continuous/integer response metrics
+
+For all four metrics, values closer to 0 indicate better predictive performance (see `?bias_precision` for details). All three accuracy statistics (`RRMSE`, `RMAE`, and `RMedAE`) express prediction error as a percentage of the mean observed value, which places them on a common scale regardless of the units or magnitude of the response. To recover the corresponding raw error in the original units of the response, multiply any of these values by the observed mean and divide by 100. For example, an `RRMSE` of 18% with a sample mean of 50 implies a root mean squared error of 9 in the original units.
+
+- `RRMSE` (Relative Root Mean Squared Error): The square root of average squared prediction errors, expressed as a percentage of the mean observed value. Because errors are squared before averaging, `RRMSE` penalizes large individual errors more heavily than small ones, making it sensitive to cases where the model produces occasional extreme predictions.
 
     ```         
     fit_cost_rrmse <- function(y, yhat) sqrt(mean((yhat - y)^2)) / mean(y) * 100
     ```
 
--   `RMAE (Relative Mean Absolute Error)`: The average absolute prediction error expressed as a percentage of the mean observed value. `RMAE` treats all errors proportionally to their size without the extra weight that squaring applies, and is often the most intuitive summary of typical prediction accuracy.
+- `RMAE` (Relative Mean Absolute Error): The average absolute prediction error expressed as a percentage of the mean observed value. `RMAE` treats all errors proportionally to their size without the extra weight that squaring applies, and is often the most intuitive summary of typical prediction accuracy.
 
     ```         
     fit_cost_rmae  <- function(y, yhat) mean(abs(yhat - y)) / mean(y) * 100
     ```
 
--   `RMedAE (Relative Median Absolute Error)`: The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, `RMedAE` is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
+- `RMedAE` (Relative Median Absolute Error): The median absolute prediction error expressed as a percentage of the mean observed value. Because it is based on the median rather than the mean of the error distribution, `RMedAE` is the most robust of the three to outlying predictions and gives the best picture of accuracy for a typical observation when the error distribution is skewed.
 
     ```         
     fit_cost_rmedae  <- function(y, yhat) median(abs(yhat - y)) / mean(y) * 100
     ```
 
--   Taken together, these three statistics tell a more complete story than any one alone. If `RRMSE` is notably larger than `RMAE`, that signals a handful of high-leverage predictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
+Taken together, these three statistics tell a more complete story than any one alone. If `RRMSE` is notably larger than `RMAE`, that signals a handful of high-leverage predictions are inflating the squared-error average, which is a pattern `RMedAE` will often fail to reflect if the bulk of predictions are accurate. Conversely, close agreement among all three suggests errors are roughly symmetric and there are no extreme outliers driving the summary.
 
--   `RBIAS (Relative Bias)`: The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic over-prediction and negative values indicate systematic under-prediction. `RBIAS` is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting `RBIAS` alongside `RRMSE` and `RMAE` therefore distinguishes random prediction noise from systematic directional error.
+- `RBIAS` (Relative Bias): The mean signed prediction error expressed as a percentage of the mean observed value, where positive values indicate systematic over-prediction and negative values indicate systematic under-prediction. `RBIAS` is independent of the accuracy metrics above: a model can be nearly unbiased on average yet still produce large errors, or it can be highly biased while still ranking observations correctly. Reporting `RBIAS` alongside `RRMSE` and `RMAE` therefore distinguishes random prediction noise from systematic directional error.
 
     ```         
     fit_cost_rbias <- function(y, yhat) mean(yhat - y) / mean(y) * 100
     ```
 
-`brier_auc()`: used for models with binary response variables and estimates three predictive performance metrics using repeated resampling: `AUC`, `Brier score`, and `log loss`. `AUC` values closer to 1 (bounded between 0 and 1) indicate better classification performance, whereas `Brier score` (bounded between 0 and 1) and `log loss` (lower bound of 0, no upper bound) values closer to 0 indicate better probabilistic predictions (see `?brier_auc` for details).
+#### Binary response metrics
 
--   The three binary metrics each capture a different aspect of predictive performance and are most informative when interpreted together.
+`brier_auc()` returns three metrics for binary responses. `AUC` values closer to 1 (bounded between 0 and 1) indicate better classification performance, whereas `Brier score` (bounded between 0 and 1) and `log loss` (lower bound of 0, no upper bound) values closer to 0 indicate better probabilistic predictions (see `?brier_auc` for details). The three binary metrics each capture a different aspect of predictive performance and are most informative when interpreted together.
 
--   `AUC (Area Under the ROC Curve)`: The probability that a randomly chosen positive case receives a higher predicted probability than a randomly chosen negative case, ranging from 0 (no discrimination) to 1 (perfect discrimination), and where an `AUC` of 0.5 indicates that a model predicts no better than random chance (and `AUC` \<0.5 is worse than random). `AUC` is purely a measure of discrimination (the model's ability to rank cases by their probability of the outcome) and is insensitive to how well the predicted probabilities are calibrated in absolute terms. This function also returns the null model (i.e., intercept-only) `AUC` statistic, which is assumed to be 0.5, which allows for comparison to the summarized `AUC` metrics.
+- `AUC` (Area Under the ROC Curve): The probability that a randomly chosen positive case receives a higher predicted probability than a randomly chosen negative case, ranging from 0 (no discrimination) to 1 (perfect discrimination), where an `AUC` of 0.5 indicates that a model predicts no better than random chance (and `AUC` $< 0.5$ is worse than random). `AUC` is purely a measure of discrimination (the model's ability to rank cases by their probability of the outcome) and is insensitive to how well the predicted probabilities are calibrated in absolute terms. This function also returns the null model (i.e., intercept-only) `AUC` statistic, which is assumed to be 0.5, which allows for comparison to the summarized `AUC` metrics.
 
--   `Brier Score`: Across all observations, the mean squared difference between predicted probabilities and observed binary outcomes (0/1), ranging from 0 (perfect) to 1 (worst). The `Brier score` jointly rewards good discrimination and good calibration, penalizing confident but wrong predictions more heavily than uncertain ones. A model can have high `AUC` but a poor `Brier score` if its predicted probabilities are systematically too high or too low even while correctly ordering cases. This function also returns the null model (i.e., intercept-only) `Brier score` for reference (i.e., the best predictive performance achievable without any predictors), computed as `p_bar * (1 - p_bar)`, where `p_bar` is the observed event rate, which allows for comparison to the summarized Brier score metrics. Note that the null Brier score is based on the arithmetic mean of the response, which approximates but is not identical to plogis(intercept) from a fitted intercept-only logistic model; the difference is negligible in practice and avoids the overhead of model fitting.
+- `Brier Score`: Across all observations, the mean squared difference between predicted probabilities and observed binary outcomes (0/1), ranging from 0 (perfect) to 1 (worst). The `Brier score` jointly rewards good discrimination and good calibration, penalizing confident but wrong predictions more heavily than uncertain ones. A model can have high `AUC` but a poor `Brier score` if its predicted probabilities are systematically too high or too low even while correctly ordering cases. This function also returns the null model (i.e., intercept-only) `Brier score` for reference (i.e., the best predictive performance achievable without any predictors), computed as $\bar{p}(1 - \bar{p})$, where $\bar{p}$ is the observed event rate, which allows for comparison to the summarized `Brier score` metrics. Note that the null `Brier score` is based on the arithmetic mean of the response, which approximates but is not identical to `plogis(intercept)` from a fitted intercept-only logistic model; the difference is negligible in practice and avoids the overhead of model fitting.
 
--   `Log Loss (Binary Cross-Entropy)`: Across all observations, the mean negative log-likelihood of the observed outcomes under the predicted probabilities, where lower values indicate better performance. Like the `Brier score`, `log loss` rewards calibration, but its logarithmic scale means it penalizes extreme, confidently wrong predictions far more aggressively. `Log loss` is therefore the most sensitive of the three to cases where the model assigns near-zero probability to an outcome that actually occurs. This function also returns the null model (i.e., intercept-only) log loss for reference (i.e., the best predictive performance achievable without any predictors), computed as `-(p_bar * log(p_bar) + (1 - p_bar) * log(1 - p_bar))`, where `p_bar` is the observed event rate, which allows for comparison to the summarized log loss metrics. Note that the null log loss is based on the arithmetic mean of the response, which approximates but is not identical to plogis(intercept) from a fitted intercept-only logistic model; the difference is negligible in practice and avoids the overhead of model fitting. Log loss is computed internally as:
+- `Log Loss` (Binary Cross-Entropy): Across all observations, the mean negative log-likelihood of the observed outcomes under the predicted probabilities, where lower values indicate better performance. Like the `Brier score`, `log loss` rewards calibration, but its logarithmic scale means it penalizes extreme, confidently wrong predictions far more aggressively. `Log loss` is therefore the most sensitive of the three to cases where the model assigns near-zero probability to an outcome that actually occurs. This function also returns the null model `log loss` for reference, computed as $-[\bar{p}\log(\bar{p}) + (1 - \bar{p})\log(1 - \bar{p})]$, where $\bar{p}$ is the observed event rate. `Log loss` is computed internally as:
 
-```         
-    log_loss <- function(y, p, eps = 1e-15) {p <- pmax(pmin(p, 1 - eps), eps) -mean(y * log(p) + (1 - y) * log(1 - p))}
+    ```         
+    log_loss <- function(y, p, eps = 1e-15) {
+      p <- pmax(pmin(p, 1 - eps), eps)
+      -mean(y * log(p) + (1 - y) * log(1 - p))
+    }
+    ```
+
+Reporting all three together is recommended: `AUC` reflects whether the model correctly separates cases from non-cases; `Brier score` provides an overall summary of probability accuracy on a squared-error scale; and `log loss` highlights whether the model is making any dangerously overconfident errors that the `Brier score` might underweight.
+
+#### Guidance for zero-heavy data
+
+For zero-heavy count or continuous data, the choice of performance metric matters. `RBIAS` in particular can behave unexpectedly when the response contains zeros or values near zero, because the relative error formulation divides by the observed value, producing unstable or extreme terms that can dominate the average and give a misleading impression of systematic underprediction. This is a known limitation of relative bias metrics rather than evidence of poor model fit (Hyndman and Koehler 2006), and is most likely to occur when zeros are common but the zero-generating process is not explicitly modeled.
+
+In these situations, `RMedAE` or `RMAE` may provide more reliable summaries of predictive performance. `RMedAE` is robust to extreme errors because it is based on the median absolute error rather than the mean, and therefore better reflects predictive accuracy for a typical observation. `RMAE` can also be useful because absolute-error metrics weight errors linearly rather than quadratically, making them less sensitive to extreme observations than `RMSE`-based measures.
+
+When combined with the `DHARMa` zero-inflation test (`testZI = TRUE`), these metrics provide a more complete assessment than any single measure alone. `RMedAE` or `RMAE` summarize predictive accuracy, while the ZI test evaluates whether the model correctly reproduces the observed frequency of zeros. A significant ZI test result with `ratioObsSim > 1` indicates that the model is underpredicting zeros, suggesting that a zero-inflated model family or additional sources of heterogeneity should be considered.
+
+### Resampling methods
+
+Two resampling methods are available via the `method` argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets.
+
+Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training data set contains the same number of observations as the original data set, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller data sets, but is slightly less intuitive than the holdout approach. For models without random effects and reasonably sized data sets, both methods should produce similar results.
+
+#### Bootstrap limitation with sparse random effects
+
+Differences between holdout and bootstrap can emerge for random-effect models, particularly when random-effect groups have few observations. Case bootstrap with replacement duplicates rows within resampled training sets, and these duplicates appear to the model as within-group replicates. When groups are sparse, each duplicated row has disproportionate leverage over that group's apparent within-group structure, systematically inflating the estimated random-effect variance in refitted training models relative to the full-data fit. When `bias_adjust = "manual"` is used (see the Jensen section below), the correction factor is computed once from the full-data model and therefore under-corrects the inflated per-refit Jensen bias under bootstrap, leaving residual negative `RBIAS` in the output.
+
+The effect is largely independent of model specification; it appears in both correctly-specified and misspecified fits when groups are sparse, and diminishes substantially when groups have many observations regardless of specification. The issue is particularly acute for balanced repeated-measures designs (e.g., a fixed number of sub-samples per site or subject), where case bootstrap generates duplicated rows at rates and structures inconsistent with the sampling design. Cluster bootstrap (resampling entire groups) or parametric bootstrap would be more appropriate resampling schemes; `GLAMMGoF` currently supports neither, so `method = "holdout"` is the recommended choice for random-effect models with sparse groups.
+
+The figure below shows this pattern across a controlled simulation. Out-of-sample `RBIAS` after Jensen correction is shown for sparse (top row) and dense (bottom row) groups under both correctly specified and misspecified models. Bootstrap and holdout `RBIAS` diverge when groups are sparse but largely converge when groups are dense.
+
+```{r bootstrap-figure, fig.width = 7, fig.height = 7, echo = FALSE, message = FALSE, warning = FALSE}
+# Simulation results generated by data-raw/sim_bootstrap_holdout.R
+# See metadata field for seed and session info.
+
+sim_data <- readRDS(system.file("extdata", "sim_bootstrap_holdout.rds",
+                                package = "GLAMMGoF"))
+
+# Panel A: RBIAS (manual) by method x family x n_obs
+panelA <- sim_data$rbias_df |>
+  filter(Group == "Out-of-sample performance") |>
+  ggplot(aes(x = method, y = value, fill = method)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  geom_boxplot(outlier.size = 0.4, alpha = 0.7) +
+  facet_grid(n_obs ~ fit_family) +
+  labs(x = NULL,
+       y = "Out-of-sample RBIAS (%)\nbias_adjust = 'manual'",
+       title = "RBIAS after Jensen correction, by method") +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none")
+
+panelA
 ```
 
--   Reporting all three together is recommended: `AUC` reflects whether the model correctly separates cases from non-cases; `Brier score` provides an overall summary of probability accuracy on a squared-error scale; and `log loss` highlights whether the model is making any dangerously overconfident errors that the `Brier score` might underweight.
-
-### Important things to know
-
-#### Inclusion of random effects
-
-Both functions accept models with or without random effects. By default, predictive performance is based on population-level (marginal) predictions, meaning random effects are excluded during prediction (re.form = ~0). This behavior can be changed via the conditional_predictions argument (see “Marginal vs conditional predictions” below for details). 
-
-#### Resampling methods
-
-Two resampling methods are available via the method argument. The default (`method = "holdout"`) uses repeated random holdout (Monte Carlo cross-validation), which splits the data into a training set (80% by default, controlled by `propTrain`) and a test set (the remaining 20%). The model is refit to the training data and performance is evaluated on both the training data (in-sample performance) and the withheld test data (out-of-sample performance). This method is intuitive and widely understood, but the fixed training/test split means the training set is always smaller than the full data set, which can be a limitation for smaller data sets. Alternatively, `method = "bootstrap"` uses bootstrap resampling with replacement, where each bootstrap training data set contains the same number of observations as the original data set, sampled with replacement. Out-of-sample performance is evaluated on the out-of-bag observations not selected in the bootstrap sample (approximately 36.8% of observations on average). This method makes more efficient use of the available data and tends to produce more stable estimates, particularly for smaller data sets, but is slightly less intuitive than the holdout approach. For models without random effects and reasonably sized data sets, both methods should produce similar results. Differences can emerge for random-effect models, particularly when random-effect groups have few observations. See “A note about holdout vs bootstrap resampling methods when diagnosing and adjusting for Jensen’s inequality bias” below for details.
-
-#### Results summaries
-
-Results are stored across all `nReps` replicates and reported as a summary table (mean and 95% confidence intervals) and a histogram of replicate values for each performance statistic, with a blue dotted vertical line indicating the mean across replicates. For `brier_auc()`, a red dashed vertical line is also displayed in the log loss panels, indicating the null (intercept-only) log loss baseline as a reference point for model comparison.
-
-### Using the `bias_precision()` function
+### Using `bias_precision()`
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, gamma, negative binomial, Poisson, or Tweedie) are supported, as are numerous R packages (`glmmTMB`, `lme4` (including `glmer`, `glmer.nb`, and `lmer`), `MASS` (`glm.nb`), `mgcv` (`gam`), and `glm`/`lm` from the `stats` package). The function will throw an informative error message if the wrong type of model is supplied. 
+1. Be sure you're using it with the correct model type, which in this case is one with a continuous or integer response variable. Here, a variety of distributions (e.g., Gaussian, gamma, negative binomial, Poisson, or Tweedie) are supported, as are numerous R packages (`glmmTMB`; `lme4` including `glmer`, `glmer.nb`, and `lmer`; `MASS::glm.nb`; `mgcv::gam`; and `glm`/`lm` from the `stats` package). The function will throw an informative error message if the wrong type of model is supplied.
 
-2.  For the simplest call, the only other choices you need to make are:
+2. For the simplest call, the only other choices you need to make are:
 
-    1.  The number of bootstrap or Monte Carlo replicates you want to use (the default is `nReps=100` but this should be at least 500 or 1000).
+    1. The number of bootstrap or Monte Carlo replicates you want to use (the default is `nReps = 100` but this should be at least 500 or 1000).
 
-    2.  For `method = "holdout"` only: The proportion of data you want to use for assessing in-sample predictive performance (the default is 0.8).
+    2. For `method = "holdout"` only: the proportion of data you want to use for assessing in-sample predictive performance (the default is `propTrain = 0.8`).
 
-    3.  Whether you want to use the `DHARMa` package's `simulateResiduals()` function to assess and plot the model's residuals (the default is `DHARMaPlot=TRUE`), whether you also want `DHARMa's` to test for zero inflation using the `testZeroInflation()` function (the default is `testZI=TRUE`), and how many simulation replicates you want `DHARMa` to use (the default is `DHARMaReps=1000`).
+    3. Whether you want to use the `DHARMa` package's `simulateResiduals()` function to assess and plot the model's residuals (default `DHARMaPlot = TRUE`), whether you also want `DHARMa` to test for zero inflation using the `testZeroInflation()` function (default `testZI = TRUE`), and how many simulation replicates you want `DHARMa` to use (default `DHARMaReps = 1000`).
 
-Now let's run it on countModel_GLMM and see what happens...
+By default, predictive performance is based on population-level (marginal) predictions, meaning random effects are excluded during prediction (`re.form = ~0`). This behavior can be changed via the `conditional_predictions` argument, discussed below. Results are stored across all `nReps` replicates and reported as a summary table (mean and 95% confidence intervals) and a histogram of replicate values for each performance statistic, with a blue dotted vertical line indicating the mean across replicates.
+
+Now let's run it on `countModel_GLMM` and see what happens...
 
 ```{r, warning=FALSE, comment=NA}
-bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData,
+                     propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE,
+                     DHARMaReps = 1000, seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -143,19 +194,12 @@ Look at the first few fit statistics...
 knitr::kable(head(bp$bias_precision_results, 8))
 ```
 
- 
-
 And then look at a summary of the `nReps` values...
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
 bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
 knitr::kable(head(bp$bias_precision_summary, 8))
 ```
-
- 
 
 And now look at a plot of the summaries...
 
@@ -163,56 +207,73 @@ And now look at a plot of the summaries...
 bp$bias_precision_hist
 ```
 
- 
-
-Now let's compare to the `bootstrap` method for the same model, which generally should be very similar for well-behaved models and reasonably sized data sets (but see "A note about holdout vs bootstrap resampling methods when diagnosing and adjusting for Jensen's inequality bias" below for details)
+Now let's compare to the `bootstrap` method for the same model. As noted in the resampling methods section above, holdout is preferred for random-effect models with sparse groups; for a well-behaved model with reasonably sized data, the two methods should produce similar results.
 
 ```{r, warning=FALSE, comment=NA}
-bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData, propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
+bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData,
+                     propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE,
+                     DHARMaReps = 1000, seed = 123, method = "bootstrap")
 ```
 
-Summary of `bootstrap` method
+Summary of the `bootstrap` method:
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
 bp$bias_precision_summary <- bp$bias_precision_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
 knitr::kable(head(bp$bias_precision_summary, 8))
 ```
 
-And now look at a plot of the summaries...
+And a plot of the summaries:
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 bp$bias_precision_hist
 ```
 
-#### A note about zero-heavy data
+#### Marginal vs conditional predictions: the `conditional_predictions` argument
 
-For zero-heavy count or continuous data, the choice of performance metric matters. `RBIAS` in particular can behave unexpectedly when the response contains zeros or values near zero, because the relative error formulation divides by the observed value, producing unstable or extreme terms that can dominate the average and give a misleading impression of systematic underprediction. This is a known limitation of relative bias metrics rather than evidence of poor model fit (Hyndman and Koehler 2006), and is most likely to occur when zeros are common but the zero-generating process is not explicitly modeled.
+By default, `bias_precision()` uses population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable — the most relevant question when predicting to new sites, new years, or new individuals.
 
--   In these situations, `RMedAE` or `RMAE` may provide more reliable summaries of predictive performance. `RMedAE` is robust to extreme errors because it is based on the median absolute error rather than the mean, and therefore better reflects predictive accuracy for a typical observation. `RMAE` can also be useful because absolute-error metrics weight errors linearly rather than quadratically, making them less sensitive to extreme observations than `RMSE`-based measures.
+Setting `conditional_predictions = TRUE` switches both in-sample and out-of-sample predictions to condition on estimated random effects (`re.form = NULL`). Since `GLAMMGoF`'s holdout CV splits rows within groups rather than groups themselves, random effect estimates from the training model are valid for held-out observations from the same groups. In-sample and out-of-sample metrics remain directly comparable since both use the same prediction strategy; the gap between them reflects genuine row-level over-fitting rather than any marginal vs conditional distinction.
 
--   When combined with the `DHARMa` zero-inflation test (`testZI = TRUE`), these metrics provide a more complete assessment than any single measure alone. `RMedAE` or `RMAE` summarize predictive accuracy, while the ZI test evaluates whether the model correctly reproduces the observed frequency of zeros. A significant ZI test result with `ratioObsSim > 1` indicates that the model is underpredicting zeros, suggesting that a zero-inflated model family or additional sources of heterogeneity should be considered.
+```{r, warning=FALSE, comment=NA, eval=FALSE}
+# Conditional predictions for within-group accuracy assessment
+chk_cond <- bias_precision(nReps = 100, testModel = countModel_GLMM,
+                           testData = countData, method = "holdout",
+                           DHARMaPlot = FALSE, conditional_predictions = TRUE,
+                           seed = 123)
+chk_cond$bias_precision_summary
+```
 
-There are two example data sets, `countData` and `logitData`, with integer and binary response variables, respectively. Each data set also includes a variety of continuous and categorical predictor variables. Additionally, there are 12 example model objects (6 beginning with `count` and 6 beginning with `logit`): `Model_GLM`, `Model_GLMM`, `Model_GLMM2`, `Model_GAM`, `Model_GAMM`, and `Model_GAMM2`. Models ending in `M` include only fixed effects, whereas models ending in `MM` and `MM2` include one and two random effects, respectively. All 12 example models were fitted using `glmmTMB`, but `GLAMMGoF` supports models fitted using a variety of compatible `R` packages
+The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. There are four distinct behaviors in total; the combination marked $\times$ is blocked with an informative error.
 
-### Using the `brier_auc()` function
+| `bias_adjust`      | `conditional_predictions` | Prediction type      | What it measures                                                                     |
+|:-------------------|:--------------------------|:---------------------|:-------------------------------------------------------------------------------------|
+| `"none"` (default) | `FALSE` (default)         | Marginal             | Population-level generalization; Jensen signal visible in `RBIAS`                    |
+| `"manual"`         | `FALSE`                   | Marginal + corrected | Population-level generalization with analytical Jensen correction                    |
+| `"none"`           | `TRUE`                    | Conditional          | Within-group accuracy; Jensen bias absorbed by REs                                   |
+| `"manual"`         | `TRUE`                    | $\times$ Error       | Double-correction — not permitted                                                    |
+
+The `bias_adjust` and `conditional_predictions` restrictions for log-transformed-response models (no `"manual"` with conditional predictions) are described in *Worked example 2* below. The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow.
+
+### Using `brier_auc()`
 
 To use this function properly, you must:
 
-1.  Be sure you're using it with the correct model type, which in this case is only a logistic regression with a binary response variable. Additionally, logistic regression models fit using the R packages `glmmTMB`, `lme4`, and `glm`/`lm` from the `stats` package are all supported. The function will throw an informative error message if the wrong type of model is supplied. 
+1. Be sure you're using it with the correct model type, which in this case is only a logistic regression with a binary response variable. Additionally, logistic regression models fit using the R packages `glmmTMB`, `lme4`, and `glm`/`lm` from the `stats` package are all supported. The function will throw an informative error message if the wrong type of model is supplied.
 
-2.  For the simplest call, the only other choices you need to make are:
+2. For the simplest call, the only other choices you need to make are:
 
-    1.  The number of bootstrap or Monte Carlo replicates you want to use (the default `nReps = 100` but this should be at least 500 or 1000).
+    1. The number of bootstrap or Monte Carlo replicates you want to use (default `nReps = 100`; should be at least 500 or 1000).
 
-    2.  For `method = "holdout"` only: The proportion of data you want to use for assessing in-sample predictive performance (the default is `propTrain = 0.8`).
+    2. For `method = "holdout"` only: the proportion of data you want to use for assessing in-sample predictive performance (default `propTrain = 0.8`).
 
-    3.  Whether you want to use the `DHARMa` package's `simulateResiduals()` function to assess and plot the model's residuals (the default is `DHARMaPlot=TRUE`) and how many simulation replicates you want `DHARMa` to use (the default is `DHARMaReps=1000`). There is no option to test for zero-inflation with this function as this is not strictly relevant to logistic regression models with binary responses.
+    3. Whether you want to use the `DHARMa` package's `simulateResiduals()` function to assess and plot the model's residuals (default `DHARMaPlot = TRUE`) and how many simulation replicates you want `DHARMa` to use (default `DHARMaReps = 1000`). There is no option to test for zero-inflation with this function as this is not strictly relevant to logistic regression models with binary responses.
+
+Output structure mirrors `bias_precision()`: a summary table (mean and 95% CIs) and a histogram of replicate values for each performance statistic. A red dashed vertical line is displayed in the log loss panels indicating the null (intercept-only) log loss baseline as a reference point for model comparison.
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "holdout")
+br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData,
+                    propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
+                    seed = 123, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -225,116 +286,99 @@ Look at the first few fit statistics...
 knitr::kable(head(br_auc$brier_auc_results, 9))
 ```
 
- 
-
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
 br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
-```
-
- 
-
-And then look at a summary of the `nReps` values...
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
 knitr::kable(head(br_auc$brier_auc_summary, 9))
 ```
 
- 
-
-And now look at a plot of the summaries...
+And a plot of the summaries:
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 br_auc$brier_auc_hist
 ```
 
- 
-
-Let's again compare to the `bootstrap` method, which generally should be very similar for well-behaved models and reasonably sized data sets (but see "A note about holdout vs bootstrap resampling methods when diagnosing and adjusting for Jensen's inequality bias" below for details).
+Comparison to the `bootstrap` method:
 
 ```{r, warning=FALSE, comment=NA}
-br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData, propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000, seed = 123, method = "bootstrap")
+br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData,
+                    propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
+                    seed = 123, method = "bootstrap")
 ```
-
-Summary of `bootstrap` method
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
 br_auc$brier_auc_summary <- br_auc$brier_auc_summary %>% mutate(across(c(mn, lwr95, upr95), ~ round(., 2)))
-```
-
-```{r, warning=FALSE, comment=NA, echo=FALSE}
 knitr::kable(head(br_auc$brier_auc_summary, 9))
 ```
-
-And now look at a plot of the summaries...
 
 ```{r, warning=FALSE, comment=NA, message=FALSE, echo=FALSE}
 br_auc$brier_auc_hist
 ```
+
+Note that for `brier_auc()`, `bias_adjust = "manual"` is not available regardless of `conditional_predictions`: the analytical correction is only valid where predictions are back-transformed via the exponential (log-link and log-transformed-response models), and the logit link does not admit a closed-form scalar marginal-mean correction. No bias adjustment is currently supported for binomial GLMMs in `brier_auc()`; `Brier score` and `log loss` should be interpreted relative to the null model baseline that the function reports alongside the resampling summaries.
 
 ### Jensen's inequality, random effects, and marginal predictions
 
-When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward  (e.g., a bowl-shaped or exponential growth curve), and averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging. This property is known as Jensen's inequality. For a log-link model with random effects, this means:
+When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward (e.g., a bowl-shaped or exponential growth curve), and averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging. This property is known as Jensen's inequality. For a log-link model with random effects, this means:
 
 $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
-where $\sigma^2$ is the total random effect variance. In other words, $\exp(\beta_0)$ , the typical marginal prediction, underestimates the true arithmetic mean by a factor of $\exp(\sigma^2/2)$.
+where $\sigma^2$ is the total random effect variance. In other words, $\exp(\beta_0)$, the typical marginal prediction, underestimates the true arithmetic mean by a factor of $\exp(\sigma^2/2)$.
 
 This bias is directly analogous to the well-known log-normal back-transformation bias. The math is identical; the only difference is which variance components sit on the log scale, *inside* the back-transformation:
 
-|  | Log-normal LM | Log-link GLMM | Log-normal LMM |
-|:---|:---|:---|:---|
-| Model structure | $\log(Y_i) \sim \text{Normal}(X\beta, \sigma^2_\varepsilon)$ | $\log(\mu_{ij}) = X\beta + u_j$, $u_j \sim \text{Normal}(0, \sigma^2_u)$ | $\log(Y_{ij}) \sim \text{Normal}(X\beta + u_j, \sigma^2_\varepsilon)$ |
-| Log-scale variance | Residual $\sigma^2_\varepsilon$ | Random effect $\sigma^2_u$ | **Both:** $\sigma^2_\varepsilon + \sigma^2_u$ |
-| Naive back-transform | $\exp(X\beta)$ | $\exp(X\beta)$ | $\exp(X\beta)$ |
-| True arithmetic mean | $\exp(X\beta + \sigma^2_\varepsilon/2)$ | $\exp(X\beta + \sigma^2_u/2)$ | $\exp(X\beta + (\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
-| Correction factor | $\exp(\sigma^2_\varepsilon/2)$ | $\exp(\sigma^2_u/2)$ | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
+|                       | Log-normal LM                                                | Log-link GLMM                                                                                | Log-normal LMM                                                                                       |
+|:----------------------|:-------------------------------------------------------------|:---------------------------------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------|
+| Model structure       | $\log(Y_i) \sim \text{Normal}(X\beta, \sigma^2_\varepsilon)$ | $\log(\mu_{ij}) = X\beta + u_j$, $u_j \sim \text{Normal}(0, \sigma^2_u)$                     | $\log(Y_{ij}) \sim \text{Normal}(X\beta + u_j, \sigma^2_\varepsilon)$                                |
+| Log-scale variance    | Residual $\sigma^2_\varepsilon$                              | Random effect $\sigma^2_u$                                                                   | **Both:** $\sigma^2_\varepsilon + \sigma^2_u$                                                        |
+| Naive back-transform  | $\exp(X\beta)$                                               | $\exp(X\beta)$                                                                               | $\exp(X\beta)$                                                                                       |
+| True arithmetic mean  | $\exp(X\beta + \sigma^2_\varepsilon/2)$                      | $\exp(X\beta + \sigma^2_u/2)$                                                                | $\exp(X\beta + (\sigma^2_\varepsilon + \sigma^2_u)/2)$                                               |
+| Correction factor     | $\exp(\sigma^2_\varepsilon/2)$                               | $\exp(\sigma^2_u/2)$                                                                         | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$                                                        |
 
 In the log-normal LM case, the log-scale variance is the residual variance and the correction is widely known. In the log-link GLMM case, the log-scale variance is the random effect variance and the same correction applies; however, this connection seems to be rarely made explicit in ecological statistics training.
 
-The third column is where the two meet. A log-normal model *with* random effects is subject to both sources of bias simultaneously, because both the residual error and the random effects are additive on the log scale and therefore both sit inside the exponential. The correction is $\exp((\sigma^2_{\varepsilon} + \sigma^2_{u}) / 2)$, and omitting the residual term is a common and consequential mistake: residual variance is typically the *larger* of the two components, so a correction built from `VarCorr()` alone can recover only a fraction of the bias while appearing to have addressed it. A fixed-effects GLM with a log link has no random component on the linear predictor and therefore no Jensen bias at all; $\exp(\beta_0)$ is exactly the arithmetic mean.
+The third column is where the two meet. A log-normal model *with* random effects is subject to both sources of bias simultaneously, because both the residual error and the random effects are additive on the log scale and therefore both sit inside the exponential. The correction is $\exp((\sigma^2_\varepsilon + \sigma^2_u) / 2)$, and omitting the residual term is a common and consequential mistake: residual variance is typically the *larger* of the two components, so a correction built from `VarCorr()` alone can recover only a fraction of the bias while appearing to have addressed it. A fixed-effects GLM with a log link has no random component on the linear predictor and therefore no Jensen bias at all; $\exp(\beta_0)$ is exactly the arithmetic mean.
 
-This bias grows with random effect variance, is invisible to standard diagnostics (DHARMa, AIC, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
+This bias grows with random effect variance, is invisible to standard diagnostics (`DHARMa`, `AIC`, residual checks), and although it does not affect fixed-effect inference or contrasts, it can substantially affect response-scale predictions used for management.
 
 For models with multiple random effects, the variances are additive on the log scale:
 
 $$\text{correction} = \exp\left(\frac{\sigma^2_1 + \sigma^2_2 + \cdots + \sigma^2_k}{2}\right)$$
 
-**This is not a model deficiency** but rather a structural property of GLMMs. Consistent negative RBIAS in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
+**This is not a model deficiency** but rather a structural property of GLMMs. Consistent negative `RBIAS` in `bias_precision()` output signals that this heterogeneity is being ignored in marginal predictions. For purely inferential purposes (contrasts, p-values, effect directions) this does not matter. For calibrated response-scale predictions (abundance maps, density estimates, management outputs), the correction should be applied.
 
 #### When does Jensen bias matter? Substantive vs nuisance random effects
 
-Whether Jensen bias is consequential for a given analysis depends critically on the nature of the random effects in the model and the purpose of the predictions. Users should consider two broad categories:
+Whether Jensen bias is consequential for a given analysis depends critically on the nature of the random effects in the model and the purpose of the predictions. Users should consider two broad categories.
 
 **Substantive random effects** represent real, ecologically meaningful group-level variation that is relevant to prediction. For these, Jensen bias matters for response-scale predictions because marginalizing over the RE loses real information about the quantity being predicted:
 
--   Site random effects when predicting abundance or density at specific locations
--   Spatial random effects when generating abundance maps or occupancy surfaces
--   Individual random effects in mark-recapture models when individual-level predictions are of interest
--   Population random effects in hierarchical models where population identity carries biological meaning
+- Site random effects when predicting abundance or density at specific locations
+- Spatial random effects when generating abundance maps or occupancy surfaces
+- Individual random effects in mark-recapture models when individual-level predictions are of interest
+- Population random effects in hierarchical models where population identity carries biological meaning
 
 **Nuisance random effects** capture study-specific variation that is not relevant to forward predictions or generalization. For these, marginalizing over the RE is conceptually correct and the Jensen bias is largely irrelevant:
 
--   Year random effects capturing inter-annual variation during a study period: not meaningful when predicting to future years or simulating counts under specified covariate conditions
--   Observer random effects capturing individual variation in detection: not relevant when predicting to new observers
--   Overdispersion random effects (OLREs): capture residual heterogeneity not attributable to any substantive grouping factor
--   Batch or run random effects in laboratory studies: study-specific, not generalizable
+- Year random effects capturing inter-annual variation during a study period: not meaningful when predicting to future years or simulating counts under specified covariate conditions
+- Observer random effects capturing individual variation in detection: not relevant when predicting to new observers
+- Overdispersion random effects (OLREs): capture residual heterogeneity not attributable to any substantive grouping factor
+- Batch or run random effects in laboratory studies: study-specific, not generalizable
 
 The general principle is: **if the random effect represents variation you would want to condition on in a prediction, the Jensen bias matters. If it represents study-specific noise that should not carry forward, marginalizing over it is correct and the Jensen bias is a non-issue.** Whether to apply the bias correction is therefore a scientific judgment call that depends on the nature of the random effects, the purpose of the predictions, and the magnitude of the bias given the estimated RE variance. `bias_precision()` surfaces the bias and provides tools to quantify and correct it; the decision of whether to act on it rests with the user.
 
 #### Which correction applies? Log *link* vs log *response*
 
-The single most important distinction is whether the log appears as a **link function** or as a **transformation of the response**, because this determines
-whether the residual variance sits inside or outside the back-transformation. The family alone does not tell you: a Gaussian model can appear on either side of this line.
+The single most important distinction is whether the log appears as a **link function** or as a **transformation of the response**, because this determines whether the residual variance sits inside or outside the back-transformation. The family alone does not tell you: a Gaussian model can appear on either side of this line.
 
-In the notation below, $u$ denotes a random-effect deviation (e.g., site-level intercept) assumed to be Gaussian with mean 0 and variance $\sigma^2_u$, and $\epsilon$ denotes the residual error term, also Gaussian with variance $\sigma^2_\epsilon$. In log-link models, $\epsilon$ is additive on the response scale (outside the exponential); in log-transformed-response models, $\epsilon$ is additive on the log scale (inside the exponential). This distinction determines whether residual variance contributes to the Jensen correction.
+In the notation below, $u$ denotes a random-effect deviation (e.g., site-level intercept) assumed to be Gaussian with mean 0 and variance $\sigma^2_u$, and $\varepsilon$ denotes the residual error term, also Gaussian with variance $\sigma^2_\varepsilon$. In log-link models, $\varepsilon$ is additive on the response scale (outside the exponential); in log-transformed-response models, $\varepsilon$ is additive on the log scale (inside the exponential). This distinction determines whether residual variance contributes to the Jensen correction.
 
-| Model | Formula | Residual is additive on... | Correction |
-|:---|:---|:---|:---|
-| Log-link GLM | `y ~ x, family = poisson` | (no log-scale random component) | none needed |
-| Log-link GLMM | `y ~ x + (1|site), family = poisson` | response scale | $\exp(\sigma^2_u/2)$ |
-| Gaussian log **link** | `y ~ x + (1|site), family = gaussian("log")` | response scale | $\exp(\sigma^2_u/2)$ |
-| Log-normal LM | `log(y) ~ x` | **log scale** | $\exp(\sigma^2_\varepsilon/2)$ |
-| Log-normal LMM | `log(y) ~ x + (1|site)` | **log scale** | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$ |
+| Model                | Formula                                          | Residual is additive on...      | Correction                                             |
+|:---------------------|:-------------------------------------------------|:--------------------------------|:-------------------------------------------------------|
+| Log-link GLM         | `y ~ x, family = poisson`                        | (no log-scale random component) | none needed                                            |
+| Log-link GLMM        | `y ~ x + (1|site), family = poisson`             | response scale                  | $\exp(\sigma^2_u/2)$                                   |
+| Gaussian log **link**| `y ~ x + (1|site), family = gaussian("log")`     | response scale                  | $\exp(\sigma^2_u/2)$                                   |
+| Log-normal LM        | `log(y) ~ x`                                     | **log scale**                   | $\exp(\sigma^2_\varepsilon/2)$                         |
+| Log-normal LMM       | `log(y) ~ x + (1|site)`                          | **log scale**                   | $\exp((\sigma^2_\varepsilon + \sigma^2_u)/2)$          |
 
 Notably, `gaussian(link = "log")` and `log(y) ~ x` are easy to conflate, as both involve a Gaussian likelihood and an exponential; however, they are different models. With a log link the response is untransformed and the residual error is additive on the *response* scale, outside $\exp()$, so it contributes nothing to the re-transformation bias. With a log-transformed response the residual error is additive on the *log* scale, inside $\exp()$, so it contributes fully.
 
@@ -344,35 +388,17 @@ Notably, `gaussian(link = "log")` and `log(y) ~ x` are easy to conflate, as both
 
 Lastly, for distributional families with free dispersion parameters (`gamma`, `tweedie`, negative binomial via `nbinom1`/`nbinom2`) used with a log link, the dispersion parameter does not contribute to the Jensen correction on the conditional mean. This holds whether dispersion is constant or modeled as a function of covariates via `dispformula`; the log link used internally by `dispformula` is a numerical convenience for keeping the dispersion parameter positive, and does not put the dispersion inside the exponential that produces $E[Y|X]$. Modeling dispersion can of course affect estimation of the fixed effects and their standard errors through the likelihood, but that is a separate matter from the back-transformation bias the Jensen correction addresses. Only $\sigma^2_u$ from the random effects enters the correction factor. For Gaussian families, the correction depends on whether the log appears as a link function or as a response transformation (see the table above).
 
-#### Diagnosing and correcting Jensen's inequality bias
+#### The `bias_adjust` argument
 
-`bias_precision()` provides a `bias_adjust` argument for diagnosing and correcting Jensen's inequality bias. The `"manual"` correction is available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response. A message is automatically triggered when both in-sample and out-of-sample RBIAS are consistently negative (\< -10%), prompting the user to investigate. The recommended diagnostic workflow is:
+`bias_precision()` provides a `bias_adjust` argument for diagnosing and correcting Jensen's inequality bias. The `"manual"` correction is available for `glmmTMB` and `lme4` models, and for `lm`/`glm` fits to a log-transformed response. A message is automatically triggered when both in-sample and out-of-sample `RBIAS` are consistently negative ($< -10\%$), prompting the user to investigate.
 
-**Step 1** - Run with defaults (`bias_adjust = "none"`) and inspect RBIAS. A consistently negative RBIAS in both in-sample and out-of-sample performance suggests Jensen's inequality may be contributing.
+The analytical correction $\exp(V/2)$ is applied to marginal predictions, where $V$ is the sum of the variance components that are additive on the log scale. For a log-link model this is the total random effect variance from `VarCorr()`. For a model fit to a log-transformed response, the residual variance from `sigma()` is included as well, since it too sits inside the back-transformation. Once Jensen's inequality has been diagnosed as the source of negative `RBIAS`, the correction can also be applied directly to response-scale predictions outside of `bias_precision()` via the `jensen_correct()` function, which resolves the appropriate correction automatically from the model and accepts predictions, standard errors, and confidence interval bounds on the link or response scale (see `?jensen_correct` for details).
 
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-# Step 1: default marginal predictions, Jensen signal visible
-chk_none <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-                           testData = countData, method = "holdout",
-                           DHARMaPlot = FALSE, bias_adjust = "none", seed = 123)
-chk_none$bias_precision_summary
-```
-
-**Step 2** - Re-run with `bias_adjust = "manual"`. If RBIAS moves toward zero, Jensen's inequality is confirmed as the source of the negative bias rather than model misspecification or poor generalization. The analytical correction $\exp(V/2)$ is applied to marginal predictions, where $V$ is the sum of the variance components that are additive on the log scale. For a log-link model this is the total random effect variance from `VarCorr()`. For a model fit to a log-transformed response, the residual variance from `sigma()` is included as well, since it too sits inside the back-transformation.
-
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-# Step 2: analytical lognormal correction
-chk_manual <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-                             testData = countData, method = "holdout",
-                             DHARMaPlot = FALSE, bias_adjust = "manual", seed = 123)
-chk_manual$bias_precision_summary
-```
-
-The figure below shows the effect of applying the Jensen correction across a range of random-effect variances, based on a simulation of intercept-only Poisson GLMMs (100 independent datasets × 100 cross-validation replicates per σ value, N = 20,000). The `"none"` line traces the underlying Jensen bias as it grows with random-effect variance, reaching roughly −40% at σ = 1 for the two-RE case. The `"manual"` line shows the same simulations after applying the analytical correction: `RBIAS` is pulled to near zero across the full σ range whenever random effects are present. For a GLM without random effects (left panel) both options behave identically, since the correction factor is `exp(0/2) = 1` and does nothing.
+The figure below shows the effect of applying the Jensen correction across a range of random-effect variances, based on a simulation of intercept-only Poisson GLMMs (100 independent datasets $\times$ 100 cross-validation replicates per $\sigma$ value, $N = 20{,}000$). The `"none"` line traces the underlying Jensen bias as it grows with random-effect variance, reaching roughly $-40\%$ at $\sigma = 1$ for the two-RE case. The `"manual"` line shows the same simulations after applying the analytical correction: `RBIAS` is pulled to near zero across the full $\sigma$ range whenever random effects are present. For a GLM without random effects (left panel) both options behave identically, since the correction factor is $\exp(0/2) = 1$ and does nothing.
 
 A small residual positive `RBIAS` remains under `"manual"` at higher $\sigma$, growing modestly with random-effect variance. This is not residual Jensen bias; the analytical correction has fully addressed that. It reflects the fact that a real user must estimate $\sigma^2$ from their data; they don't have access to the true value, and the resulting $\hat{\sigma}^2$ is a random draw from a sampling distribution around the true $\sigma^2$. Any single user's correction factor ($\exp(\hat{\sigma}^2/2)$) therefore under-corrects (if their estimated $\hat{\sigma}^2$ is below the true $\sigma^2$) or over-corrects (if their $\hat{\sigma}^2$ is above), by an amount determined by the sampling variability of $\hat{\sigma}^2$. This is a real effect experienced by individual analyses; users just don't know which side of the true $\sigma^2$ their particular $\hat{\sigma}^2$ falls on.
 
-The systematic positive drift shown in the figure is the *average* of these residuals across the 100 simulated datasets. Because $\hat{\sigma}^2$ varies across those datasets and because $\exp()$ is convex, the average sits slightly above zero by Jensen's inequality (i.e., $\text{mean}(\exp(\hat{\sigma}^2/2)) > \exp(\sigma^2/2))$ . This across-simulation average shows the *expected* residual bias across the sampling distribution of $\hat{\sigma}^2$, and it grows with $\sigma$ because $\text{Var}(\hat{\sigma}^2)$ grows with $\sigma$. An individual user's residual could be positive, negative, or near zero depending on their specific $\hat{\sigma}^2$; the figure summarizes the average tendency.
+The systematic positive drift shown in the figure is the *average* of these residuals across the 100 simulated datasets. Because $\hat{\sigma}^2$ varies across those datasets and because $\exp()$ is convex, the average sits slightly above zero by Jensen's inequality (i.e., $\text{mean}(\exp(\hat{\sigma}^2/2)) > \exp(\sigma^2/2)$). This across-simulation average shows the *expected* residual bias across the sampling distribution of $\hat{\sigma}^2$, and it grows with $\sigma$ because $\text{Var}(\hat{\sigma}^2)$ grows with $\sigma$. An individual user's residual could be positive, negative, or near zero depending on their specific $\hat{\sigma}^2$; the figure summarizes the average tendency.
 
 The practical takeaway: for typical applied datasets with reasonable numbers of RE levels and modest $\sigma$, this residual is small (usually within a few percentage points) and is not something the correction can eliminate, because it stems from estimating $\sigma^2$ from finite data rather than from any limitation of the correction itself. Small-groups designs with high true $\sigma$ are the regime where this residual is largest and most variable across analyses.
 
@@ -407,26 +433,9 @@ ggplot(sim_jensen$results_df,
         strip.text       = element_text(size = 9))
 ```
 
-Once Jensen's inequality has been diagnosed as the source of negative RBIAS, the correction can be applied directly to response-scale predictions outside of GLAMMGoF. Note that although the calculations are explicitly written out below, GLAMMGoF has a `jensen_correct()` function which provides a convenient wrapper for this calculation, resolving the appropriate correction automatically from the model and accepting predictions, standard errors, and confidence interval bounds on the link or response scale (see ?jensen_correct for details):
+#### Worked example 1: single random intercept (log-link GLMM)
 
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-# Manual lognormal correction (fast, reliable for random intercept models)
-vc         <- VarCorr(countModel_GLMM)$cond
-correction <- exp(sum(sapply(vc, function(x) x[1, 1])) / 2)
-preds_adjusted <- predict(countModel_GLMM, newdata = countData,
-                          type = "response", re.form = ~0) * correction
-
-# Standard errors for manually corrected predictions should also be scaled
-# by the same correction factor, since it is a multiplicative constant.
-# The delta method gives: SE_corrected = SE_original * correction
-preds_se   <- predict(countModel_GLMM, newdata = countData,
-                      type = "response", re.form = ~0, se.fit = TRUE)$se.fit
-preds_se_adjusted <- preds_se * correction
-```
-
-#### A worked example: correcting for a single random intercept
-
-Re-run the example from above using the default setting of `bias_adjust = "none"` (nReps = 1000 now instead of 100)
+Re-run the introductory example on `countModel_GLMM` at higher precision (`nReps = 1000`), first with the default `bias_adjust = "none"`:
 
 ```{r bp-countModelGLMM-uncorrected-display, eval = FALSE}
 # Shown for reference; pre-computed with nReps = 1000. See
@@ -449,7 +458,8 @@ bp_countModelGLMM_uncorrected <-
 ```{r, warning = FALSE, comment = NA, echo = FALSE}
 knitr::kable(head(bp_countModelGLMM_uncorrected, 8))
 ```
-Now for the bias-corrected fun: the only difference here is that we are now setting `bias_adjust = "manual"`
+
+Now with `bias_adjust = "manual"`:
 
 ```{r bp-countModelGLMM-corrected-display, eval = FALSE}
 # Shown for reference; pre-computed with nReps = 1000. See
@@ -473,11 +483,11 @@ bp_countModelGLMM_corrected <-
 knitr::kable(head(bp_countModelGLMM_corrected, 8))
 ```
 
-`RBIAS` shifts from roughly −4.5% to +1–2% for both in-sample and out-of-sample performance. For reference, `countModel_GLMM` has $\hat{\sigma} \approx 0.36$ against a true $\sigma = 0.5$, which reflects a low draw from the sampling distribution of $\hat{\sigma}$ that is unsurprising with only 10 `Site` levels in the simulated random effect. An estimated $\hat{\sigma} \approx 0.36$ gives a correction factor of $\exp(\hat{\sigma}^2/2) \approx 1.07$, a modest ~7% multiplicative shift that is nonetheless enough to move `RBIAS` from clearly negative to near zero. The correction has fully resolved the systematic Jensen underprediction that the model was subject to.
+`RBIAS` shifts from roughly $-4.5\%$ to $+1$–$2\%$ for both in-sample and out-of-sample performance. For reference, `countModel_GLMM` has $\hat{\sigma} \approx 0.36$ against a true $\sigma = 0.5$, which reflects a low draw from the sampling distribution of $\hat{\sigma}$ that is unsurprising with only 10 `Site` levels in the simulated random effect. An estimated $\hat{\sigma} \approx 0.36$ gives a correction factor of $\exp(\hat{\sigma}^2/2) \approx 1.07$, a modest $\sim$7% multiplicative shift that is nonetheless enough to move `RBIAS` from clearly negative to near zero. The correction has fully resolved the systematic Jensen underprediction that the model was subject to.
 
-The small residual positive `RBIAS` visible in the corrected output is a separate phenomenon and is not related to Jensen bias. It arises because each of the `nReps` CV replicates refits the model to a different training subset, producing a slightly different $\hat{\beta}$ each time; when predictions are exponentiated and averaged across replicates, the convexity of $\exp()$ inflates the resulting mean by roughly $\exp(0.5 \cdot \text{Var}(X_i \hat{\beta})) - 1$. This is a general property of averaging exponentiated estimates from a variable underlying estimator, not a limitation of the Jensen correction. Its magnitude depends on sample size and the number of fixed-effect parameters, typically contributing 1–2% of positive `RBIAS` in applied datasets. Precision metrics also shift with the re-scaling, but it is the change in `RBIAS` from clearly negative to near zero that indicates Jensen's inequality bias has been resolved. The small residual is a summary artifact of the CV procedure and should not be interpreted as incomplete correction.
+The small residual positive `RBIAS` visible in the corrected output is the same phenomenon described above in *The `bias_adjust` argument*: it arises from averaging exponentiated draws from a variable underlying estimator across CV replicates and typically contributes 1–2% of positive `RBIAS` in applied datasets. It is the change in `RBIAS` from clearly negative to near zero that indicates Jensen's inequality bias has been resolved. The small residual is a summary artifact of the CV procedure and should not be interpreted as incomplete correction.
 
-#### A worked example: the doubly-biased case
+#### Worked example 2: the doubly-biased case (log-normal LMM)
 
 The example below simulates data from a log-normal LMM with known variance components, then compares the naive back-transform against the correction built from the random effect variance alone and the full correction including the residual term.
 
@@ -539,17 +549,16 @@ jensen_correct(m_precomputed)                      # error: transformation not v
 jensen_correct(m_precomputed, type = "lognormal")  # correct: exp(sigma^2_resid / 2)
 ```
 
-#### Lognormal models with covariates in the dispersion model (`glmmTMB`)
+#### Worked example 3: covariate-dependent dispersion (`dispformula`)
 
-When residual variance depends on covariates, `dispformula = ~ ...` in glmmTMB fits a linear model for the log-scale dispersion parameter. For lognormal LMMs (natural-log responses fit as `log(y) ~ ..., family = gaussian`), this changes what the Jensen correction looks like: `σ²` becomes a function of the covariates rather than a scalar, and the correction becomes per-observation.
+When residual variance depends on covariates, `dispformula = ~ ...` in `glmmTMB` fits a linear model for the log-scale dispersion parameter. For lognormal LMMs (natural-log responses fit as `log(y) ~ ..., family = gaussian`), this changes what the Jensen correction looks like: $\sigma^2$ becomes a function of the covariates rather than a scalar, and the correction becomes per-observation.
 
-The scalar path breaks down. Recall that for a standard lognormal LMM with a trivial dispformula, the Jensen correction is `exp((σ² + Σσ²_k)/2)` where `σ²` is the residual variance and `Σσ²_k` sums the random-effect variances. `jensen_correct()` computes this from `sigma(mod)^2 + sum(VarCorr components)`. When `dispformula` has more than one parameter, `sigma(mod)` returns NA (`glmmTMB`'s convention), because there isn't a single dispersion value to return. The scalar correction is undefined for that model; it's not a bug, it's a signal that the model's variance structure has been generalized past what a scalar can represent.
+**The scalar path breaks down.** Recall that for a standard lognormal LMM with a trivial `dispformula`, the Jensen correction is $\exp((\sigma^2 + \sum_k \sigma^2_k)/2)$, where $\sigma^2$ is the residual variance and $\sum_k \sigma^2_k$ sums the random-effect variances. `jensen_correct()` computes this from `sigma(mod)^2 + sum(VarCorr components)`. When `dispformula` has more than one parameter, `sigma(mod)` returns `NA` (`glmmTMB`'s convention), because there isn't a single dispersion value to return. The scalar correction is undefined for that model; it's not a bug, it's a signal that the model's variance structure has been generalized past what a scalar can represent.
 
-The correction becomes per-observation. `jensen_correction()` handles this case by reconstructing `σ²(x)` from the dispformula design matrix and the fitted dispersion coefficients: `σ²(xᵢ) = exp(2 · X_disp,i β̂_disp`). The correction is then ` exp((σ²(xᵢ) + Σσ²_k)/2)` per row of newdata. The random-effect contribution stays scalar because RE variances aren't functions of the covariates.
+**The correction becomes per-observation.** `jensen_correction()` handles this case by reconstructing $\sigma^2(x)$ from the `dispformula` design matrix and the fitted dispersion coefficients: $\sigma^2(x_i) = \exp(2 \cdot X_{\text{disp},i} \, \hat{\beta}_{\text{disp}})$. The correction is then $\exp((\sigma^2(x_i) + \sum_k \sigma^2_k)/2)$ per row of `newdata`. The random-effect contribution stays scalar because RE variances aren't functions of the covariates.
 
-**Reminder**: as stated earlier in the `Which correction applies? Log *link* vs log *response*` section, for distributional families with free dispersion parameters (`gamma`, `tweedie`, negative binomial via `nbinom1`/`nbinom2`) used with a log link, the dispersion parameter does not contribute to the Jensen correction on the conditional mean. This holds whether dispersion is constant or modeled as a function of covariates via `dispformula`.
+**Reminder**: as stated earlier in *Which correction applies?*, for distributional families with free dispersion parameters (`gamma`, `tweedie`, negative binomial via `nbinom1`/`nbinom2`) used with a log link, the dispersion parameter does not contribute to the Jensen correction on the conditional mean. This holds whether dispersion is constant or modeled as a function of covariates via `dispformula`.
 
-Worked example
 Suppose we fit a lognormal LMM of lipid class abundance on class, phase, site, and processing group, with the same covariate structure in both the mean and dispersion models:
 
 ```{r, eval=FALSE}
@@ -569,14 +578,15 @@ cf <- jensen_correction(mod, newdata = dat)
 summary(cf)
 ```
 
-The returned vector has one correction per row of newdata. It can be handed to `boot_predict()` (fixed grid) or `bias_precision()` (holdout resampling) via the correction_factor argument. `boot_predict()` also handles this automatically when called with `bias_adjust = "manual"`; it routes through `jensen_correction()` internally, so the user doesn't need to compute the vector by hand:
+The returned vector has one correction per row of `newdata`. It can be handed to `boot_predict()` (fixed grid) or `bias_precision()` (holdout resampling) via the `correction_factor` argument. `boot_predict()` also handles this automatically when called with `bias_adjust = "manual"`; it routes through `jensen_correction()` internally, so the user doesn't need to compute the vector by hand:
 
 ```{r, eval = FALSE}
 # Automatic routing (equivalent to computing cf externally and passing it)
 pred <- boot_predict(mod, newdata = pred_grid, bias_adjust = "manual")
 ```
 
-Explicit (equivalent, useful for reusing cf across multiple calls)
+Explicit (equivalent, useful for reusing `cf` across multiple calls):
+
 ```{r, eval = FALSE}
 cf <- jensen_correction(mod, newdata = pred_grid)
 pred <- boot_predict(mod, newdata = pred_grid, correction_factor = cf)
@@ -590,105 +600,19 @@ diag <- bias_precision(nReps = 100, testModel = mod, testData = dat,
                        bias_adjust = "manual", correction_factor = cf_full)
 ```
 
-For `glmmTMB` `family = lognormal(link = "log")` (Path B in the package's internals), the residual variance is absorbed into the mean parameterization internally, so the correction is RE-only regardless of `dispformula`. `jensen_correct(mod)` returns the scalar RE-only correction; `jensen_correction(mod)` returns the same scalar with a note that the dispformula was seen and deliberately not used.  
+For `glmmTMB` `family = lognormal(link = "log")` (Path B in the package's internals), the residual variance is absorbed into the mean parameterization internally, so the correction is RE-only regardless of `dispformula`. `jensen_correct(mod)` returns the scalar RE-only correction; `jensen_correction(mod)` returns the same scalar with a note that the `dispformula` was seen and deliberately not used.
 
-#### A note about `holdout` vs `bootstrap` resampling methods when diagnosing and adjusting for Jensen's inequality bias
-
-Note on method choice for random-effect models: `method = "holdout"` is recommended over `method = "bootstrap"` when the design has few observations per random-effect group. Case bootstrap with replacement duplicates rows within resampled training sets, and these duplicates appear to the model as within-group replicates. When groups are sparse, each duplicated row has disproportionate leverage over that group's apparent within-group structure, systematically inflating the estimated random-effect variance in refitted training models relative to the full-data fit. When bias_adjust = "manual" is used, the correction factor is computed once from the full-data model and therefore under-corrects the inflated per-refit Jensen bias under bootstrap, leaving residual negative RBIAS in the output. The effect is largely independent of model specification; it appears in both correctly-specified and misspecified fits when groups are sparse, and diminishes substantially when groups have many observations regardless of specification. The issue is particularly acute for balanced repeated-measures designs (e.g., a fixed number of sub-samples per site or subject), where case bootstrap generates duplicated rows at rates and structures inconsistent with the sampling design. Cluster bootstrap (resampling entire groups) or parametric bootstrap would be more appropriate resampling schemes; `GLAMMGoF` currently supports neither, so `method = "holdout"` is the recommended choice.
-
-The figure below shows this pattern across a controlled simulation. Out-of-sample RBIAS after Jensen correction is shown for sparse (top row) and dense (bottom row) groups under both correctly specified and misspecified models. Bootstrap and holdout RBIAS diverge when groups are sparse but largely converge when groups are dense.
-
-```{r bootstrap-figure, fig.width = 7, fig.height = 7, echo = FALSE, message = FALSE, warning = FALSE}
-# Simulation results generated by data-raw/sim_bootstrap_holdout.R
-# See metadata field for seed and session info.
-
-sim_data <- readRDS(system.file("extdata", "sim_bootstrap_holdout.rds",
-                                package = "GLAMMGoF"))
-
-# Panel A: RBIAS (manual) by method x family x n_obs
-panelA <- sim_data$rbias_df |>
-  filter(Group == "Out-of-sample performance") |>
-  ggplot(aes(x = method, y = value, fill = method)) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
-  geom_boxplot(outlier.size = 0.4, alpha = 0.7) +
-  facet_grid(n_obs ~ fit_family) +
-  labs(x = NULL,
-       y = "Out-of-sample RBIAS (%)\nbias_adjust = 'manual'",
-       title = "RBIAS after Jensen correction, by method") +
-  theme_bw(base_size = 11) +
-  theme(legend.position = "none")
-
-panelA
-```
-
-### Potential sources of residual bias after correction
-
-The subsections below describe conditions under which the analytical correction may under-perform, producing residual *negative* `RBIAS` after correction (i.e., the Jensen bias is not fully resolved). A different phenomenon (small residual *positive* `RBIAS` after correction) arises from a distinct mechanism unrelated to Jensen bias, involving how CV or bootstrap procedures summarize predictions from variable underlying estimators. That phenomenon is described in the worked-example interpretation above and in the `boot_predict()` section below; it is not a case of the correction failing. If observed residual `RBIAS` after correction is negative, one of the four sources below likely applies. If it is small and positive, it is likely a summarization artifact rather than a correction limitation.
-
-The analytical log-normal correction closes most of the marginal bias in log-link mixed models, but residual negative bias can persist under specific conditions. When you observe uncorrected bias remaining after applying jensen_correct() or the equivalent internal correction, the sources below are possible candidates. None of these are problems with your model per se; rather, they are conditions under which the sum-of-variances correction has limitations, and identifying which one applies tells you something useful about where your response-scale predictions may be unreliable.
-
-A note on how to use this diagnostic: RBIAS and related metrics are informative about where the correction is falling short and, by extension, where response-scale predictions from the model may not be delivering what you expect. That is a legitimate and useful thing to know. What they are not is a model-selection criterion. Iterating on random-effect structure until RBIAS looks better risks removing real structure from the model to optimize a metric, which defeats the purpose. Design-based considerations (does the grouping capture genuine non-independence, do you need to predict to new levels, does partial pooling matter for your inference) and standard fit-based criteria remain the appropriate basis for random-effect specification. Use the diagnostic to understand your model, not to reshape it.
-
-#### Random effects with few levels (< ~10)
-
-The correction depends on σ̂² from the fitted model, and variance components estimated from small numbers of groups are downward-biased and highly variable. REML partially corrects small-sample bias but cannot fully compensate below roughly 10 levels. An under-estimated σ̂² produces under-correction, which shows up as residual negative bias on the response scale.
-
-To investigate: refit the model with the small-group factor as a fixed effect and compare. If fixed-effect estimates remain stable, residual variance does not inflate substantially, and the residual bias resolves, the fixed-effect specification was probably more appropriate on modeling grounds anyway; grouping factors with fewer than ~5–8 levels are commonly recommended as fixed regardless. If fixed effects shift or residual variance inflates, the random effect is capturing structure the fixed-effect specification cannot absorb, and the residual bias is a correction limitation to report alongside your predictions rather than a modeling problem to fix.
-
-#### Random slopes
-
-`jensen_correct()` currently applies a sum-of-variances correction that treats random-slope variance as if it contributed uniformly across observations. The exact marginal correction for a random slope depends on the covariate values at which predictions are made, and intercept–slope covariance complicates it further. This is documented as a known approximation and per-observation slope corrections are planned for a future release. Residual bias in models with random slopes is often traceable to this approximation rather than to any of the other sources listed here.
-
-#### Non-Gaussian random-effect distributions
-
-The analytical correction assumes the random effects are Gaussian. In ecological data, conditional modes are often visibly skewed or heavy-tailed; a few sites, years, or individuals are genuine outliers relative to a Gaussian working assumption. When the true random-effect distribution departs substantially from Gaussian, exp(0.5 Σσ̂²) can under- or over-correct depending on the direction of the departure. A `qqnorm()` check on the conditional modes for each grouping factor is a quick visual diagnostic; substantial non-normality is a signal that the correction is not the whole story and that the model itself may benefit from revisiting (e.g., additional fixed effects that absorb the outlying structure).
-
-#### Unmodeled overdispersion
-
-If Pearson dispersion (sum(resid(model, "pearson")^2) / df.residual(model)) exceeds ~1.2 in a Poisson model, some residual marginal bias on the response scale is coming from un-modeled overdispersion rather than from the correction itself. Refitting as negative binomial and re-running validation typically resolves it.
-
-
-### Marginal vs conditional predictions: the `conditional_predictions` argument
-
-By default, `bias_precision()` and `brier_auc()` use population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable - the most relevant question when predicting to new sites, new years, or new individuals.
-
-Setting `conditional_predictions = TRUE` switches both in-sample and out-of-sample predictions to condition on estimated random effects (`re.form = NULL`). Since GLAMMGoF's holdout CV splits rows within groups rather than groups themselves, random effect estimates from the training model are valid for held-out observations from the same groups. In-sample and out-of-sample metrics remain directly comparable since both use the same prediction strategy; the gap between them reflects genuine row-level over-fitting rather than any marginal vs conditional distinction.
-
-```{r, warning=FALSE, comment=NA, eval=FALSE}
-# Conditional predictions for within-group accuracy assessment
-chk_cond <- bias_precision(nReps = 100, testModel = countModel_GLMM,
-                           testData = countData, method = "holdout",
-                           DHARMaPlot = FALSE, conditional_predictions = TRUE,
-                           seed = 123)
-chk_cond$bias_precision_summary
-```
-
-#### Summary of `bias_adjust` and `conditional_predictions` combinations
-
-The table below summarizes the behavior of each combination of `bias_adjust` and `conditional_predictions` in `bias_precision()`. There are four distinct behaviors in total; the combination marked ❌ is blocked with an informative error.
-
-| `bias_adjust` | `conditional_predictions` | Prediction type | What it measures |
-|:-----------------|:-----------------|:-----------------|:-----------------|
-| `"none"` (default) | `FALSE` (default) | Marginal | Population-level (i.e., ignore REs) generalization; Jensen signal visible in RBIAS |
-| `"manual"` | `FALSE` | Marginal + corrected | Population-level (i.e., ignore REs) generalization with analytical Jensen correction |
-| `"none"` | `TRUE` | Conditional | Within-group (i.e., predict to known RE groupings) accuracy; Jensen bias absorbed by REs |
-| `"manual"` | `TRUE` | ❌ Error | Double-correction - not permitted |
-
-The `bias_adjust` and `conditional_predictions` restrictions for log-transformed-response models (no `"manual"` with conditional predictions) are described in the worked example above. For `brier_auc()`, the same logic applies, except that `bias_adjust = "manual"` is not available for binomial models regardless of `conditional_predictions`: the analytical correction is only valid where predictions are back-transformed via the exponential (log-link and log-transformed-response models), and the logit link does not admit a closed-form scalar marginal-mean correction. No bias adjustment is currently supported for binomial GLMMs in `brier_auc()`; Brier score and log loss should be interpreted relative to the null model baseline that the function reports alongside the resampling summaries.
-
-The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow described above.
-
-### `boot_predict()`: response-scale predictions with parametric bootstrap intervals
+### Response-scale predictions with `boot_predict()`
 
 The previous sections established that Jensen's inequality bias in log-link GLMMs can be diagnosed with `bias_precision()` and quantified with `jensen_correct()`. The final piece of the workflow is producing response-scale predictions that carry both a proper uncertainty quantification and the Jensen correction. `boot_predict()` does this.
 
-The problem the function solves is straightforward. Standard `predict(mod, se.fit = TRUE)` returns marginal predictions and delta-method Wald standard errors on the link scale. For a log-link GLMM, back-transforming those to the response scale via `exp()` requires either (a) accepting the asymmetric, sometimes-poor approximation that a delta method gives for a nonlinear transformation of a normal quantity, or (b) writing a parametric bootstrap by hand. Neither option is what a typical user wants. And neither option applies the Jensen correction; that step is left to the user to remember to do afterward.
+The problem the function solves is straightforward. Standard `predict(mod, se.fit = TRUE)` returns marginal predictions and delta-method Wald standard errors on the link scale. For a log-link GLMM, back-transforming those to the response scale via `exp()` requires either (a) accepting the asymmetric, sometimes-poor approximation that a delta method gives for a nonlinear transformation of a normal quantity, or (b) writing a parametric bootstrap by hand. Neither option applies the Jensen correction; that step is left to the user to remember to do afterward.
 
 `boot_predict()` handles both. It draws `n_sim` samples from the joint asymptotic distribution of the fixed-effect coefficients, transforms each draw through the model's inverse-link function, applies the Jensen correction if requested, and returns the mean, median, standard error, and confidence-interval bounds of the resulting bootstrap distribution alongside the covariate values used for prediction. The output is a data frame ready to plot or table.
 
 #### Basic usage
 
-The simplest call produces predictions on an auto-generated grid built from the model's covariates. Factor covariates expand to their observed levels; numeric covariates default to their mean observed value in the data. When the fitted model contains an offset, the offset variables must be present in the prediction grid or supplied via the `offset` argument  (see `?boot_predict` for details).
+The simplest call produces predictions on an auto-generated grid built from the model's covariates. Factor covariates expand to their observed levels; numeric covariates default to their mean observed value in the data. When the fitted model contains an offset, the offset variables must be present in the prediction grid or supplied via the `offset` argument (see `?boot_predict` for details).
 
 ```{r bp-boot-basic, warning = FALSE, comment = NA}
 bp_uncorrected <- boot_predict(
@@ -701,15 +625,11 @@ bp_uncorrected <- boot_predict(
 bp_uncorrected
 ```
 
-The output has one row per prediction. `boot_mean` and `boot_median` are two summaries of the bootstrap distribution, and although both estimate `E[Y | X]`, they differ in how parameter uncertainty enters the point estimate (see below).
+The output has one row per prediction. `boot_mean` and `boot_median` both estimate the marginal expectation $E[Y \mid X]$, but they differ in how the response-scale draws from the parametric bootstrap are summarized. `boot_mean` averages the exponentiated draws, integrating over the sampling distribution of the fixed-effect coefficients and incorporating parameter uncertainty into the point estimate itself (the frequentist analog of a posterior predictive mean). `boot_median` takes the median across exponentiated draws, and because the median is invariant to the exponential transformation, it approximates the plug-in point prediction $\exp(X\hat{\beta})$ (analogous to a prediction at the posterior mode).
 
-As stated above, both `boot_mean` and `boot_median` estimate the marginal expectation `E[Y | X]`; they differ only in how the response-scale draws from the parametric bootstrap are summarized. `boot_mean` averages the exponentiated draws, which is the frequentist analog of a posterior predictive mean; specifically, it integrates over the sampling distribution of the fixed-effect coefficients, incorporating parameter uncertainty into the point estimate itself. `boot_median` takes the median across exponentiated draws, and because the median is invariant to the exponential transformation, it approximates the plug-in point prediction `exp(Xβ^)`; this is analogous to a prediction at the posterior mode. Both `boot_mean` and `boot_median` receive the same Jensen correction when `bias_adjust = "manual"`.
+A second-order phenomenon is worth naming explicitly to avoid confusion with the Jensen bias the analytical correction addresses. Because the parametric bootstrap draws $\hat{\beta}$ from its estimated sampling distribution and propagates each draw through $\exp()$, `boot_mean` sits slightly above `boot_median` by approximately $\exp(0.5 \cdot \text{Var}(X_i \hat{\beta})) - 1$. This gap reflects the fact that averaging exponentiated draws from a variable estimator produces a slightly larger value than exponentiating a single point estimate; it is a general property of nonlinear transformations of estimators, not a form of Jensen bias in the sense corrected by `jensen_correct()`. Its magnitude depends on fixed-effect parameter uncertainty and is typically 1–2% in applied datasets, larger at small sample sizes or with many fixed-effect parameters. Both `boot_mean` and `boot_median` receive the same scalar Jensen correction when `bias_adjust = "manual"`, and the small parameter-uncertainty gap between them persists after correction because it is a separate mechanism.
 
-A separate second-order phenomenon appears in `boot_predict()` output and is worth naming explicitly to avoid confusion with the Jensen bias the analytical correction is designed to address. Because the parametric bootstrap draws $\hat{\beta}$ from its estimated sampling distribution and propagates each draw through $\exp()$, the mean of the bootstrap distribution (`boot_mean`) sits slightly above the plug-in point prediction (`boot_median`), by approximately $\exp(0.5 \cdot \text{Var}(X_i \hat{\beta})) - 1$. This gap reflects the fact that averaging exponentiated draws from a variable estimator produces a slightly larger value than exponentiating a single point estimate; this is a general property of nonlinear transformations of estimators, not a form of Jensen bias in the sense corrected by `jensen_correct()`. Its magnitude depends on fixed-effect parameter uncertainty and is typically 1–2% in applied datasets, larger at small sample sizes or with many fixed-effect parameters.
-
-The two quantities answer different questions. `boot_median` estimates the plug-in prediction $\exp(X_i \hat{\beta})$, the model's central prediction at its fitted point estimate. `boot_mean` estimates $E[\exp(X_i \hat{\beta})]$ under the bootstrap distribution, integrating over what is not known about $\beta$. Both are legitimate summaries; the gap between them communicates parameter uncertainty in a way the confidence interval alone does not. Neither is a residual of the Jensen correction. When `bias_adjust = "manual"` is used, both `boot_mean` and `boot_median` receive the same scalar Jensen correction, and the small parameter-uncertainty gap between them persists after correction because it is a separate mechanism.
-
-The remaining columns describe the spread of the bootstrap distribution. `boot_se`, `boot_lwr`, and `boot_upr` summarize the standard error and two-tailed confidence-interval bounds (defaulting to 95%, controlled via alpha). The intervals returned are percentile intervals from the parametric bootstrap distribution. Higher-order interval methods (bias-corrected and accelerated, `BCa`) are motivated by concerns about estimator bias and variance heterogeneity that do not apply to the parametric-bootstrap setup used here, where draws come directly from the asymptotic distribution centered on the fitted point estimate.
+The remaining columns describe the spread of the bootstrap distribution. `boot_se`, `boot_lwr`, and `boot_upr` summarize the standard error and two-tailed confidence-interval bounds (defaulting to 95%, controlled via `alpha`). The intervals returned are percentile intervals from the parametric bootstrap distribution. Higher-order interval methods (bias-corrected and accelerated, `BCa`) are motivated by concerns about estimator bias and variance heterogeneity that do not apply to the parametric-bootstrap setup used here, where draws come directly from the asymptotic distribution centered on the fitted point estimate.
 
 To apply the Jensen correction, set `bias_adjust = "manual"`:
 
@@ -730,11 +650,11 @@ Notice that each row's prediction has shifted upward by approximately the same m
 attr(bp_corrected, "jensen_factor")
 ```
 
-For `countModel_GLMM` this factor is roughly 1.07, consistent with the σ̂ ≈ 0.36 estimate discussed in the worked example above.
+For `countModel_GLMM` this factor is roughly 1.07, consistent with the $\hat{\sigma} \approx 0.36$ estimate discussed in *Worked example 1* above.
 
 #### Prediction at user-specified covariate values
 
-For predictions at specific covariate values rather than the default mean value, there are two options. The `at` argument can be used to specify values for model covariates the user wishes to vary. Values passed via `at` override the `numeric_default` expansion for the named covariates, and any covariates **not** included in the `at` argument are subject to the `numeric_default` setting. 
+For predictions at specific covariate values rather than the default mean value, there are two options. The `at` argument can be used to specify values for model covariates the user wishes to vary. Values passed via `at` override the `numeric_default` expansion for the named covariates; any covariates **not** included in the `at` argument are subject to the `numeric_default` setting.
 
 ```{r bp-boot-at, warning = FALSE, comment = NA, eval = FALSE}
 boot_predict(
@@ -746,17 +666,20 @@ boot_predict(
 )
 ```
 
-The resulting grid in this example crosses each Season level with each specified Temp value, giving 4 × 3 = 12 rows. For a fully user-controlled prediction target, pass a complete `newdata` data frame instead; `boot_predict()` will use it directly without auto-generating a grid, as shown below.
+The resulting grid in this example crosses each `Season` level with each specified `Temp` value, giving $4 \times 3 = 12$ rows. For a fully user-controlled prediction target, pass a complete `newdata` data frame instead; `boot_predict()` will use it directly without auto-generating a grid, as shown below.
 
 ```{r bp-boot-curve_custom-grid, warning = FALSE, comment = NA, message = FALSE}
-pred_dat <- expand.grid(Season = unique(countData$Season), Temp = seq(min(countData$Temp), max(countData$Temp), length.out = 30))
+pred_dat <- expand.grid(
+  Season = unique(countData$Season),
+  Temp   = seq(min(countData$Temp), max(countData$Temp), length.out = 30)
+)
 
 bp_curve <- boot_predict(
-  mod             = countModel_GLMM,
-  newdata = pred_dat,
-  n_sim           = 1000,
-  bias_adjust     = "manual",
-  seed            = 123
+  mod         = countModel_GLMM,
+  newdata     = pred_dat,
+  n_sim       = 1000,
+  bias_adjust = "manual",
+  seed        = 123
 )
 
 ggplot(bp_curve, aes(x = Temp, y = boot_median, colour = Season, fill = Season)) +
@@ -770,7 +693,7 @@ ggplot(bp_curve, aes(x = Temp, y = boot_median, colour = Season, fill = Season))
 
 The ribbons carry the full bootstrap uncertainty on the response scale, including the fixed-effect coefficient covariance. Because the Jensen correction shifts every draw by the same scalar, the ribbon shapes are unchanged from the uncorrected version; only their level differs.
 
-#### Dealing with offsets
+#### Offsets
 
 When a fitted model contains an offset, there are two ways to specify the offset value for predictions.
 
@@ -807,52 +730,40 @@ boot_predict(
 
 Note that the `at` argument cannot be used to specify offsets because offset variables are excluded from the auto-grid by design. Use the `offset` argument or a `newdata` frame instead.
 
-#### User-specified correction factors in `boot_predict`
+#### User-specified correction factors
 
 The `correction_factor` argument allows users to supply their own scalar correction factor rather than relying on the internal `jensen_correct(mod)` computation. This is useful when only a subset of random-effect variance components should contribute to the correction; for example, when a model contains both substantive REs (site-level effects that should be marginalized) and nuisance REs (observer or batch effects that should not). The user can compute `cf = exp(sum(substantive_variances) / 2)` from `VarCorr(mod)` and supply it as `correction_factor = cf`. When supplied, `correction_factor` overrides `bias_adjust` and an informative message is issued.
 
-#### Demonstrate agreement between `jensen_correct()` and `boot_predict()`
+#### Backend support and scope
 
-Here, we use `countModel_GLMM2` to verify agreement between the calculated Jensen adjustment factor and means and medians calculated using `boot_predict()`
+`boot_predict()` supports the same set of model backends as `jensen_correct()`: `glmmTMB`, `lme4` (including `lmerMod`, `glmerMod`, and `glmer.nb` fits), `MASS::glm.nb`, and base `stats::glm` and `stats::lm`. GAMs fit with `mgcv` are not currently supported because variance-component extraction from smooth terms uses a different pathway that is not yet integrated with `jensen_correct()`. Bayesian model objects (`brmsfit`, `stanreg`) are not supported directly. If marginal response-scale predictions are computed by exponentiating linear-predictor draws at `re_formula = NA`, `jensen_correct()` applied to the resulting response-scale draws provides the appropriate correction. If marginal predictions are computed via `posterior_epred()` with proper Monte Carlo integration over the random-effect posterior, no additional correction is needed and `jensen_correct()` should not be applied.
 
-##### The Jensen factor
-```{r, manual-jf}
-jf <- jensen_correct(countModel_GLMM2)  # 1.143358
-```
-
-##### The corrected/uncorrected ratio from boot_predict()
-```{r, boot-corr}
-bp_corr   <- boot_predict(countModel_GLMM2, n_sim = 10000, bias_adjust = "manual", seed = 1)
-bp_uncorr <- boot_predict(countModel_GLMM2, n_sim = 10000, bias_adjust = "none",   seed = 1)
-```
-
-##### Compare ratios for each Seasonal estimate (4 total)
-```{r, jf-ratio}
-bp_corr$boot_median / bp_uncorr$boot_median  # ~1.143 across every row
-bp_corr$boot_mean / bp_uncorr$boot_mean  # ~1.143 across every row
-```
-
-##### Verify agreement
-```{r, jf-boot-agreement}
-all.equal(mean(bp_corr$boot_median / bp_uncorr$boot_median), jf, tolerance = 0.01)
-all.equal(mean(bp_corr$boot_mean / bp_uncorr$boot_mean), jf, tolerance = 0.01)
-```
-
-#### Back-end support and scope notes
-
-`boot_predict()` supports the same set of model backends as `jensen_correct()`: `glmmTMB`, `lme4` (including `lmerMod`, `glmerMod`, and `glmer.nb` fits), `MASS::glm.nb`, and base `stats::glm` and `stats::lm`. GAMs fit with `mgcv` are not currently supported because variance-component extraction from smooth terms uses a different pathway that is not yet integrated with `jensen_correct()`. Bayesian model objects (`brmsfit`, `stanreg`) are not supported directly. If marginal response-scale predictions are computed by exponentiating linear-predictor draws at `re_formula = NA`, `jensen_correct()` applied to the resulting response-scale draws provides the appropriate correction. If marginal predictions are computed via `posterior_epred()` with proper Monte Carlo integration over the random-effect posterior, no additional correction is needed and `jensen_correct()` should not be applied.   
-
-Zero-inflated models are supported when fit with `glmmTMB` using a `ziformula`. Both intercept-only and covariate-dependent zero-inflation are handled correctly, with the Jensen correction applied to the marginal expectation `(1 − p_zi) · E[Y]` that the function returns. Note also that for zero-inflated models, uncertainty in the conditional and zero-inflation components is propagated jointly via the full model variance-covariance matrix, so any covariance between the two parameter blocks is correctly incorporated into the parametric bootstrap draws.  
+Zero-inflated models are supported when fit with `glmmTMB` using a `ziformula`. Both intercept-only and covariate-dependent zero-inflation are handled correctly, with the Jensen correction applied to the marginal expectation $(1 - p_{zi}) \cdot E[Y]$ that the function returns. For zero-inflated models, uncertainty in the conditional and zero-inflation components is propagated jointly via the full model variance-covariance matrix, so any covariance between the two parameter blocks is correctly incorporated into the parametric bootstrap draws.
 
 For fixed-effect log-link GLMs (no random effects) and identity-response models with no log transform, no Jensen correction is warranted; setting `bias_adjust = "manual"` in those cases produces an informative warning and returns unchanged predictions. For logit-link models, no closed-form scalar correction exists and the same warning applies.
 
-### Recommended workflow for inference and predictions
+### Diagnosing residual bias after correction
 
-The following general workflow is recommended for log-link GLMMs with random effects, and applies equally to models fit to a log-transformed response. Use marginal predictions (`re.form = ~0`) for all inferential purposes; fixed-effect contrasts, effect directions, p-values, and model comparison are unaffected by Jensen's inequality bias. For response-scale quantities intended for reporting, figures, or management; predicted abundances, density estimates, and covariate effect plots; apply the log-normal bias correction via `jensen_correct()` or `bias_adjust = "manual"` in `bias_precision()`. This two-stage approach separates the inferential and predictive roles of the model and ensures that response-scale outputs are calibrated to the arithmetic mean of the population rather than the geometric mean.
+The subsections below describe conditions under which the analytical correction may under-perform, producing residual *negative* `RBIAS` after correction (i.e., the Jensen bias is not fully resolved). A different phenomenon (small residual *positive* `RBIAS` after correction) arises from a distinct mechanism unrelated to Jensen bias, involving how CV or bootstrap procedures summarize predictions from variable underlying estimators. That phenomenon is described in *Worked example 1* and in the `boot_predict()` section above; it is not a case of the correction failing. If observed residual `RBIAS` after correction is negative, one of the four sources below likely applies. If it is small and positive, it is likely a summarization artifact rather than a correction limitation.
 
-The full diagnose-correct-predict workflow for a log-link GLMM with random effects is therefore:
+The analytical log-normal correction closes most of the marginal bias in log-link mixed models, but residual negative bias can persist under specific conditions. When you observe uncorrected bias remaining after applying `jensen_correct()` or the equivalent internal correction, the sources below are possible candidates. None of these are problems with your model per se; rather, they are conditions under which the sum-of-variances correction has limitations, and identifying which one applies tells you something useful about where your response-scale predictions may be unreliable.
 
-1. Fit the model to all available data (maximizing information for inference).
-2. Diagnose Jensen bias with `bias_precision(bias_adjust = "none")` and inspect RBIAS.
-3. Confirm the correction resolves the bias with `bias_precision(bias_adjust = "manual")`.
-4. Produce corrected response-scale predictions with `boot_predict(bias_adjust = "manual")` for reporting, figures, and management outputs.
+A note on how to use this diagnostic: `RBIAS` and related metrics are informative about where the correction is falling short and, by extension, where response-scale predictions from the model may not be delivering what you expect. That is a legitimate and useful thing to know. What they are not is a model-selection criterion. Iterating on random-effect structure until `RBIAS` looks better risks removing real structure from the model to optimize a metric, which defeats the purpose. Design-based considerations (does the grouping capture genuine non-independence, do you need to predict to new levels, does partial pooling matter for your inference) and standard fit-based criteria remain the appropriate basis for random-effect specification. Use the diagnostic to understand your model, not to reshape it.
+
+#### Random effects with few levels ($<\!\sim$10)
+
+The correction depends on $\hat{\sigma}^2$ from the fitted model, and variance components estimated from small numbers of groups are downward-biased and highly variable. REML partially corrects small-sample bias but cannot fully compensate below roughly 10 levels. An under-estimated $\hat{\sigma}^2$ produces under-correction, which shows up as residual negative bias on the response scale.
+
+To investigate: refit the model with the small-group factor as a fixed effect and compare. If fixed-effect estimates remain stable, residual variance does not inflate substantially, and the residual bias resolves, the fixed-effect specification was probably more appropriate on modeling grounds anyway; grouping factors with fewer than $\sim$5–8 levels are commonly recommended as fixed regardless. If fixed effects shift or residual variance inflates, the random effect is capturing structure the fixed-effect specification cannot absorb, and the residual bias is a correction limitation to report alongside your predictions rather than a modeling problem to fix.
+
+#### Random slopes
+
+`jensen_correct()` currently applies a sum-of-variances correction that treats random-slope variance as if it contributed uniformly across observations. The exact marginal correction for a random slope depends on the covariate values at which predictions are made, and intercept–slope covariance complicates it further. This is documented as a known approximation and per-observation slope corrections are planned for a future release. Residual bias in models with random slopes is often traceable to this approximation rather than to any of the other sources listed here.
+
+#### Non-Gaussian random-effect distributions
+
+The analytical correction assumes the random effects are Gaussian. In ecological data, conditional modes are often visibly skewed or heavy-tailed; a few sites, years, or individuals are genuine outliers relative to a Gaussian working assumption. When the true random-effect distribution departs substantially from Gaussian, $\exp(0.5 \sum \hat{\sigma}^2)$ can under- or over-correct depending on the direction of the departure. A `qqnorm()` check on the conditional modes for each grouping factor is a quick visual diagnostic; substantial non-normality is a signal that the correction is not the whole story and that the model itself may benefit from revisiting (e.g., additional fixed effects that absorb the outlying structure).
+
+#### Unmodeled overdispersion
+
+If Pearson dispersion (`sum(resid(model, "pearson")^2) / df.residual(model)`) exceeds $\sim$1.2 in a Poisson model, some residual marginal bias on the response scale is coming from un-modeled overdispersion rather than from the correction itself. Refitting as negative binomial and re-running validation typically resolves it.
