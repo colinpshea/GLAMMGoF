@@ -181,7 +181,7 @@ Now let's run it on `countModel_GLMM` and see what happens...
 ```{r, warning=FALSE, comment=NA}
 bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData,
                      propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE,
-                     DHARMaReps = 1000, seed = 123, method = "holdout")
+                     DHARMaReps = 1000, seed = 1234, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -212,7 +212,7 @@ Now let's compare to the `bootstrap` method for the same model. As noted in the 
 ```{r, warning=FALSE, comment=NA}
 bp <- bias_precision(nReps = 100, testModel = countModel_GLMM, testData = countData,
                      propTrain = 0.8, DHARMaPlot = TRUE, testZI = TRUE,
-                     DHARMaReps = 1000, seed = 123, method = "bootstrap")
+                     DHARMaReps = 1000, seed = 1234, method = "bootstrap")
 ```
 
 Summary of the `bootstrap` method:
@@ -239,7 +239,7 @@ Setting `conditional_predictions = TRUE` switches both in-sample and out-of-samp
 chk_cond <- bias_precision(nReps = 100, testModel = countModel_GLMM,
                            testData = countData, method = "holdout",
                            DHARMaPlot = FALSE, conditional_predictions = TRUE,
-                           seed = 123)
+                           seed = 1234)
 chk_cond$bias_precision_summary
 ```
 
@@ -273,7 +273,7 @@ Output structure mirrors `bias_precision()`: a summary table (mean and 95% CIs) 
 ```{r, warning=FALSE, comment=NA}
 br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData,
                     propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
-                    seed = 123, method = "holdout")
+                    seed = 1234, method = "holdout")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -302,7 +302,7 @@ Comparison to the `bootstrap` method:
 ```{r, warning=FALSE, comment=NA}
 br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData,
                     propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
-                    seed = 123, method = "bootstrap")
+                    seed = 12344, method = "bootstrap")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -442,7 +442,7 @@ Re-run the introductory example on `countModel_GLMM` at higher precision (`nReps
 # data-raw/precompute_bp_countModelGLMM.R for the generating script.
 bp_countModelGLMM_uncorrected <- bias_precision(
   nReps = 1000, testModel = countModel_GLMM, testData = countData,
-  propTrain = 0.8, DHARMaPlot = FALSE, seed = 123,
+  propTrain = 0.8, DHARMaPlot = FALSE, seed = 1234,
   method = "holdout", bias_adjust = "none")
 ```
 
@@ -466,7 +466,7 @@ Now with `bias_adjust = "manual"`:
 # data-raw/precompute_bp_countModelGLMM.R for the generating script.
 bp_countModelGLMM_corrected <- bias_precision(
   nReps = 1000, testModel = countModel_GLMM, testData = countData,
-  propTrain = 0.8, DHARMaPlot = FALSE, seed = 123,
+  propTrain = 0.8, DHARMaPlot = FALSE, seed = 1234,
   method = "holdout", bias_adjust = "manual")
 ```
 
@@ -527,11 +527,11 @@ The naive back-transform recovers the geometric mean and underestimates the arit
 ```{r, warning=FALSE, comment=NA, eval=FALSE}
 bp_ln_none <- bias_precision(nReps = 100, testModel = m_ln, testData = lnDat,
                              method = "holdout", DHARMaPlot = FALSE,
-                             bias_adjust = "none", seed = 123)
+                             bias_adjust = "none", seed = 1234)
 
 bp_ln_man  <- bias_precision(nReps = 100, testModel = m_ln, testData = lnDat,
                              method = "holdout", DHARMaPlot = FALSE,
-                             bias_adjust = "manual", seed = 123)
+                             bias_adjust = "manual", seed = 1234)
 
 bp_ln_none$bias_precision_summary   # RBIAS strongly negative
 bp_ln_man$bias_precision_summary    # RBIAS pulled toward zero
@@ -750,7 +750,7 @@ The analytical log-normal correction closes most of the marginal bias in log-lin
 
 A note on how to use this diagnostic: `RBIAS` and related metrics are informative about where the correction is falling short and, by extension, where response-scale predictions from the model may not be delivering what you expect. That is a legitimate and useful thing to know. What they are not is a model-selection criterion. Iterating on random-effect structure until `RBIAS` looks better risks removing real structure from the model to optimize a metric, which defeats the purpose. Design-based considerations (does the grouping capture genuine non-independence, do you need to predict to new levels, does partial pooling matter for your inference) and standard fit-based criteria remain the appropriate basis for random-effect specification. Use the diagnostic to understand your model, not to reshape it.
 
-#### Random effects with few levels ($<\!\sim$10)
+#### Random effects with few levels
 
 The correction depends on $\hat{\sigma}^2$ from the fitted model, and variance components estimated from small numbers of groups are downward-biased and highly variable. REML partially corrects small-sample bias but cannot fully compensate below roughly 10 levels. An under-estimated $\hat{\sigma}^2$ produces under-correction, which shows up as residual negative bias on the response scale.
 
