@@ -318,11 +318,27 @@ Note that for `brier_auc()`, `bias_adjust = "manual"` is not available regardles
 
 ### Jensen's inequality, random effects, and marginal predictions
 
+#### A note on terminology
+
+Three response-scale prediction targets appear throughout this section, and the vocabulary used to describe them varies across the ecological and statistical literatures. To avoid ambiguity, I use the following throughout:
+
+- **Marginal prediction** (also called **population-level prediction**): $\exp(X\beta)$, the back-transformed linear predictor with random effects set to zero (`re.form = ~0` in `glmmTMB` and `lme4`). This is what `predict()` returns by default when random effects are excluded, and is the quantity subject to Jensen's inequality bias.
+
+- **Population-averaged prediction** (also called **arithmetic-mean prediction**): $E[\exp(X\beta + u)]$, the expectation of the response taken over the random-effect distribution. For a Gaussian RE with variance $\sigma^2_u$, this equals $\exp(X\beta) \cdot \exp(\sigma^2_u / 2)$. This is the quantity the Jensen correction produces, and it is what most response-scale reporting (predicted counts, biomass, density) implicitly intends.
+
+- **Conditional prediction** (also called **group-conditional prediction**): $\exp(X\beta + \hat{u}_j)$, using the estimated random-effect deviation $\hat{u}_j$ for group $j$ (`re.form = NULL` in `glmmTMB` and `lme4`). This gives the predicted value for a specific observed group, and is what `bias_precision(conditional_predictions = TRUE)` uses.
+
+The central distinction is between the first two. The **marginal prediction** $\exp(X\beta)$ is what standard software returns for population-level output, but it is systematically smaller than the **population-averaged prediction** $E[\exp(X\beta + u)]$ by a factor of $\exp(\sigma^2_u / 2)$. This gap is Jensen's inequality bias, and applying the correction $\exp(\sigma^2_u / 2)$ resolves it.
+
+A note on the word "marginal": in the strict statistical sense, the true marginal expectation of a mixed model is the population-averaged one (integrating over the random-effect distribution). What I call the "marginal prediction" here — $\exp(X\beta)$ with random effects set to zero — is a conditional mean at $u = 0$. However, this quantity is universally called "marginal" or "population-level" in `glmmTMB` and `lme4` usage and in the applied ecological literature, so I retain that convention. The corrected population-averaged prediction is the strict marginal in this vocabulary.
+
+#### The bias
+
 When a GLMM includes random effects and a nonlinear link function (e.g., log or logit), back-transforming population-level (marginal) predictions to the response scale introduces a systematic bias. This occurs because the exponential function curves upward (e.g., a bowl-shaped or exponential growth curve), and averaging on the log scale and then back-transforming always gives a smaller value than back-transforming individual predictions and then averaging. This property is known as Jensen's inequality. For a log-link model with random effects, this means:
 
 $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
-For a log-link GLMM with a single random intercept  $u_j \sim \text{Normal}(0, \sigma^2_u)$ per group $j$, the marginal expectation on the response scale is not $\exp(\beta_0)$ but rather $E[\exp(\beta_0 + u_j)] = \exp(\beta_0) \cdot \exp(\sigma^2_u/2)$, integrating over the distribution of $u$. In other words, $\exp(\beta_0)$, the typical marginal prediction, underestimates the true arithmetic mean by a factor of $\exp(\sigma^2_u/2)$.
+For a log-link GLMM with a single random intercept  $u_j \sim \text{Normal}(0, \sigma^2_u)$ per group $j$, the **population-averaged prediction** on the response scale is not $\exp(\beta_0)$ but rather $E[\exp(\beta_0 + u_j)] = \exp(\beta_0) \cdot \exp(\sigma^2_u/2)$, integrating over the distribution of $u$. In other words, $\exp(\beta_0)$, the marginal prediction (in the sense defined above), underestimates the population-averaged arithmetic mean by a factor of $\exp(\sigma^2_u/2)$.
 
 This bias is directly analogous to the well-known log-normal back-transformation bias. The math is identical; the only difference is which variance components sit on the log scale, *inside* the back-transformation:
 
