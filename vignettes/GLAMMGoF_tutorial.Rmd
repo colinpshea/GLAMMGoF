@@ -302,7 +302,7 @@ Comparison to the `bootstrap` method:
 ```{r, warning=FALSE, comment=NA}
 br_auc <- brier_auc(nReps = 100, testModel = logitModel_GLMM, testData = logitData,
                     propTrain = 0.8, DHARMaPlot = TRUE, DHARMaReps = 1000,
-                    seed = 12344, method = "bootstrap")
+                    seed = 1234, method = "bootstrap")
 ```
 
 ```{r, warning=FALSE, comment=NA, echo=FALSE}
@@ -322,7 +322,7 @@ When a GLMM includes random effects and a nonlinear link function (e.g., log or 
 
 $$E[\exp(\beta_0 + u)] = \exp(\beta_0) \cdot \exp(\sigma^2/2)$$
 
-where $\sigma^2$ is the total random effect variance. In other words, $\exp(\beta_0)$, the typical marginal prediction, underestimates the true arithmetic mean by a factor of $\exp(\sigma^2/2)$.
+For a log-link GLMM with a single random intercept  $u_j \sim \text{Normal}(0, \sigma^2_u)$ per group $j$, the marginal expectation on the response scale is not $\exp(\beta_0)$ but rather $E[\exp(\beta_0 + u_j)] = \exp(\beta_0) \cdot \exp(\sigma^2_u/2)$, integrating over the distribution of $u$. In other words, $\exp(\beta_0)$, the typical marginal prediction, underestimates the true arithmetic mean by a factor of $\exp(\sigma^2_u/2)$.
 
 This bias is directly analogous to the well-known log-normal back-transformation bias. The math is identical; the only difference is which variance components sit on the log scale, *inside* the back-transformation:
 
@@ -555,7 +555,7 @@ When residual variance depends on covariates, `dispformula = ~ ...` in `glmmTMB`
 
 **The scalar path breaks down.** Recall that for a standard lognormal LMM with a trivial `dispformula`, the Jensen correction is $\exp((\sigma^2 + \sum_k \sigma^2_k)/2)$, where $\sigma^2$ is the residual variance and $\sum_k \sigma^2_k$ sums the random-effect variances. `jensen_correct()` computes this from `sigma(mod)^2 + sum(VarCorr components)`. When `dispformula` has more than one parameter, `sigma(mod)` returns `NA` (`glmmTMB`'s convention), because there isn't a single dispersion value to return. The scalar correction is undefined for that model; it's not a bug, it's a signal that the model's variance structure has been generalized past what a scalar can represent.
 
-**The correction becomes per-observation.** `jensen_correct_rowwise()` handles this case by reconstructing $\sigma^2(x)$ from the `dispformula` design matrix and the fitted dispersion coefficients: $\sigma^2(x_i) = \exp(2 \cdot X_{\text{disp},i} \, \hat{\beta}_{\text{disp}})$. The correction is then $\exp((\sigma^2(x_i) + \sum_k \sigma^2_k)/2)$ per row of `newdata`. The random-effect contribution stays scalar because RE variances aren't functions of the covariates.
+**The correction becomes per-observation.** `jensen_correct_rowwise()` handles this case by reconstructing $\sigma^2(x)$ from the `dispformula` design matrix and the fitted dispersion coefficients. Because `glmmTMB` parameterizes the standard deviation on the log scale, $\exp(X_{\text{disp}, i} \, \hat{\beta}_{\text{disp}})$ gives $\sigma(x_i)$, and squaring gives the variance: $$\sigma^2(x_i) = [\exp(X_{\text{disp},i} \, \hat{\beta}_{\text{disp}})]^2 = \exp(2 \cdot X_{\text{disp},i} \, \hat{\beta}_{\text{disp}}).$$ The correction is then $\exp((\sigma^2(x_i) + \sum_k \sigma^2_k)/2)$ per row of `newdata`, where `newdata` can be the original data used to fit the model or a custom data frame used for predictions. The random-effect contribution, on the other hand, stays scalar because RE variances aren't functions of the covariates.
 
 **Reminder**: as stated earlier in *Which correction applies?*, for distributional families with free dispersion parameters (`gamma`, `tweedie`, negative binomial via `nbinom1`/`nbinom2`) used with a log link, the dispersion parameter does not contribute to the Jensen correction on the conditional mean. This holds whether dispersion is constant or modeled as a function of covariates via `dispformula`.
 
@@ -619,7 +619,7 @@ bp_uncorrected <- boot_predict(
   mod         = countModel_GLMM,
   n_sim       = 1000,
   bias_adjust = "none",
-  seed        = 123
+  seed        = 1234
 )
 
 bp_uncorrected
@@ -638,7 +638,7 @@ bp_corrected <- boot_predict(
   mod         = countModel_GLMM,
   n_sim       = 1000,
   bias_adjust = "manual",
-  seed        = 123
+  seed        = 1234
 )
 
 bp_corrected
@@ -662,7 +662,7 @@ boot_predict(
   at          = list(Temp = c(10, 15, 20)),
   n_sim       = 1000,
   bias_adjust = "manual",
-  seed        = 123
+  seed        = 1234
 )
 ```
 
@@ -679,7 +679,7 @@ bp_curve <- boot_predict(
   newdata     = pred_dat,
   n_sim       = 1000,
   bias_adjust = "manual",
-  seed        = 123
+  seed        = 1234
 )
 
 ggplot(bp_curve, aes(x = Temp, y = boot_median, colour = Season, fill = Season)) +
@@ -706,7 +706,7 @@ boot_predict(
   offset      = log(100),
   n_sim       = 1000,
   bias_adjust = "manual",
-  seed        = 123
+  seed        = 1234
 )
 ```
 
@@ -724,7 +724,7 @@ boot_predict(
   newdata     = pred_dat_offset,
   n_sim       = 1000,
   bias_adjust = "manual",
-  seed        = 123
+  seed        = 1234
 )
 ```
 
@@ -758,7 +758,7 @@ To investigate: refit the model with the small-group factor as a fixed effect an
 
 #### Random slopes
 
-`jensen_correct()` currently applies a sum-of-variances correction that treats random-slope variance as if it contributed uniformly across observations. The exact marginal correction for a random slope depends on the covariate values at which predictions are made, and intercept–slope covariance complicates it further. This is documented as a known approximation and per-observation slope corrections are planned for a future release. Residual bias in models with random slopes is often traceable to this approximation rather than to any of the other sources listed here.
+`jensen_correct()` currently applies a sum-of-variances correction that treats random-slope variance as if it contributed uniformly across observations. The exact marginal correction for a random slope depends on the covariate values at which predictions are made. This is similar to the case when covariates are included in the dispersion formula of a log-normal LMM and row-wise corrections are calculated (see *Worked example 3 above*), but here, the intercept-slope covariance and the slope variance both contribute to the linear predictor's variance at each covariate value, so the correction depends on the full random effect covariance matrix rather than just the diagonal variance components. This is documented as a known approximation, and per-observation slope corrections are planned for a future release.
 
 #### Non-Gaussian random-effect distributions
 
