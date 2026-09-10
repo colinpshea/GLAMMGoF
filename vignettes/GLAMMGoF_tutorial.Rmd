@@ -230,7 +230,7 @@ bp$bias_precision_hist
 
 #### Marginal vs conditional predictions: the `conditional_predictions` argument
 
-By default, `bias_precision()` uses population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailable — the most relevant question when predicting to new sites, new years, or new individuals.
+By default, `bias_precision()` uses population-level (marginal) predictions for both in-sample and out-of-sample performance, setting random effects to zero (`re.form = ~0`). This assesses how well the model generalizes to new observations where group-level context is unavailabl, which is the most relevant question when predicting to new sites, new years, or new individuals.
 
 Setting `conditional_predictions = TRUE` switches both in-sample and out-of-sample predictions to condition on estimated random effects (`re.form = NULL`). Since `GLAMMGoF`'s holdout CV splits rows within groups rather than groups themselves, random effect estimates from the training model are valid for held-out observations from the same groups. In-sample and out-of-sample metrics remain directly comparable since both use the same prediction strategy; the gap between them reflects genuine row-level over-fitting rather than any marginal vs conditional distinction.
 
@@ -250,7 +250,7 @@ The table below summarizes the behavior of each combination of `bias_adjust` and
 | `"none"` (default) | `FALSE` (default)         | Marginal             | Population-level generalization; Jensen signal visible in `RBIAS`                    |
 | `"manual"`         | `FALSE`                   | Marginal + corrected | Population-level generalization with analytical Jensen correction                    |
 | `"none"`           | `TRUE`                    | Conditional          | Within-group accuracy; Jensen bias absorbed by REs                                   |
-| `"manual"`         | `TRUE`                    | $\times$ Error       | Double-correction — not permitted                                                    |
+| `"manual"`         | `TRUE`                    | $\times$ Error       | Double-correction; not permitted                                                    |
 
 The `bias_adjust` and `conditional_predictions` restrictions for log-transformed-response models (no `"manual"` with conditional predictions) are described in *Worked example 2* below. The default combination (`bias_adjust = "none"`, `conditional_predictions = FALSE`) is recommended as the starting point for all analyses. It provides the most diagnostic information and surfaces Jensen's inequality bias when present. The other combinations are best used in sequence as part of the step-wise diagnostic workflow.
 
@@ -330,7 +330,7 @@ Three response-scale prediction targets appear throughout this section, and the 
 
 The central distinction is between the first two. The **marginal prediction** $\exp(X\beta)$ is what standard software returns for population-level output, but it is systematically smaller than the **population-averaged prediction** $E[\exp(X\beta + u)]$ by a factor of $\exp(\sigma^2_u / 2)$. This gap is Jensen's inequality bias, and applying the correction $\exp(\sigma^2_u / 2)$ resolves it.
 
-A note on the word "marginal": in the strict statistical sense, the true marginal expectation of a mixed model is the population-averaged one (integrating over the random-effect distribution). What I call the "marginal prediction" here — $\exp(X\beta)$ with random effects set to zero — is a conditional mean at $u = 0$. However, this quantity is universally called "marginal" or "population-level" in `glmmTMB` and `lme4` usage and in the applied ecological literature, so I retain that convention. The corrected population-averaged prediction is the strict marginal in this vocabulary.
+A note on the word "marginal": in the strict statistical sense, the true marginal expectation of a mixed model is the population-averaged one (integrating over the random-effect distribution). What I call the "marginal prediction" here ($\exp(X\beta)$ with random effects set to zero) is a conditional mean at $u = 0$. However, this quantity is universally called "marginal" or "population-level" in `glmmTMB` and `lme4` usage and in the applied ecological literature, so I retain that convention. The corrected population-averaged prediction is the strict marginal in this vocabulary.
 
 #### The bias
 
