@@ -500,7 +500,7 @@ bp_countModelGLMM_corrected <-
 knitr::kable(head(bp_countModelGLMM_corrected, 8))
 ```
 
-`RBIAS` shifts from roughly $-4.5\%$ to $+1$–$2\%$ for both in-sample and out-of-sample performance. For reference, `countModel_GLMM` has $\hat{\sigma} \approx 0.36$ against a true $\sigma = 0.5$, which reflects a low draw from the sampling distribution of $\hat{\sigma}$ that is unsurprising with only 10 `Site` levels in the simulated random effect. An estimated $\hat{\sigma} \approx 0.36$ gives a correction factor of $\exp(\hat{\sigma}^2/2) \approx 1.07$, a modest $\sim$7% multiplicative shift that is nonetheless enough to move `RBIAS` from clearly negative to near zero. The correction has fully resolved the systematic Jensen underprediction that the model was subject to.
+`RBIAS` shifts from roughly $-4.5\%$ to $+1$–$2\%$ for both in-sample and out-of-sample performance. For reference, `countModel_GLMM` has $\hat{\sigma} \approx 0.36$ against a true $\sigma = 0.5$, which reflects a low draw from the sampling distribution of $\hat{\sigma}$ that is unsurprising with only 10 `Site` levels in the simulated random effect. An estimated $\hat{\sigma} \approx 0.36$ gives a correction factor of $\exp(\hat{\sigma}^2/2) \approx 1.07$, a modest ~7% multiplicative shift that is nonetheless enough to move `RBIAS` from clearly negative to near zero. The correction has fully resolved the systematic Jensen underprediction that the model was subject to.
 
 The small residual positive `RBIAS` visible in the corrected output is the same phenomenon described above in *The `bias_adjust` argument*: it arises from averaging exponentiated draws from a variable underlying estimator across CV replicates and typically contributes 1–2% of positive `RBIAS` in applied datasets. It is the change in `RBIAS` from clearly negative to near zero that indicates Jensen's inequality bias has been resolved. The small residual is a summary artifact of the CV procedure and should not be interpreted as incomplete correction.
 
@@ -771,7 +771,7 @@ A note on how to use this diagnostic: `RBIAS` and related metrics are informativ
 
 The correction depends on $\hat{\sigma}^2$ from the fitted model, and variance components estimated from small numbers of groups are downward-biased and highly variable. REML partially corrects small-sample bias but cannot fully compensate below roughly 10 levels. An under-estimated $\hat{\sigma}^2$ produces under-correction, which shows up as residual negative bias on the response scale.
 
-To investigate: refit the model with the small-group factor as a fixed effect and compare. If fixed-effect estimates remain stable, residual variance does not inflate substantially, and the residual bias resolves, the fixed-effect specification was probably more appropriate on modeling grounds anyway; grouping factors with fewer than $\sim$5–8 levels are commonly recommended as fixed regardless. If fixed effects shift or residual variance inflates, the random effect is capturing structure the fixed-effect specification cannot absorb, and the residual bias is a correction limitation to report alongside your predictions rather than a modeling problem to fix.
+To investigate: refit the model with the small-group factor as a fixed effect and compare. If fixed-effect estimates remain stable, residual variance does not inflate substantially, and the residual bias resolves, the fixed-effect specification was probably more appropriate on modeling grounds anyway; grouping factors with fewer than ~5–8 levels are commonly recommended as fixed regardless. If fixed effects shift or residual variance inflates, the random effect is capturing structure the fixed-effect specification cannot absorb, and the residual bias is a correction limitation to report alongside your predictions rather than a modeling problem to fix.
 
 #### Random slopes
 
@@ -783,4 +783,4 @@ The analytical correction assumes the random effects are Gaussian. In ecological
 
 #### Unmodeled overdispersion
 
-If Pearson dispersion (`sum(resid(model, "pearson")^2) / df.residual(model)`) exceeds $\sim$1.2 in a Poisson model, some residual marginal bias on the response scale is coming from un-modeled overdispersion rather than from the correction itself. Refitting as negative binomial and re-running validation typically resolves it.
+If Pearson dispersion (`sum(resid(model, "pearson")^2) / df.residual(model)`) exceeds ~1.2 in a Poisson model, some residual marginal bias on the response scale is coming from un-modeled overdispersion rather than from the correction itself. Refitting as negative binomial and re-running validation typically resolves it.
