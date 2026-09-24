@@ -1,3 +1,9 @@
+# GLAMMGoF 1.5.2
+
+## New features
+
+* Restructured the vignette
+
 # GLAMMGoF 1.5.1
 
 ## New features
