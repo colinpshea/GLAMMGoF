@@ -116,6 +116,3 @@ Step 2 - If negative RBIAS is detected, re-run with \code{bias_adjust = "manual"
 
 Step 3 (optional) - Re-run with \code{conditional_predictions = TRUE} to assess within-group predictive accuracy using estimated random effects. This measures how well the model interpolates within observed groups rather than generalizing to new ones. The in-sample vs out-of-sample gap now reflects genuine row-level overfitting rather than any marginal vs conditional distinction.
 }
-\references{
-Hyndman, R.J. and Koehler, A.B. (2006) Another look at measures of forecast accuracy. \emph{International Journal of Forecasting}, 22, 679--688.
-}

@@ -1,3 +1,9 @@
+# GLAMMGoF 1.5.3
+
+## New features
+
+* Improved the vignette by conducting a terminology cleanup: standardized terminology on 'conditional-at-zero prediction' throughout (from 'marginal prediction') for consistency with the accompanying paper (Shea 2026).
+
 # GLAMMGoF 1.5.2
 
 ## New features
