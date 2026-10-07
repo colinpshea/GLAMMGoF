@@ -14,7 +14,6 @@ LazyData: true
 Imports:
     dplyr
     ,tidyr
-    ,rms (>= 6.0-0)
     ,DHARMa (>= 0.4.0)
     ,glmmTMB  (>= 1.1.5)
     ,lme4
@@ -26,6 +25,7 @@ Imports:
     ,qgam
     ,rlang
     ,reformulas
+    ,RTMB (< 2.0.0)
     ,nlme
 Depends: 
     ggplot2,

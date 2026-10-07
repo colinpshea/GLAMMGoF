@@ -2,4 +2,5 @@
 #' @importFrom ggplot2 coord_cartesian
 #' @importFrom mgcViz getViz
 #' @importFrom qgam qgam
+#' @importFrom RTMB ADREPORT
 utils::globalVariables(c("simRep", "metric", "Group", "Metric", "value", "mn", "null_value"))

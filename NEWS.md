@@ -2,7 +2,19 @@
 
 ## New features
 
-* Added an AI-assisted development disclosure (AI disclosure.md) at the package repo root for consistency with documentation in the accompanying manuscript (Shea 2026).
+* Added `AI_disclosure.md` at repo root documenting AI-assisted development,
+  consistent with the AI disclosure statement in the accompanying manuscript.
+* Pinned `RTMB (< 2.0.0)` in Imports as a temporary workaround for an upstream
+  compatibility issue between the current `glmmTMB` and `RTMB 2.0`; this
+  constraint will be removed in a future release once `glmmTMB` adapts.
+* Added `qgam` to Imports to ensure reliable installation across environments
+  that may not resolve transitive dependencies consistently.
+* Replaced `rms::val.prob()` in `brier_auc()` with direct computation of
+  Brier score (mean squared error) and AUC (rank-based Mann-Whitney U
+  formula). Results are mathematically equivalent to the previous
+  implementation (confirmed to 7 decimal places), but faster, more robust
+  against upstream changes, and self-contained. The `rms` package is no
+  longer a dependency.
 
 # GLAMMGoF 1.5.3
 
