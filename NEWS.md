@@ -1,3 +1,9 @@
+# GLAMMGoF 1.5.4
+
+## New features
+
+* Added an AI-assisted development disclosure (AI disclosure.md) at the package repo root for consistency with documentation in the accompanying manuscript (Shea 2026).
+
 # GLAMMGoF 1.5.3
 
 ## New features
