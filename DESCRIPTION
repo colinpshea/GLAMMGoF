@@ -23,6 +23,7 @@ Imports:
     ,methods
     ,mgcViz
     ,mgcv
+    ,qgam
     ,rlang
     ,reformulas
     ,nlme
