@@ -1,3 +1,9 @@
+# GLAMMGoF 1.5.5
+
+* Minor changes to `AI_disclosure.md` and version bump to 1.5.5.
+
+## New features
+
 # GLAMMGoF 1.5.4
 
 ## New features

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `GLAMMGoF` R package was developed iteratively with assistance from a generative AI tool (Claude, Anthropic; most recently Claude Opus 4.7, with earlier Claude versions used during earlier stages of development). This document is intended to provide transparency about the nature and extent of AI involvement in the package's development in a manner consistent with the AI disclosure statement in the accompanying manuscript (Shea, 2026). 
+The `GLAMMGoF` R package was developed iteratively with assistance from a generative AI tool (Claude, Anthropic; most recently Claude Opus 4.7, with earlier Claude versions used during earlier stages of development). This document is intended to provide transparency about the nature and extent of AI involvement in the package's development in a manner consistent with the AI disclosure statement in the accompanying manuscript (Shea, XXXX). 
 
 ## Nature of AI assistance
 
@@ -36,19 +36,24 @@ Due to the iterative nature of AI assistance during the development of `GLAMMGoF
 
 The author takes full responsibility for the package's code and functionality, including any errors. Users encountering issues or suggesting improvements should file issues at the package's repository. 
 
-## Citation
-
-If citing this disclosure or discussing the package's development, please reference the companion manuscript: 
-
-**Shea, C.P. (2026). GLAMMGoF: Resampling-based predictive validation for generalized linear and generalized additive models. R package version 1.5.4.**
-**[will add paper citation in the event of formal publication]**
+## Package information
 
 - **Package:** GLAMMGoF
-- **Repository:** https://colinpshea.r-universe.dev/GLAMMGoF
-- **Archived version:** https://doi.org/10.5281/zenodo.22666285
-- **Author:** Colin P. Shea, Florida Fish and Wildlife Conservation Commission / Fish and Wildlife Research Institute (colin.shea@myfwc.com)
+- **Concept DOI:** https://doi.org/10.5281/zenodo.22666285 (resolves to the latest version)
+- **Author:** Colin P. Shea, Florida Fish and Wildlife Conservation Commission / Fish and Wildlife Research Institute
+- **Contact:** colin.shea@myfwc.com
+
+## Citation
+
+If you use GLAMMGoF in published work, please cite:
+
+**Shea, C.P. (XXXX). [Manuscript title]. [Journal], [volume/pages/DOI].**
+
+The package can be cited using its Zenodo concept DOI:
+
+**Shea, C.P. (XXXX). GLAMMGoF: Resampling-based predictive validation for generalized linear and generalized additive models. R package version X.X.X. Zenodo. https://doi.org/10.5281/zenodo.22666285**
 
 ## Document version
 
-- **Version:** 1.0
-- **Last updated:** October 7, 2026
+- **Version:** 2.0
+- **Last updated:** October 8, 2026
